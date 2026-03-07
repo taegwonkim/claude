@@ -1,0 +1,172 @@
+#MicroXplorer Configuration settings - do not modify
+#Sat Mar 07 00:00:00 UTC 2026
+
+# -----------------------------------------------------------------------
+# 이 .ioc 파일은 STM32CubeMX에서 직접 열어 사용하십시오.
+# File → Open Project → 이 파일 선택
+# -----------------------------------------------------------------------
+
+File.Version=6
+ProjectManager.LibraryCopySrc=1
+ProjectManager.ProjectBuildStruct=
+ProjectManager.ProjectFileName=STM32H5_SD_GPDMA.ioc
+ProjectManager.ProjectName=STM32H5_SD_GPDMA
+ProjectManager.ToolChain=STM32CubeIDE
+ProjectManager.LibraryCopyMode=0
+
+# MCU 선택
+Mcu.CPN=STM32H563ZITx
+Mcu.Family=STM32H5
+Mcu.IP0=GPDMA1
+Mcu.IP1=GPDMA2
+Mcu.IP2=NVIC
+Mcu.IP3=RCC
+Mcu.IP4=SDMMC1
+Mcu.IP5=SYS
+Mcu.IP6=USART1
+Mcu.IPNb=7
+Mcu.Name=STM32H563Z(G-I)Tx
+Mcu.Package=LQFP144
+Mcu.Pin0=PC8
+Mcu.Pin1=PC9
+Mcu.Pin2=PC10
+Mcu.Pin3=PC11
+Mcu.Pin4=PC12
+Mcu.Pin5=PD2
+Mcu.Pin6=PA9
+Mcu.Pin7=PA10
+Mcu.Pin8=PG2
+Mcu.Pin9=PB0
+Mcu.PinsNb=10
+Mcu.ThirdPartyNb=0
+Mcu.UserConstants=
+Mcu.UserName=STM32H563ZITx
+
+# RCC 설정
+RCC.AHBFreq_Value=250000000
+RCC.APB1Freq_Value=125000000
+RCC.APB2Freq_Value=125000000
+RCC.APB3Freq_Value=125000000
+RCC.CortexFreq_Value=250000000
+RCC.FCLKCortexFreq_Value=250000000
+RCC.FamilyName=M
+RCC.HCLKFreq_Value=250000000
+RCC.HSEFreq_Value=24000000
+RCC.HSE_VALUE=24000000
+RCC.IPParameters=AHBFreq_Value,APB1Freq_Value,APB2Freq_Value,APB3Freq_Value,CortexFreq_Value,FCLKCortexFreq_Value,FamilyName,HCLKFreq_Value,HSEFreq_Value,HSE_VALUE,PLLFreq_Value,PLLM,PLLN,PLLP,PLLQ,PLLQLCKFreq_Value,PLLR,PLLSource,SYSCLKSource,SYSCLKFreq_VALUE,TimSysFreq_Value,VCOFreq_Value
+RCC.PLLFreq_Value=250000000
+RCC.PLLM=4
+RCC.PLLN=125
+RCC.PLLP=3
+RCC.PLLQ=6
+RCC.PLLQLCKFreq_Value=125000000
+RCC.PLLR=2
+RCC.PLLSource=RCC_PLLSOURCE_HSE
+RCC.SYSCLKSource=RCC_SYSCLKSOURCE_PLLCLK
+RCC.SYSCLKFreq_VALUE=250000000
+RCC.TimSysFreq_Value=125000000
+RCC.VCOFreq_Value=750000000
+
+# SDMMC1 설정
+SDMMC1.BusWide=SDMMC_BUS_WIDE_4B
+SDMMC1.ClockDiv=2
+SDMMC1.ClockEdge=SDMMC_CLOCK_EDGE_RISING
+SDMMC1.ClockPowerSave=SDMMC_CLOCK_POWER_SAVE_DISABLE
+SDMMC1.HardwareFlowControl=SDMMC_HARDWARE_FLOW_CONTROL_DISABLE
+SDMMC1.IPParameters=BusWide,ClockDiv,ClockEdge,ClockPowerSave,HardwareFlowControl
+SDMMC1.PeriphClkSelection=RCC_PERIPHCLK_SDMMC1
+SDMMC1.Sdmmc1ClockSelection=RCC_SDMMC1CLKSOURCE_PLL1Q
+
+# GPDMA1 — SDMMC1 DMA 채널
+GPDMA1.GPDMA1_Channel0.0.BlkHWRequest=DMA_BREQ_SINGLE_BURST
+GPDMA1.GPDMA1_Channel0.0.DestBurstLength=4
+GPDMA1.GPDMA1_Channel0.0.DestDataWidth=DMA_DEST_DATAWIDTH_WORD
+GPDMA1.GPDMA1_Channel0.0.DestInc=DMA_DINC_INCREMENTED
+GPDMA1.GPDMA1_Channel0.0.Direction=DMA_PERIPH_TO_MEMORY
+GPDMA1.GPDMA1_Channel0.0.Mode=DMA_NORMAL
+GPDMA1.GPDMA1_Channel0.0.Priority=DMA_HIGH_PRIORITY
+GPDMA1.GPDMA1_Channel0.0.Request=GPDMA1_REQUEST_SDMMC1
+GPDMA1.GPDMA1_Channel0.0.SrcBurstLength=4
+GPDMA1.GPDMA1_Channel0.0.SrcDataWidth=DMA_SRC_DATAWIDTH_WORD
+GPDMA1.GPDMA1_Channel0.0.SrcInc=DMA_SINC_FIXED
+GPDMA1.GPDMA1_Channel0.0.TransferEventMode=DMA_TCEM_BLOCK_TRANSFER
+
+GPDMA1.GPDMA1_Channel1.0.BlkHWRequest=DMA_BREQ_SINGLE_BURST
+GPDMA1.GPDMA1_Channel1.0.DestBurstLength=4
+GPDMA1.GPDMA1_Channel1.0.DestDataWidth=DMA_DEST_DATAWIDTH_WORD
+GPDMA1.GPDMA1_Channel1.0.DestInc=DMA_DINC_FIXED
+GPDMA1.GPDMA1_Channel1.0.Direction=DMA_MEMORY_TO_PERIPH
+GPDMA1.GPDMA1_Channel1.0.Mode=DMA_NORMAL
+GPDMA1.GPDMA1_Channel1.0.Priority=DMA_HIGH_PRIORITY
+GPDMA1.GPDMA1_Channel1.0.Request=GPDMA1_REQUEST_SDMMC1
+GPDMA1.GPDMA1_Channel1.0.SrcBurstLength=4
+GPDMA1.GPDMA1_Channel1.0.SrcDataWidth=DMA_SRC_DATAWIDTH_WORD
+GPDMA1.GPDMA1_Channel1.0.SrcInc=DMA_SINC_INCREMENTED
+GPDMA1.GPDMA1_Channel1.0.TransferEventMode=DMA_TCEM_BLOCK_TRANSFER
+
+# GPDMA2 — USART1 TX
+GPDMA2.GPDMA2_Channel0.0.Direction=DMA_MEMORY_TO_PERIPH
+GPDMA2.GPDMA2_Channel0.0.DestDataWidth=DMA_DEST_DATAWIDTH_BYTE
+GPDMA2.GPDMA2_Channel0.0.DestInc=DMA_DINC_FIXED
+GPDMA2.GPDMA2_Channel0.0.Mode=DMA_NORMAL
+GPDMA2.GPDMA2_Channel0.0.Priority=DMA_LOW_PRIORITY
+GPDMA2.GPDMA2_Channel0.0.Request=GPDMA2_REQUEST_USART1_TX
+GPDMA2.GPDMA2_Channel0.0.SrcDataWidth=DMA_SRC_DATAWIDTH_BYTE
+GPDMA2.GPDMA2_Channel0.0.SrcInc=DMA_SINC_INCREMENTED
+
+# USART1 설정
+USART1.BaudRate=115200
+USART1.IPParameters=BaudRate,Mode,Parity,StopBits,WordLength
+USART1.Mode=UART_MODE_TX_RX
+USART1.Parity=UART_PARITY_NONE
+USART1.StopBits=UART_STOPBITS_1
+USART1.WordLength=UART_WORDLENGTH_8B
+
+# NVIC 우선순위
+NVIC.GPDMA1_Channel0_IRQn=5\:0\:1\:0\:0\:0\:0\:0\:0
+NVIC.GPDMA1_Channel1_IRQn=5\:0\:1\:0\:0\:0\:0\:0\:0
+NVIC.GPDMA2_Channel0_IRQn=6\:0\:1\:0\:0\:0\:0\:0\:0
+NVIC.SDMMC1_IRQn=5\:0\:1\:0\:0\:0\:0\:0\:0
+NVIC.USART1_IRQn=6\:0\:1\:0\:0\:0\:0\:0\:0
+NVIC.SysTick_IRQn=15\:0\:0\:0\:0
+
+# GPIO 핀 설정
+PC8.AF=GPIO_AF12_SDMMC1
+PC8.Mode=Alternate Function Push Pull
+PC8.Signal=SDMMC1_D0
+PC9.AF=GPIO_AF12_SDMMC1
+PC9.Mode=Alternate Function Push Pull
+PC9.Signal=SDMMC1_D1
+PC10.AF=GPIO_AF12_SDMMC1
+PC10.Mode=Alternate Function Push Pull
+PC10.Signal=SDMMC1_D2
+PC11.AF=GPIO_AF12_SDMMC1
+PC11.Mode=Alternate Function Push Pull
+PC11.Signal=SDMMC1_D3
+PC12.AF=GPIO_AF12_SDMMC1
+PC12.Mode=Alternate Function Push Pull
+PC12.Signal=SDMMC1_CK
+PD2.AF=GPIO_AF12_SDMMC1
+PD2.Mode=Alternate Function Push Pull
+PD2.Signal=SDMMC1_CMD
+PA9.AF=GPIO_AF7_USART1
+PA9.Mode=Alternate Function Push Pull
+PA9.Signal=USART1_TX
+PA10.AF=GPIO_AF7_USART1
+PA10.Mode=Alternate Function Push Pull
+PA10.Signal=USART1_RX
+PG2.GPIO_Label=SD_DETECT
+PG2.GPIO_ModeDefaultOutputPP=GPIO_MODE_INPUT
+PG2.GPIO_PuPdOuSDMMC=GPIO_PULLUP
+PG2.Signal=GPIO_Input
+PB0.GPIO_Label=LD1_LED
+PB0.GPIO_ModeDefaultOutputPP=GPIO_MODE_OUTPUT_PP
+PB0.Signal=GPIO_Output
+
+# FatFS 미들웨어
+MiddleWare.FatFS.Version=R0.15
+FatFS.IPParameters=_FS_REENTRANT,_USE_LFN,_MAX_SS,_MIN_SS
+FatFS._FS_REENTRANT=0
+FatFS._USE_LFN=1
+FatFS._MAX_SS=512
+FatFS._MIN_SS=512
