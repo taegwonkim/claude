@@ -1,0 +1,75 @@
+#MicroXplorer Configuration settings - do not modify
+#Sat Mar 28 00:00:00 UTC 2026
+File.Version=6
+LibraryCopySrc=1
+ProjectManager.ProjectBaudRate=115200
+ProjectManager.ProjectFileName=STM32L5_VoltageControl.ioc
+ProjectManager.ProjectName=STM32L5_VoltageControl
+ProjectManager.TargetToolchain=STM32CubeIDE
+ProjectManager.LibraryCopySrc=1
+ProjectManager.ProjectType=STM32Cube
+
+Mcu.Family=STM32L5
+Mcu.Name=STM32L552ZETxQ
+Mcu.Package=LQFP144
+Mcu.Pin0=PA0-PA3 (TIM2_CH1-4, PWM출력)
+Mcu.Pin1=PA5 (SPI1_SCK)
+Mcu.Pin2=PA6 (SPI1_MISO)
+Mcu.Pin3=PA7 (SPI1_MOSI)
+Mcu.Pin4=PA9 (USART1_TX)
+Mcu.Pin5=PA10 (USART1_RX)
+Mcu.Pin6=PB6 (MCP3465R_CS, GPIO_OUT)
+Mcu.Pin7=PB7 (MCP3465R_IRQ, GPIO_IN, EXTI)
+Mcu.Pin8=PC7 (LED_STATUS, GPIO_OUT)
+
+RCC.HSIState=1
+RCC.PLLState=1
+RCC.PLLSource=RCC_PLLSOURCE_HSI
+RCC.PLLM=1
+RCC.PLLN=10
+RCC.PLLP=RCC_PLLP_DIV7
+RCC.PLLQ=RCC_PLLQ_DIV2
+RCC.PLLR=RCC_PLLR_DIV2
+RCC.SYSCLKSource=RCC_SYSCLKSOURCE_PLLCLK
+RCC.AHBCLKDivider=RCC_SYSCLK_DIV1
+RCC.APB1CLKDivider=RCC_HCLK_DIV1
+RCC.APB2CLKDivider=RCC_HCLK_DIV1
+
+USART1.IPParameters=BaudRate,WordLength,Parity,StopBits,Mode,OverSampling
+USART1.BaudRate=115200
+USART1.WordLength=UART_WORDLENGTH_8B
+USART1.Parity=UART_PARITY_NONE
+USART1.StopBits=UART_STOPBITS_1
+USART1.Mode=UART_MODE_TX_RX
+USART1.OverSampling=UART_OVERSAMPLING_16
+
+SPI1.IPParameters=Mode,Direction,DataSize,CLKPolarity,CLKPhase,NSS,BaudRatePrescaler,FirstBit
+SPI1.Mode=SPI_MODE_MASTER
+SPI1.Direction=SPI_DIRECTION_2LINES
+SPI1.DataSize=SPI_DATASIZE_8BIT
+SPI1.CLKPolarity=SPI_POLARITY_LOW
+SPI1.CLKPhase=SPI_PHASE_1EDGE
+SPI1.NSS=SPI_NSS_SOFT
+SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_8
+SPI1.FirstBit=SPI_FIRSTBIT_MSB
+
+TIM2.IPParameters=Prescaler,Period,AutoReloadPreload,CH1,CH2,CH3,CH4
+TIM2.Prescaler=0
+TIM2.Period=4095
+TIM2.AutoReloadPreload=TIM_AUTORELOAD_PRELOAD_ENABLE
+TIM2.CH1=TIM_CHANNEL_1
+TIM2.CH2=TIM_CHANNEL_2
+TIM2.CH3=TIM_CHANNEL_3
+TIM2.CH4=TIM_CHANNEL_4
+
+FREERTOS.IPParameters=Tasks01,Queues01,Semaphores01,Mutexes01,configTOTAL_HEAP_SIZE,configUSE_TIMERS
+FREERTOS.Tasks01=UartRxTask,3,512,vUartRxTask,Default,NULL;UartTxTask,2,512,vUartTxTask,Default,NULL;AdcReadTask,4,512,vAdcReadTask,Default,NULL;VoltageControlTask,5,512,vVoltageControlTask,Default,NULL;CurrentMonitorTask,4,256,vCurrentMonitorTask,Default,NULL
+FREERTOS.Queues01=xCmdQueue,10,sizeof(CmdQueueItem_t);xRespQueue,20,sizeof(RespQueueItem_t);xAdcResultQueue,8,sizeof(MCP3465R_Result_t)
+FREERTOS.Semaphores01=xAdcDataReady,Binary;xUartRxReady,Binary
+FREERTOS.Mutexes01=xSpiMutex,Recursive;xUartTxMutex,Normal
+FREERTOS.configTOTAL_HEAP_SIZE=20480
+FREERTOS.configUSE_TIMERS=1
+FREERTOS.configTIMER_TASK_PRIORITY=5
+FREERTOS.configCHECK_FOR_STACK_OVERFLOW=2
+FREERTOS.configUSE_MALLOC_FAILED_HOOK=1
+FREERTOS.Interface=CMSIS_V2
