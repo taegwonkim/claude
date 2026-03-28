@@ -18,6 +18,7 @@
 #include "queue.h"
 #include "semphr.h"
 #include "timers.h"
+#include "stream_buffer.h"
 
 /* ======================================================================== */
 /*  주변장치 핸들 (main.c에서 정의, 다른 파일에서 extern으로 참조)           */
@@ -34,6 +35,7 @@ extern UART_HandleTypeDef huart3;   /**< UART3 디버그 출력 */
 
 extern SemaphoreHandle_t  xADCDoneSem;  /**< ADC DMA 완료 신호 세마포어 */
 extern SemaphoreHandle_t  xCtrlMutex;   /**< 채널 구조체 보호 뮤텍스 */
+extern StreamBufferHandle_t xUARTRxStream; /**< UART RX ISR → vUARTRxTask 스트림 버퍼 */
 
 /* ======================================================================== */
 /*  태스크 우선순위                                                            */
@@ -41,6 +43,7 @@ extern SemaphoreHandle_t  xCtrlMutex;   /**< 채널 구조체 보호 뮤텍스 *
 
 #define TASK_PRIO_ADC       (configMAX_PRIORITIES - 1)  /**< ADC: 최고 우선순위 */
 #define TASK_PRIO_CONTROL   (configMAX_PRIORITIES - 2)  /**< PID 제어 */
+#define TASK_PRIO_UART_RX   (configMAX_PRIORITIES - 3)  /**< UART RX 명령 처리 */
 #define TASK_PRIO_MONITOR   (tskIDLE_PRIORITY + 1)      /**< UART 모니터 */
 
 /* ======================================================================== */
@@ -49,7 +52,15 @@ extern SemaphoreHandle_t  xCtrlMutex;   /**< 채널 구조체 보호 뮤텍스 *
 
 #define STACK_ADC           256U
 #define STACK_CONTROL       512U
+#define STACK_UART_RX       512U
 #define STACK_MONITOR       512U
+
+/* ======================================================================== */
+/*  UART RX DMA 버퍼 크기                                                    */
+/* ======================================================================== */
+
+#define UART_RX_DMA_SIZE    128U   /**< DMA 원형 수신 버퍼 크기 */
+#define UART_RX_STREAM_SIZE 256U   /**< StreamBuffer 크기 */
 
 /* ======================================================================== */
 /*  오류 핸들러                                                               */

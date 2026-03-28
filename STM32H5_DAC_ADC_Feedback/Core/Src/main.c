@@ -26,6 +26,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
+#include "stream_buffer.h"
 
 /* ======================================================================== */
 /*  전역 주변장치 핸들                                                        */
@@ -40,12 +41,21 @@ UART_HandleTypeDef huart3;
 /*  FreeRTOS 공유 객체                                                        */
 /* ======================================================================== */
 
-SemaphoreHandle_t xADCDoneSem;
-SemaphoreHandle_t xCtrlMutex;
+SemaphoreHandle_t   xADCDoneSem;
+SemaphoreHandle_t   xCtrlMutex;
+StreamBufferHandle_t xUARTRxStream;
 
 /* ADC DMA 버퍼 (4채널, 캐시 정렬을 위해 32바이트 정렬) */
 __attribute__((aligned(32)))
 static uint16_t s_adc_buf[4];
+
+/*
+ * UART RX DMA 원형 버퍼
+ * HAL_UARTEx_ReceiveToIdle_DMA()가 idle-line 검출 시마다
+ * HAL_UARTEx_RxEventCallback()을 호출하여 수신 크기를 알려준다.
+ */
+__attribute__((aligned(4)))
+uint8_t s_uart_rx_dma[UART_RX_DMA_SIZE];  /* extern 참조를 위해 static 제거 */
 
 /* ======================================================================== */
 /*  FreeRTOS 태스크 선언 (freertos_tasks.c)                                  */
@@ -53,6 +63,7 @@ static uint16_t s_adc_buf[4];
 
 extern void vADCTask(void *pvParameters);
 extern void vControlTask(void *pvParameters);
+extern void vUARTRxTask(void *pvParameters);
 extern void vMonitorTask(void *pvParameters);
 
 /* ======================================================================== */
@@ -91,11 +102,20 @@ int main(void)
     VCtrl_Init();
 
     /* ---- FreeRTOS 공유 객체 생성 ---- */
-    xADCDoneSem = xSemaphoreCreateBinary();
-    xCtrlMutex  = xSemaphoreCreateMutex();
-    if (xADCDoneSem == NULL || xCtrlMutex == NULL) {
+    xADCDoneSem  = xSemaphoreCreateBinary();
+    xCtrlMutex   = xSemaphoreCreateMutex();
+    xUARTRxStream = xStreamBufferCreate(UART_RX_STREAM_SIZE, 1U);
+    if (xADCDoneSem == NULL || xCtrlMutex == NULL || xUARTRxStream == NULL) {
         Error_Handler();
     }
+
+    /* ---- UART RX DMA 시작 (idle-line 검출 방식) ---- */
+    if (HAL_UARTEx_ReceiveToIdle_DMA(&huart3, s_uart_rx_dma,
+                                      UART_RX_DMA_SIZE) != HAL_OK) {
+        Error_Handler();
+    }
+    /* DMA half-transfer 인터럽트 비활성화 (idle-line 기반이면 불필요) */
+    __HAL_DMA_DISABLE_IT(huart3.hdmarx, DMA_IT_HT);
 
     /* ---- FreeRTOS 태스크 생성 ---- */
     BaseType_t ret;
@@ -104,6 +124,9 @@ int main(void)
     if (ret != pdPASS) Error_Handler();
 
     ret = xTaskCreate(vControlTask, "CTRL",    STACK_CONTROL, NULL,      TASK_PRIO_CONTROL, NULL);
+    if (ret != pdPASS) Error_Handler();
+
+    ret = xTaskCreate(vUARTRxTask,  "URXCMD",  STACK_UART_RX, NULL,      TASK_PRIO_UART_RX, NULL);
     if (ret != pdPASS) Error_Handler();
 
     ret = xTaskCreate(vMonitorTask, "MON",     STACK_MONITOR, NULL,      TASK_PRIO_MONITOR, NULL);
@@ -179,9 +202,20 @@ static void MX_DMA_Init(void)
     /* STM32H5: GPDMA1 사용 */
     __HAL_RCC_GPDMA1_CLK_ENABLE();
 
-    /* DMA 인터럽트 우선순위 설정 (FreeRTOS 관리 범위 내) */
+    /*
+     * DMA 채널 인터럽트 우선순위 (FreeRTOS 관리 범위 내)
+     *  Channel 0: ADC1 RX
+     *  Channel 1: USART3 RX
+     */
     HAL_NVIC_SetPriority(GPDMA1_Channel0_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY, 0);
     HAL_NVIC_EnableIRQ(GPDMA1_Channel0_IRQn);
+
+    HAL_NVIC_SetPriority(GPDMA1_Channel1_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY, 0);
+    HAL_NVIC_EnableIRQ(GPDMA1_Channel1_IRQn);
+
+    /* USART3 idle-line 인터럽트 활성화 (HAL_UARTEx_ReceiveToIdle_DMA 필요) */
+    HAL_NVIC_SetPriority(USART3_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY, 0);
+    HAL_NVIC_EnableIRQ(USART3_IRQn);
 }
 
 /* ======================================================================== */
@@ -308,6 +342,12 @@ static void MX_TIM3_Init(void)
 /*  USART3 초기화 (PD8=TX, PD9=RX, 115200 baud)                             */
 /* ======================================================================== */
 
+/*
+ * USART3 RX용 DMA 핸들
+ * GPDMA1 Channel 1 을 USART3 RX에 연결한다.
+ */
+static DMA_HandleTypeDef hdma_usart3_rx;
+
 static void MX_USART3_UART_Init(void)
 {
     __HAL_RCC_USART3_CLK_ENABLE();
@@ -321,6 +361,7 @@ static void MX_USART3_UART_Init(void)
     gpio.Alternate = GPIO_AF7_USART3;
     HAL_GPIO_Init(GPIOD, &gpio);
 
+    /* ---- UART 기본 설정 ---- */
     huart3.Instance          = USART3;
     huart3.Init.BaudRate     = 115200;
     huart3.Init.WordLength   = UART_WORDLENGTH_8B;
@@ -330,6 +371,27 @@ static void MX_USART3_UART_Init(void)
     huart3.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
     huart3.Init.OverSampling = UART_OVERSAMPLING_16;
     if (HAL_UART_Init(&huart3) != HAL_OK) Error_Handler();
+
+    /* ---- GPDMA1 Channel 1 → USART3 RX 연결 ---- */
+    hdma_usart3_rx.Instance                 = GPDMA1_Channel1;
+    hdma_usart3_rx.Init.Request             = GPDMA1_REQUEST_USART3_RX;
+    hdma_usart3_rx.Init.BlkHWRequest        = DMA_BREQ_SINGLE_BURST;
+    hdma_usart3_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
+    hdma_usart3_rx.Init.SrcInc             = DMA_SINC_FIXED;
+    hdma_usart3_rx.Init.DestInc            = DMA_DINC_INCREMENTED;
+    hdma_usart3_rx.Init.SrcDataWidth       = DMA_SRC_DATAWIDTH_BYTE;
+    hdma_usart3_rx.Init.DestDataWidth      = DMA_DEST_DATAWIDTH_BYTE;
+    hdma_usart3_rx.Init.Priority           = DMA_LOW_PRIORITY_LOW_WEIGHT;
+    hdma_usart3_rx.Init.SrcBurstLength     = 1;
+    hdma_usart3_rx.Init.DestBurstLength    = 1;
+    hdma_usart3_rx.Init.TransferAllocatedPort = DMA_DEST_ALLOCATED_PORT0 |
+                                                DMA_SRC_ALLOCATED_PORT0;
+    hdma_usart3_rx.Init.TransferEventMode  = DMA_TCEM_BLOCK_TRANSFER;
+    hdma_usart3_rx.Init.Mode               = DMA_NORMAL;
+    if (HAL_DMA_Init(&hdma_usart3_rx) != HAL_OK) Error_Handler();
+
+    /* UART 핸들과 DMA 핸들 연결 */
+    __HAL_LINKDMA(&huart3, hdmarx, hdma_usart3_rx);
 }
 
 /* ======================================================================== */
@@ -342,6 +404,33 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(xADCDoneSem, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+/* ======================================================================== */
+/*  HAL UART RX 이벤트 콜백                                                  */
+/*                                                                            */
+/*  HAL_UARTEx_ReceiveToIdle_DMA() 사용 시:                                  */
+/*    - IDLE line 감지: 수신 데이터 전부 콜백                                 */
+/*    - DMA half/full:  일반적으로 IDLE보다 먼저 발생하지 않으므로 무시       */
+/* ======================================================================== */
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+    if (huart->Instance != USART3) return;
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    /* 수신된 바이트들을 StreamBuffer로 전송 (ISR 안전) */
+    xStreamBufferSendFromISR(xUARTRxStream,
+                             (const void *)s_uart_rx_dma,
+                             (size_t)Size,
+                             &xHigherPriorityTaskWoken);
+
+    /* 다음 수신 재시작 */
+    HAL_UARTEx_ReceiveToIdle_DMA(huart, s_uart_rx_dma, UART_RX_DMA_SIZE);
+    __HAL_DMA_DISABLE_IT(huart->hdmarx, DMA_IT_HT);
+
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 

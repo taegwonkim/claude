@@ -172,3 +172,13 @@ void VCtrl_SetEnabled(uint8_t ch_idx, bool enable)
     if (ch_idx >= VCTRL_NUM_CHANNELS) return;
     PID_SetEnabled(&s_ctrl.ch[ch_idx].pid, enable);
 }
+
+void VCtrl_SetPID(uint8_t ch_idx, float Kp, float Ki, float Kd)
+{
+    if (ch_idx >= VCTRL_NUM_CHANNELS) return;
+    PID_t *pid = &s_ctrl.ch[ch_idx].pid;
+    pid->Kp = Kp;
+    pid->Ki = Ki;
+    pid->Kd = Kd;
+    PID_Reset(pid);  /* 이득 변경 시 과도응답 방지를 위해 적분 초기화 */
+}

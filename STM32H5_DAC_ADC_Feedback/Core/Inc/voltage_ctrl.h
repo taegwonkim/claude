@@ -119,4 +119,13 @@ void VCtrl_GetChannelInfo(uint8_t ch_idx, VCtrl_Channel_t *out_ch);
  */
 void VCtrl_SetEnabled(uint8_t ch_idx, bool enable);
 
+/**
+ * @brief  런타임에 PID 이득을 변경하고 적분 항을 초기화한다.
+ * @param  ch_idx  채널 인덱스
+ * @param  Kp      새로운 비례 이득
+ * @param  Ki      새로운 적분 이득
+ * @param  Kd      새로운 미분 이득
+ */
+void VCtrl_SetPID(uint8_t ch_idx, float Kp, float Ki, float Kd);
+
 #endif /* VOLTAGE_CTRL_H */
