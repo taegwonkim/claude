@@ -55,6 +55,15 @@ APB2    = 80 MHz (APB2 Prescaler = 1)
 | PA2 | TIM2_CH3  | CH3  | 0~3.3V (RC 필터 후)       |
 | PA3 | TIM2_CH4  | CH4  | 0~3.3V (RC 필터 후)       |
 
+### FDCAN1 (CAN 버스 통신) ★ 추가
+| 핀  | 기능         | 설명                          |
+|-----|-------------|-------------------------------|
+| PB8 | FDCAN1_RX   | CAN RX (AF9)                  |
+| PB9 | FDCAN1_TX   | CAN TX (AF9)                  |
+
+> **외부 CAN 트랜시버 필요**: SN65HVD230 (3.3V) 또는 TJA1051T
+> PC 연결: USB-CAN 어댑터 (PEAK PCAN-USB, Kvaser Leaf, SLCAN 등)
+
 ### 상태 LED
 | 핀  | 기능      | 설명           |
 |-----|-----------|----------------|
@@ -119,7 +128,48 @@ PWM Generation:
 NVIC: TIM2 global interrupt: Disabled (필요시 Enable)
 ```
 
-### 4.4 ADC1 설정 (내부 온도/기준전압 모니터링용, 선택사항)
+### 4.4 FDCAN1 설정 ★ 추가
+```
+Mode: Enabled
+
+Frame Format: FD with Bit Rate Switching (BRS)
+  → Classic CAN 8바이트와 FDCAN 최대 64바이트 모두 지원
+
+Auto Retransmission: Enabled   (송신 실패 시 자동 재시도)
+Protocol Exception: Enabled
+
+Nominal Bit Timing (500 kbps - Classic CAN 호환):
+  Prescaler     : 10    (80MHz / 10 = 8MHz)
+  Sync Jump Width: 4
+  Time Seg 1    : 11    (Propagation + Phase1)
+  Time Seg 2    : 4     (Phase2)
+  → 비트레이트 = 8MHz / (1+11+4) = 500 kbps ✓
+  → 샘플 포인트 = (1+11)/16 × 100 = 75%
+
+Data Bit Timing (2 Mbps - FDCAN BRS 전용):
+  Prescaler     : 2     (80MHz / 2 = 40MHz)
+  Sync Jump Width: 4
+  Time Seg 1    : 14
+  Time Seg 2    : 5
+  → 데이터 비트레이트 = 40MHz / (1+14+5) = 2 Mbps ✓
+
+Message RAM:
+  Std Filter Elements : 4
+  Rx FIFO0 Elements   : 8    (수신 큐 버퍼)
+  Rx FIFO0 Elem Size  : 8 Bytes
+  Tx Buffer Elements  : 3    (Dedicated TX 버퍼)
+  Tx Elem Size        : 8 Bytes
+
+NVIC:
+  FDCAN1_IT0 interrupt: Enabled  ← Priority 6  (RX FIFO0)
+  FDCAN1_IT1 interrupt: Enabled  ← Priority 6  (TX/Error, 선택)
+
+FDCAN 클럭 소스 (RCC → Peripherals Clock):
+  FDCAN Clock Mux: PCLK1 (80MHz) 선택
+  ※ CubeMX Clock Configuration 탭에서 "FDCAN" 클럭 소스를 PCLK1으로 설정
+```
+
+### 4.5 ADC1 설정 (내부 온도/기준전압 모니터링용, 선택사항)
 ```
 Mode:
   IN0 (PA0): 미사용 (PWM 핀과 중복 불가)
@@ -195,28 +245,31 @@ configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY: 5
 
 #### Tasks (태스크 생성)
 
-| Task Name           | Priority | Stack Size | Entry Function        | 설명                    |
-|--------------------|----------|------------|----------------------|-------------------------|
-| UartRxTask          | osPriorityNormal (3)    | 512  | vUartRxTask          | UART 수신/명령 파싱       |
-| UartTxTask          | osPriorityBelowNormal(2)| 512  | vUartTxTask          | UART 송신                |
-| AdcReadTask         | osPriorityAboveNormal(4)| 512  | vAdcReadTask         | MCP3465R 읽기            |
-| VoltageControlTask  | osPriorityHigh (5)      | 512  | vVoltageControlTask  | PWM 피드백 제어           |
-| CurrentMonitorTask  | osPriorityAboveNormal(4)| 256  | vCurrentMonitorTask  | 단락/단선 감지            |
+| Task Name           | Priority | Stack Size | Entry Function        | 설명                          |
+|--------------------|----------|------------|----------------------|-------------------------------|
+| UartRxTask          | osPriorityNormal (3)    | 512  | vUartRxTask          | UART 수신/명령 파싱            |
+| UartTxTask          | osPriorityBelowNormal(2)| 512  | vUartTxTask          | UART 송신                     |
+| AdcReadTask         | osPriorityAboveNormal(4)| 512  | vAdcReadTask         | MCP3465R 읽기                 |
+| VoltageControlTask  | osPriorityHigh (5)      | 512  | vVoltageControlTask  | PWM 피드백 제어                |
+| CurrentMonitorTask  | osPriorityAboveNormal(4)| 256  | vCurrentMonitorTask  | 단락/단선 감지                 |
+| **FdcanTask**       | **osPriorityNormal (3)**| **512**| **vFdcanTask**   | **FDCAN TX 주기전송 + RX처리** |
 
 #### Queues (큐 생성)
 
 | Queue Name       | Queue Length | Item Size | 설명                      |
 |-----------------|-------------|-----------|---------------------------|
-| xCmdQueue        | 10           | 32 bytes  | PC→펌웨어 명령 큐          |
-| xRespQueue       | 10           | 64 bytes  | 펌웨어→PC 응답 큐           |
-| xAdcResultQueue  | 8            | 32 bytes  | ADC 측정결과 큐             |
+| xCmdQueue        | 10           | 32 bytes  | PC→펌웨어 명령 큐 (UART/FDCAN 공용) |
+| xRespQueue       | 10           | 64 bytes  | 펌웨어→PC 응답 큐 (UART TX)         |
+| xAdcResultQueue  | 8            | 32 bytes  | ADC 측정결과 큐                      |
+| **xFdcanRxQueue**| **8**        | **12 bytes** | **FDCAN RX FIFO → FdcanTask**    |
 
 #### Mutexes (뮤텍스 생성)
 
-| Mutex Name    | 설명                        |
-|--------------|-----------------------------|
-| xSpiMutex    | SPI 버스 접근 보호            |
-| xUartTxMutex | UART TX 접근 보호             |
+| Mutex Name       | 설명                          |
+|-----------------|-------------------------------|
+| xSpiMutex       | SPI 버스 접근 보호              |
+| xUartTxMutex    | UART TX 접근 보호               |
+| **xFdcanTxMutex**| **FDCAN TX 버퍼 접근 보호**    |
 
 #### Semaphores (이진 세마포어)
 
@@ -240,12 +293,14 @@ vTaskList: Enabled  (태스크 목록 출력)
 
 | 인터럽트             | Priority | Sub-Priority | FreeRTOS API |
 |--------------------|----------|-------------|--------------|
-| SysTick (FreeRTOS) | 15       | 0           | 내부 사용     |
-| USART1 global      | 6        | 0           | 사용 가능     |
-| DMA1 Channel1      | 6        | 0           | 사용 가능     |
-| DMA1 Channel2      | 6        | 0           | 사용 가능     |
-| SPI1 global        | 6        | 0           | 사용 가능     |
-| EXTI9_5 (IRQ핀)    | 5        | 0           | 사용 가능     |
+| SysTick (FreeRTOS) | 15       | 0           | 내부 사용                      |
+| USART1 global      | 6        | 0           | 사용 가능                      |
+| DMA1 Channel1      | 6        | 0           | 사용 가능                      |
+| DMA1 Channel2      | 6        | 0           | 사용 가능                      |
+| SPI1 global        | 6        | 0           | 사용 가능                      |
+| EXTI9_5 (IRQ핀)    | 6        | 0           | 사용 가능                      |
+| **FDCAN1_IT0**     | **6**    | **0**       | **사용 가능 (RX FIFO0 수신)**  |
+| **FDCAN1_IT1**     | **6**    | **0**       | **사용 가능 (TX/에러)**        |
 | TIM2 global        | 7        | 0           | 사용 가능     |
 
 > **중요**: STM32L5 Cortex-M33은 4비트 우선순위 → 0(최고)~15(최저)

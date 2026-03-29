@@ -3,6 +3,7 @@
  * =========================================================*/
 #include "current_monitor.h"
 #include "uart_protocol.h"
+#include "fdcan_protocol.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -110,8 +111,11 @@ void CurrMon_HandleFault(CurrentMonitor_t *hmon,
     hmon->ch[ch].fault = fault;
     hmon->fault_events++;
 
-    /* PC에 폴트 이벤트 전송 */
+    /* PC에 폴트 이벤트 전송 (UART) */
     Proto_SendEvent("FAULT", event_msg);
+
+    /* FDCAN으로 폴트 이벤트 동시 전송 */
+    FdcanProto_SendFaultEvent(ch, fault, hmon->ch[ch].avg_current_ma);
 }
 
 /* =========================================================

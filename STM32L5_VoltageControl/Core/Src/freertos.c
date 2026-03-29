@@ -10,6 +10,7 @@
  *   AdcReadTask      (Priority 4) - MCP3465R SPI 읽기
  *   VoltageControlTask(Priority 5) - PI 피드백 제어 루프
  *   CurrentMonitorTask(Priority 4) - 전류 감시 + 폴트 처리
+ *   FdcanTask        (Priority 3) - FDCAN TX 주기 전송 + RX 명령 처리
  * =========================================================*/
 
 /* USER CODE BEGIN Includes */
@@ -25,6 +26,7 @@
 #include "voltage_control.h"
 #include "uart_protocol.h"
 #include "current_monitor.h"
+#include "fdcan_protocol.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -40,6 +42,7 @@ osThreadId_t UartTxTaskHandle;
 osThreadId_t AdcReadTaskHandle;
 osThreadId_t VoltageControlTaskHandle;
 osThreadId_t CurrentMonitorTaskHandle;
+osThreadId_t FdcanTaskHandle;
 
 /* 태스크 속성 */
 const osThreadAttr_t UartRxTask_attributes = {
@@ -66,6 +69,11 @@ const osThreadAttr_t CurrMonTask_attributes = {
     .name       = "CurrMonTask",
     .stack_size = 256 * 4,   /* 256 words = 1024 bytes */
     .priority   = (osPriority_t) osPriorityAboveNormal,
+};
+const osThreadAttr_t FdcanTask_attributes = {
+    .name       = "FdcanTask",
+    .stack_size = 512 * 4,   /* 512 words = 2048 bytes */
+    .priority   = (osPriority_t) osPriorityNormal,
 };
 
 /* 메시지 큐 핸들 */
@@ -153,6 +161,8 @@ void MX_FREERTOS_Init(void)
                                             &VoltCtrlTask_attributes);
     CurrentMonitorTaskHandle = osThreadNew(vCurrentMonitorTask, NULL,
                                             &CurrMonTask_attributes);
+    FdcanTaskHandle = osThreadNew(vFdcanTask, NULL,
+                                   &FdcanTask_attributes);
 }
 
 /* =========================================================

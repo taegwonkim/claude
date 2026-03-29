@@ -13,11 +13,12 @@
 /* USER CODE END Includes */
 
 /* ----- HAL 핸들 (CubeMX 생성) ----- */
-SPI_HandleTypeDef  hspi1;
-TIM_HandleTypeDef  htim2;
-UART_HandleTypeDef huart1;
-DMA_HandleTypeDef  hdma_usart1_rx;
-DMA_HandleTypeDef  hdma_usart1_tx;
+SPI_HandleTypeDef   hspi1;
+TIM_HandleTypeDef   htim2;
+UART_HandleTypeDef  huart1;
+FDCAN_HandleTypeDef hfdcan1;   /* FDCAN 핸들 추가 */
+DMA_HandleTypeDef   hdma_usart1_rx;
+DMA_HandleTypeDef   hdma_usart1_tx;
 
 /* ----- 함수 선언 ----- */
 void SystemClock_Config(void);
@@ -26,6 +27,8 @@ static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
+/* FDCAN 초기화는 FdcanProto_Init()에서 수행
+ * (fdcan_protocol.c 내 HAL_FDCAN_MspInit 콜백 포함) */
 
 /* FreeRTOS 초기화 (freertos.c에서 구현) */
 extern void MX_FREERTOS_Init(void);

@@ -13,11 +13,12 @@ extern "C" {
 #include "stm32l5xx_hal.h"
 
 /* HAL 핸들 선언 (main.c에서 정의) */
-extern SPI_HandleTypeDef  hspi1;
-extern TIM_HandleTypeDef  htim2;
-extern UART_HandleTypeDef huart1;
-extern DMA_HandleTypeDef  hdma_usart1_rx;
-extern DMA_HandleTypeDef  hdma_usart1_tx;
+extern SPI_HandleTypeDef   hspi1;
+extern TIM_HandleTypeDef   htim2;
+extern UART_HandleTypeDef  huart1;
+extern FDCAN_HandleTypeDef hfdcan1;
+extern DMA_HandleTypeDef   hdma_usart1_rx;
+extern DMA_HandleTypeDef   hdma_usart1_tx;
 
 /* 에러 핸들러 */
 void Error_Handler(void);
@@ -56,6 +57,12 @@ void Error_Handler(void);
 /* LED 핀 */
 #define LED_STATUS_Pin      GPIO_PIN_7
 #define LED_STATUS_GPIO_Port GPIOC
+
+/* FDCAN 핀 */
+#define FDCAN_RX_Pin        GPIO_PIN_8
+#define FDCAN_RX_GPIO_Port  GPIOB
+#define FDCAN_TX_Pin        GPIO_PIN_9
+#define FDCAN_TX_GPIO_Port  GPIOB
 
 #ifdef __cplusplus
 }
