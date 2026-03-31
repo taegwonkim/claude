@@ -23,12 +23,12 @@
 ### 2.2 Clock Configuration
 - **PLL Source**: HSE (8 MHz)
 - **PLLM**: /1
-- **PLLN**: x27 (216 MHz VCO)
-- **PLLR**: /2 -> **SYSCLK = 110 MHz**
-- **PLLQ**: /4 -> 54 MHz (for FDCAN)
-- **AHB Prescaler**: /1 -> HCLK = 110 MHz
-- **APB1 Prescaler**: /1 -> APB1 = 110 MHz
-- **APB2 Prescaler**: /1 -> APB2 = 110 MHz
+- **PLLN**: x25 (200 MHz VCO)
+- **PLLR**: /2 -> **SYSCLK = 100 MHz**
+- **PLLQ**: /4 -> 50 MHz (for FDCAN)
+- **AHB Prescaler**: /1 -> HCLK = 100 MHz
+- **APB1 Prescaler**: /1 -> APB1 = 100 MHz
+- **APB2 Prescaler**: /1 -> APB2 = 100 MHz
 
 ### 2.3 SYS
 - **Debug**: Serial Wire
@@ -56,7 +56,7 @@
 - **Frame Format**: Motorola
 - **Data Size**: 8 bits
 - **First Bit**: MSB First
-- **Prescaler**: 32 (APB2/32 = 3.4375 MHz, MCP3465R max 20 MHz)
+- **Prescaler**: 32 (APB2/32 = 3.125 MHz, MCP3465R max 20 MHz)
 - **Clock Polarity (CPOL)**: Low (idle low)
 - **Clock Phase (CPHA)**: 1 Edge (data sampled on rising edge) -> SPI Mode 0,0
 - **NSS**: Software (GPIO managed manually)
@@ -78,7 +78,7 @@
 - **Frame Format**: Motorola
 - **Data Size**: 8 bits
 - **First Bit**: MSB First
-- **Prescaler**: 16 (APB1/16 = 6.875 MHz, AD5641 max 30 MHz)
+- **Prescaler**: 16 (APB1/16 = 6.25 MHz, AD5641 max 30 MHz)
 - **Clock Polarity (CPOL)**: Low
 - **Clock Phase (CPHA)**: 2 Edge (data latched on falling edge) -> SPI Mode 0,1
 - **NSS**: Software (4 individual CS pins for 4 DAC chips)
@@ -123,12 +123,13 @@
 - **Transmit Pause**: Enable
 - **Protocol Exception Handling**: Disable
 
-**FDCAN Clock & Bit Timing (500 kbps, FDCAN kernel clock = 54 MHz from PLLQ):**
-- **Nominal Prescaler**: 6 -> Tq = 6/54MHz = 111.11ns
-- **Nominal Time Seg1 (Prop + Phase1)**: 14 Tq
-- **Nominal Time Seg2**: 3 Tq
-- **Nominal Sync Jump Width**: 3 Tq
-- **Bit Time** = (1 + 14 + 3) Tq = 18 Tq = 2000ns -> 500 kbps
+**FDCAN Clock & Bit Timing (500 kbps, FDCAN kernel clock = 50 MHz from PLLQ):**
+- **Nominal Prescaler**: 5 -> Tq = 5/50MHz = 100ns
+- **Nominal Time Seg1 (Prop + Phase1)**: 15 Tq
+- **Nominal Time Seg2**: 4 Tq
+- **Nominal Sync Jump Width**: 4 Tq
+- **Bit Time** = (1 + 15 + 4) Tq = 20 Tq = 2000ns -> 500 kbps
+- **Sample Point** = (1 + 15) / 20 = 80%
 
 **Message RAM Configuration:**
 - Standard Filter Elements: 1
@@ -184,7 +185,7 @@
 | Parameter                        | Value    | Reason                                           |
 |----------------------------------|----------|--------------------------------------------------|
 | USE_PREEMPTION                   | Enabled  | Preemptive scheduling for real-time control       |
-| CPU_CLOCK_HZ                     | 110000000| Match SYSCLK                                     |
+| CPU_CLOCK_HZ                     | 100000000| Match SYSCLK                                     |
 | TICK_RATE_HZ                     | 1000     | 1ms tick resolution for voltage control loop      |
 | MAX_PRIORITIES                   | 7        | 7 priority levels (0=idle to 6=highest)           |
 | MINIMAL_STACK_SIZE               | 128      | 128 words (512 bytes) minimum                     |

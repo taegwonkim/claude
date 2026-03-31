@@ -97,7 +97,7 @@ int main(void)
 
 /* ========================================================================
  * System Clock Configuration
- * HSE = 8 MHz -> PLL -> SYSCLK = 110 MHz
+ * HSE = 8 MHz -> PLL -> SYSCLK = 100 MHz
  * ======================================================================== */
 void SystemClock_Config(void)
 {
@@ -117,10 +117,10 @@ void SystemClock_Config(void)
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLM = 1;       /* HSE/1 = 8 MHz */
-    RCC_OscInitStruct.PLL.PLLN = 27;      /* VCO = 8 * 27 = 216 MHz */
+    RCC_OscInitStruct.PLL.PLLN = 25;      /* VCO = 8 * 25 = 200 MHz */
     RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;  /* Not used */
-    RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV4;  /* PLLQ = 54 MHz (FDCAN) */
-    RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;  /* SYSCLK = 216/2 = 108 MHz (close to 110) */
+    RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV4;  /* PLLQ = 50 MHz (FDCAN) */
+    RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;  /* SYSCLK = 200/2 = 100 MHz */
 
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
     {
@@ -135,7 +135,7 @@ void SystemClock_Config(void)
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
     {
         Error_Handler();
     }
@@ -143,7 +143,7 @@ void SystemClock_Config(void)
 
 /* ========================================================================
  * SPI1 Initialization: MCP3465R (External ADC)
- * Full-Duplex Master, 8-bit, Mode 0,0, ~3.4 MHz
+ * Full-Duplex Master, 8-bit, Mode 0,0, ~3.125 MHz
  * ======================================================================== */
 static void MX_SPI1_Init(void)
 {
@@ -154,7 +154,7 @@ static void MX_SPI1_Init(void)
     hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;     /* CPOL = 0 */
     hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;         /* CPHA = 0 -> Mode 0,0 */
     hspi1.Init.NSS = SPI_NSS_SOFT;
-    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;  /* ~3.4 MHz */
+    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;  /* 100/32 = 3.125 MHz */
     hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
     hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
     hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -168,7 +168,7 @@ static void MX_SPI1_Init(void)
 
 /* ========================================================================
  * SPI2 Initialization: AD5641 x4 (External DAC)
- * Transmit Only Master, 8-bit, Mode 0,1, ~6.8 MHz
+ * Transmit Only Master, 8-bit, Mode 0,1, ~6.25 MHz
  * ======================================================================== */
 static void MX_SPI2_Init(void)
 {
@@ -179,7 +179,7 @@ static void MX_SPI2_Init(void)
     hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;     /* CPOL = 0 */
     hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;         /* CPHA = 1 -> Mode 0,1 */
     hspi2.Init.NSS = SPI_NSS_SOFT;
-    hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;  /* ~6.8 MHz */
+    hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;  /* 100/16 = 6.25 MHz */
     hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
     hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
     hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -229,21 +229,22 @@ static void MX_FDCAN1_Init(void)
     hfdcan1.Init.TransmitPause = ENABLE;
     hfdcan1.Init.ProtocolException = DISABLE;
 
-    /* Bit timing for 500 kbps with 54 MHz FDCAN clock (PLLQ)
-     * Prescaler = 6 -> Tq = 6/54MHz = 111.11ns
-     * Bit Time = (1 + TimeSeg1 + TimeSeg2) = 18 Tq
-     * Bit Rate = 54MHz / (6 * 18) = 500 kbps
+    /* Bit timing for 500 kbps with 50 MHz FDCAN clock (PLLQ)
+     * Prescaler = 5 -> Tq = 5/50MHz = 100ns
+     * Bit Time = (1 + TimeSeg1 + TimeSeg2) = 20 Tq
+     * Bit Rate = 50MHz / (5 * 20) = 500 kbps
+     * Sample Point = (1 + 15) / 20 = 80%
      */
-    hfdcan1.Init.NominalPrescaler = 6;
-    hfdcan1.Init.NominalSyncJumpWidth = 3;
-    hfdcan1.Init.NominalTimeSeg1 = 14;     /* Prop + Phase1 */
-    hfdcan1.Init.NominalTimeSeg2 = 3;      /* Phase2 */
+    hfdcan1.Init.NominalPrescaler = 5;
+    hfdcan1.Init.NominalSyncJumpWidth = 4;
+    hfdcan1.Init.NominalTimeSeg1 = 15;     /* Prop + Phase1 */
+    hfdcan1.Init.NominalTimeSeg2 = 4;      /* Phase2 */
 
     /* Data bit timing (same as nominal for Classic CAN) */
-    hfdcan1.Init.DataPrescaler = 6;
-    hfdcan1.Init.DataSyncJumpWidth = 3;
-    hfdcan1.Init.DataTimeSeg1 = 14;
-    hfdcan1.Init.DataTimeSeg2 = 3;
+    hfdcan1.Init.DataPrescaler = 5;
+    hfdcan1.Init.DataSyncJumpWidth = 4;
+    hfdcan1.Init.DataTimeSeg1 = 15;
+    hfdcan1.Init.DataTimeSeg2 = 4;
 
     /* Message RAM configuration */
     hfdcan1.Init.StdFiltersNbr = 1;
