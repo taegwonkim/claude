@@ -12,6 +12,7 @@ void Comm_Init(Comm_Handle_t *hcomm, UART_HandleTypeDef *huart,
     hcomm->hfdcan = hfdcan;
     hcomm->hctrl = hctrl;
     hcomm->rx_index = 0;
+    hcomm->rx_in_frame = 0;
     memset(hcomm->rx_buffer, 0, sizeof(hcomm->rx_buffer));
 }
 
@@ -22,16 +23,34 @@ void Comm_StartReception(Comm_Handle_t *hcomm)
 
 void Comm_UART_RxCallback(Comm_Handle_t *hcomm)
 {
-    if (hcomm->rx_byte == '\n' || hcomm->rx_byte == '\r') {
-        if (hcomm->rx_index > 0) {
+    uint8_t b = hcomm->rx_byte;
+
+    if (b == COMM_STX) {
+        /* Start of new frame: reset buffer */
+        hcomm->rx_index = 0;
+        hcomm->rx_in_frame = 1;
+    }
+    else if (b == COMM_ETX) {
+        /* End of frame: process if we were inside a frame */
+        if (hcomm->rx_in_frame && hcomm->rx_index > 0) {
             hcomm->rx_buffer[hcomm->rx_index] = '\0';
             Comm_ProcessCommand(hcomm, hcomm->rx_buffer);
-            hcomm->rx_index = 0;
         }
-    } else {
-        if (hcomm->rx_index < COMM_UART_RX_BUF_SIZE - 1) {
-            hcomm->rx_buffer[hcomm->rx_index++] = (char)hcomm->rx_byte;
+        hcomm->rx_in_frame = 0;
+        hcomm->rx_index = 0;
+    }
+    else {
+        /* Payload byte: store only if inside a frame */
+        if (hcomm->rx_in_frame) {
+            if (hcomm->rx_index < COMM_UART_RX_BUF_SIZE - 1) {
+                hcomm->rx_buffer[hcomm->rx_index++] = (char)b;
+            } else {
+                /* Buffer overflow: discard this frame */
+                hcomm->rx_in_frame = 0;
+                hcomm->rx_index = 0;
+            }
         }
+        /* Bytes outside STX..ETX frame are silently discarded */
     }
 
     /* Re-enable reception for next byte */
@@ -40,14 +59,30 @@ void Comm_UART_RxCallback(Comm_Handle_t *hcomm)
 
 void Comm_UartSend(Comm_Handle_t *hcomm, const char *fmt, ...)
 {
+    /*
+     * TX frame format: STX + payload + ETX
+     * tx_buffer layout: [STX][payload...][ETX]
+     */
+    hcomm->tx_buffer[0] = (char)COMM_STX;
+
     va_list args;
     va_start(args, fmt);
-    int len = vsnprintf(hcomm->tx_buffer, COMM_UART_TX_BUF_SIZE, fmt, args);
+    int payload_len = vsnprintf(&hcomm->tx_buffer[1],
+                                COMM_UART_TX_BUF_SIZE - 2,  /* reserve room for STX + ETX */
+                                fmt, args);
     va_end(args);
 
-    if (len > 0) {
-        HAL_UART_Transmit(hcomm->huart, (uint8_t *)hcomm->tx_buffer, (uint16_t)len, 100);
+    if (payload_len <= 0) return;
+
+    /* Clamp if truncated */
+    if (payload_len > COMM_UART_TX_BUF_SIZE - 2) {
+        payload_len = COMM_UART_TX_BUF_SIZE - 2;
     }
+
+    hcomm->tx_buffer[1 + payload_len] = (char)COMM_ETX;
+
+    uint16_t total_len = (uint16_t)(1 + payload_len + 1);  /* STX + payload + ETX */
+    HAL_UART_Transmit(hcomm->huart, (uint8_t *)hcomm->tx_buffer, total_len, 100);
 }
 
 void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
@@ -61,7 +96,7 @@ void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
 
     /* Parse command type */
     if (sscanf(cmd, "%15s", cmd_type) < 1) {
-        Comm_UartSend(hcomm, "ERR INVALID_CMD\r\n");
+        Comm_UartSend(hcomm, "ERR INVALID_CMD");
         return;
     }
 
@@ -69,29 +104,29 @@ void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
     if (strcmp(cmd_type, "SET") == 0) {
         if (sscanf(cmd, "SET %d %f", &ch, &voltage) == 2) {
             if (ch < 0 || ch >= VCTRL_NUM_CHANNELS) {
-                Comm_UartSend(hcomm, "ERR INVALID_CH %d\r\n", ch);
+                Comm_UartSend(hcomm, "ERR INVALID_CH %d", ch);
                 return;
             }
             if (voltage < 0.0f || voltage > 5.0f) {
-                Comm_UartSend(hcomm, "ERR INVALID_VOLTAGE %.3f\r\n", voltage);
+                Comm_UartSend(hcomm, "ERR INVALID_VOLTAGE %.3f", voltage);
                 return;
             }
 
             HAL_StatusTypeDef st = VoltCtrl_SetTarget(hcomm->hctrl, (uint8_t)ch, voltage);
             if (st == HAL_OK) {
-                Comm_UartSend(hcomm, "OK SET %d %.3f\r\n", ch, voltage);
+                Comm_UartSend(hcomm, "OK SET %d %.3f", ch, voltage);
             } else {
-                Comm_UartSend(hcomm, "ERR SET_FAIL %d\r\n", ch);
+                Comm_UartSend(hcomm, "ERR SET_FAIL %d", ch);
             }
         } else {
-            Comm_UartSend(hcomm, "ERR SET_SYNTAX\r\n");
+            Comm_UartSend(hcomm, "ERR SET_SYNTAX");
         }
     }
     /* GET <ch> */
     else if (strcmp(cmd_type, "GET") == 0) {
         if (sscanf(cmd, "GET %d", &ch) == 1) {
             if (ch < 0 || ch >= VCTRL_NUM_CHANNELS) {
-                Comm_UartSend(hcomm, "ERR INVALID_CH %d\r\n", ch);
+                Comm_UartSend(hcomm, "ERR INVALID_CH %d", ch);
                 return;
             }
             ChannelData_t data;
@@ -107,11 +142,11 @@ void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
                 default:                      state_str = "UNK"; break;
             }
 
-            Comm_UartSend(hcomm, "DATA %d %.3f %.3f %.2f %s\r\n",
+            Comm_UartSend(hcomm, "DATA %d %.3f %.3f %.2f %s",
                           ch, data.target_voltage, data.actual_voltage,
                           data.current_mA, state_str);
         } else {
-            Comm_UartSend(hcomm, "ERR GET_SYNTAX\r\n");
+            Comm_UartSend(hcomm, "ERR GET_SYNTAX");
         }
     }
     /* GETALL */
@@ -129,7 +164,7 @@ void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
                 case CH_STATE_CALIBRATING:    state_str = "CAL"; break;
                 default:                      state_str = "UNK"; break;
             }
-            Comm_UartSend(hcomm, "DATA %d %.3f %.3f %.2f %s\r\n",
+            Comm_UartSend(hcomm, "DATA %d %.3f %.3f %.2f %s",
                           i, data[i].target_voltage, data[i].actual_voltage,
                           data[i].current_mA, state_str);
         }
@@ -138,24 +173,24 @@ void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
     else if (strcmp(cmd_type, "EN") == 0) {
         if (sscanf(cmd, "EN %d %d", &ch, &enable) == 2) {
             if (ch < 0 || ch >= VCTRL_NUM_CHANNELS) {
-                Comm_UartSend(hcomm, "ERR INVALID_CH %d\r\n", ch);
+                Comm_UartSend(hcomm, "ERR INVALID_CH %d", ch);
                 return;
             }
             VoltCtrl_EnableChannel(hcomm->hctrl, (uint8_t)ch, (bool)enable);
-            Comm_UartSend(hcomm, "OK EN %d %d\r\n", ch, enable);
+            Comm_UartSend(hcomm, "OK EN %d %d", ch, enable);
         } else {
-            Comm_UartSend(hcomm, "ERR EN_SYNTAX\r\n");
+            Comm_UartSend(hcomm, "ERR EN_SYNTAX");
         }
     }
     /* STATUS */
     else if (strcmp(cmd_type, "STATUS") == 0) {
-        Comm_UartSend(hcomm, "STATUS RUNNING\r\n");
+        Comm_UartSend(hcomm, "STATUS RUNNING");
         ChannelData_t data[VCTRL_NUM_CHANNELS];
         VoltCtrl_GetAllChannelData(hcomm->hctrl, data);
         Comm_SendUartReport(hcomm);
     }
     else {
-        Comm_UartSend(hcomm, "ERR UNKNOWN_CMD %s\r\n", cmd_type);
+        Comm_UartSend(hcomm, "ERR UNKNOWN_CMD %s", cmd_type);
     }
 }
 
@@ -164,7 +199,7 @@ void Comm_SendUartReport(Comm_Handle_t *hcomm)
     ChannelData_t data[VCTRL_NUM_CHANNELS];
     VoltCtrl_GetAllChannelData(hcomm->hctrl, data);
 
-    Comm_UartSend(hcomm, "REPORT %.3f %.2f %.3f %.2f %.3f %.2f %.3f %.2f\r\n",
+    Comm_UartSend(hcomm, "REPORT %.3f %.2f %.3f %.2f %.3f %.2f %.3f %.2f",
                   data[0].actual_voltage, data[0].current_mA,
                   data[1].actual_voltage, data[1].current_mA,
                   data[2].actual_voltage, data[2].current_mA,
@@ -229,7 +264,7 @@ void Comm_SendFaultAlert(Comm_Handle_t *hcomm, uint8_t ch, ChannelState_t state)
 {
     /* UART fault alert */
     const char *fault_str = (state == CH_STATE_SHORT_CIRCUIT) ? "SHORT" : "OPEN";
-    Comm_UartSend(hcomm, "FAULT %d %s\r\n", ch, fault_str);
+    Comm_UartSend(hcomm, "FAULT %d %s", ch, fault_str);
 
     /* FDCAN fault alert */
     FDCAN_TxHeaderTypeDef tx_header;

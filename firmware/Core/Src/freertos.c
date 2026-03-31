@@ -318,7 +318,7 @@ void StartFaultMonTask(void *argument)
                 else if (prev_fault_state[ch] == CH_STATE_SHORT_CIRCUIT ||
                          prev_fault_state[ch] == CH_STATE_OPEN_CIRCUIT) {
                     /* Fault cleared */
-                    Comm_UartSend(&g_comm, "CLEAR %d\r\n", ch);
+                    Comm_UartSend(&g_comm, "CLEAR %d", ch);
                     Debug_Print("FAULT", "CH%d fault CLEARED", ch);
 
                     /* Turn off fault LED if no other channel is faulted */

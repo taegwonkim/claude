@@ -8,25 +8,35 @@
 
 /* UART Protocol Definition
  *
- * PC -> MCU Commands (ASCII, newline terminated):
- *   SET <ch> <voltage>    - Set channel voltage (e.g., "SET 0 3.300\n")
- *   GET <ch>              - Query single channel (e.g., "GET 0\n")
- *   GETALL                - Query all channels
- *   EN <ch> <0|1>         - Enable/disable channel (e.g., "EN 0 1\n")
- *   STATUS                - Get system status
+ * Frame Format: STX(0x02) + Payload + ETX(0x03)
+ *   - STX: Start of Text (0x02)
+ *   - Payload: ASCII command/response string
+ *   - ETX: End of Text (0x03)
+ *   - No \r\n inside frame; STX/ETX are the delimiters
  *
- * MCU -> PC Responses (ASCII, newline terminated):
- *   OK SET <ch> <voltage>
- *   DATA <ch> <target_V> <actual_V> <current_mA> <state>
- *   ERR <message>
- *   REPORT <ch0_V> <ch0_I> <ch1_V> <ch1_I> <ch2_V> <ch2_I> <ch3_V> <ch3_I>
- *   FAULT <ch> <SHORT|OPEN>
+ * PC -> MCU Commands:
+ *   <STX>SET <ch> <voltage><ETX>    e.g., \x02SET 0 3.300\x03
+ *   <STX>GET <ch><ETX>              e.g., \x02GET 0\x03
+ *   <STX>GETALL<ETX>
+ *   <STX>EN <ch> <0|1><ETX>         e.g., \x02EN 0 1\x03
+ *   <STX>STATUS<ETX>
+ *
+ * MCU -> PC Responses:
+ *   <STX>OK SET <ch> <voltage><ETX>
+ *   <STX>DATA <ch> <target_V> <actual_V> <current_mA> <state><ETX>
+ *   <STX>ERR <message><ETX>
+ *   <STX>REPORT <ch0_V> <ch0_I> <ch1_V> <ch1_I> <ch2_V> <ch2_I> <ch3_V> <ch3_I><ETX>
+ *   <STX>FAULT <ch> <SHORT|OPEN><ETX>
+ *   <STX>CLEAR <ch><ETX>
  *
  * FDCAN Protocol:
  *   TX Message ID: 0x100 (periodic report)
  *   TX Message ID: 0x101 (fault alert)
  *   Standard CAN frame, 8 bytes per message
  */
+
+#define COMM_STX    0x02   /* Start of Text */
+#define COMM_ETX    0x03   /* End of Text */
 
 #define COMM_UART_RX_BUF_SIZE   128
 #define COMM_UART_TX_BUF_SIZE   256
@@ -49,10 +59,11 @@ typedef struct {
     FDCAN_HandleTypeDef *hfdcan;
     VoltCtrl_Handle_t  *hctrl;
 
-    /* UART RX state */
+    /* UART RX state (STX/ETX framing) */
     uint8_t  rx_byte;
     char     rx_buffer[COMM_UART_RX_BUF_SIZE];
     uint16_t rx_index;
+    uint8_t  rx_in_frame;   /* 1 = STX received, collecting payload until ETX */
 
     /* UART TX buffer */
     char     tx_buffer[COMM_UART_TX_BUF_SIZE];
