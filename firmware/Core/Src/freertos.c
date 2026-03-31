@@ -31,7 +31,7 @@ extern FDCAN_HandleTypeDef hfdcan1;
 
 /* --------------- Global Driver Handles ---------------------------------- */
 AD5641_Handle_t    g_dac;
-MCP3465R_Handle_t  g_adc;
+MCP3465R_Handle_t  g_adc[MCP3465R_NUM_DEVICES];  /* 4 ADCs, one per channel */
 VoltCtrl_Handle_t  g_vctrl;
 Comm_Handle_t      g_comm;
 
@@ -103,14 +103,28 @@ void MX_FREERTOS_Init(void)
     g_dac.cs_port[3] = DAC_CS3_GPIO_Port;  g_dac.cs_pin[3] = DAC_CS3_Pin;
     AD5641_Init(&g_dac);
 
-    /* ADC: MCP3465R on SPI1 */
-    g_adc.hspi = &hspi1;
-    g_adc.cs_port = ADC_CS_GPIO_Port;
-    g_adc.cs_pin  = ADC_CS_Pin;
-    MCP3465R_Init(&g_adc);
+    /* ADC: MCP3465R x4 on SPI1 (one per channel) */
+    g_adc[0].hspi = &hspi1;
+    g_adc[0].cs_port = ADC_CS0_GPIO_Port;  g_adc[0].cs_pin = ADC_CS0_Pin;
+
+    g_adc[1].hspi = &hspi1;
+    g_adc[1].cs_port = ADC_CS1_GPIO_Port;  g_adc[1].cs_pin = ADC_CS1_Pin;
+
+    g_adc[2].hspi = &hspi1;
+    g_adc[2].cs_port = ADC_CS2_GPIO_Port;  g_adc[2].cs_pin = ADC_CS2_Pin;
+
+    g_adc[3].hspi = &hspi1;
+    g_adc[3].cs_port = ADC_CS3_GPIO_Port;  g_adc[3].cs_pin = ADC_CS3_Pin;
+
+    for (uint8_t i = 0; i < MCP3465R_NUM_DEVICES; i++) {
+        MCP3465R_Init(&g_adc[i]);
+    }
 
     /* Voltage controller */
-    VoltCtrl_Init(&g_vctrl, &g_dac, &g_adc);
+    MCP3465R_Handle_t *adc_ptrs[VCTRL_NUM_CHANNELS] = {
+        &g_adc[0], &g_adc[1], &g_adc[2], &g_adc[3]
+    };
+    VoltCtrl_Init(&g_vctrl, &g_dac, adc_ptrs);
 
     /* Communication handler */
     Comm_Init(&g_comm, &huart1, &hfdcan1, &g_vctrl);

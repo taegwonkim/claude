@@ -148,13 +148,13 @@ HAL_StatusTypeDef MCP3465R_ReadConversion(MCP3465R_Handle_t *hadc, int32_t *raw_
     return HAL_OK;
 }
 
-HAL_StatusTypeDef MCP3465R_ReadChannelVoltage(MCP3465R_Handle_t *hadc, uint8_t ch, float *voltage)
+HAL_StatusTypeDef MCP3465R_ReadVoltage(MCP3465R_Handle_t *hadc, float *voltage)
 {
     HAL_StatusTypeDef status;
     int32_t raw;
 
-    /* Set MUX to the desired channel */
-    status = MCP3465R_SetChannel(hadc, ch);
+    /* Set MUX to CH0 (voltage feedback) vs AGND */
+    status = MCP3465R_SetChannel(hadc, MCP3465R_VOLT_CH);
     if (status != HAL_OK) return status;
 
     /* Small delay for MUX settling */
@@ -166,10 +166,10 @@ HAL_StatusTypeDef MCP3465R_ReadChannelVoltage(MCP3465R_Handle_t *hadc, uint8_t c
 
     /*
      * Convert raw ADC value to voltage:
-     * - 24-bit signed value, but for single-ended (positive only), range is 0 to 0x7FFFFF
+     * - 24-bit signed value, single-ended range is 0 to 0x7FFFFF
      * - V_adc = (raw / 2^23) * VREF  (for gain=1)
      * - Actual voltage at DAC output = V_adc / VOLTAGE_DIVIDER_RATIO
-     *   (because we have a resistor divider scaling 0-5V to 0-3.3V)
+     *   (resistor divider scales 0-5V -> 0-3.3V at ADC input)
      */
     float v_adc = ((float)raw / (float)(1 << 23)) * MCP3465R_VREF;
 
@@ -183,17 +183,14 @@ HAL_StatusTypeDef MCP3465R_ReadChannelVoltage(MCP3465R_Handle_t *hadc, uint8_t c
     return HAL_OK;
 }
 
-HAL_StatusTypeDef MCP3465R_ReadChannelCurrent(MCP3465R_Handle_t *hadc, uint8_t ch,
-                                               float *current_mA, float shunt_ohm)
+HAL_StatusTypeDef MCP3465R_ReadCurrent(MCP3465R_Handle_t *hadc,
+                                        float *current_mA, float shunt_ohm)
 {
     HAL_StatusTypeDef status;
     int32_t raw;
 
-    /* Current sense channels are on CH4~CH7 (mapped from load CH0~CH3) */
-    uint8_t adc_ch = ch + MCP3465R_NUM_VOLT_CH;
-    if (adc_ch > 7) return HAL_ERROR;
-
-    status = MCP3465R_SetChannel(hadc, adc_ch);
+    /* Set MUX to CH1 (current sense) vs AGND */
+    status = MCP3465R_SetChannel(hadc, MCP3465R_CURR_CH);
     if (status != HAL_OK) return status;
 
     HAL_Delay(1);

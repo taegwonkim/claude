@@ -51,7 +51,7 @@
 
 ## 3. Peripherals Configuration
 
-### 3.1 SPI1 - External ADC (MCP3465R)
+### 3.1 SPI1 - External ADC (MCP3465R x4)
 - **Mode**: Full-Duplex Master
 - **Frame Format**: Motorola
 - **Data Size**: 8 bits
@@ -59,19 +59,24 @@
 - **Prescaler**: 32 (APB2/32 = 3.125 MHz, MCP3465R max 20 MHz)
 - **Clock Polarity (CPOL)**: Low (idle low)
 - **Clock Phase (CPHA)**: 1 Edge (data sampled on rising edge) -> SPI Mode 0,0
-- **NSS**: Software (GPIO managed manually)
+- **NSS**: Software (4 individual CS pins for 4 ADC chips)
 - **DMA**: Not used (register-level access)
 - **NVIC**: SPI1 interrupt enabled
 
 **GPIO Pins (SPI1):**
-| Function | Pin  | Mode            | Pull   | Speed |
-|----------|------|-----------------|--------|-------|
-| SCK      | PA5  | AF5 (SPI1_SCK)  | No Pull| High  |
-| MISO     | PA6  | AF5 (SPI1_MISO) | No Pull| High  |
-| MOSI     | PA7  | AF5 (SPI1_MOSI) | No Pull| High  |
-| CS (NSS) | PA4  | GPIO_Output      | Pull-Up| High  |
+| Function   | Pin  | Mode            | Pull   | Speed |
+|------------|------|-----------------|--------|-------|
+| SCK        | PA5  | AF5 (SPI1_SCK)  | No Pull| High  |
+| MISO       | PA6  | AF5 (SPI1_MISO) | No Pull| High  |
+| MOSI       | PA7  | AF5 (SPI1_MOSI) | No Pull| High  |
+| ADC_CS0    | PA4  | GPIO_Output     | Pull-Up| High  |
+| ADC_CS1    | PA3  | GPIO_Output     | Pull-Up| High  |
+| ADC_CS2    | PA2  | GPIO_Output     | Pull-Up| High  |
+| ADC_CS3    | PA1  | GPIO_Output     | Pull-Up| High  |
 
 > Note: MCP3465R SPI Mode: supports Mode 0,0 and Mode 1,1. We use Mode 0,0.
+> Each MCP3465R has 2 channels used: CH0 = voltage feedback, CH1 = current sense.
+> All CS pins initialized HIGH (inactive).
 
 ### 3.2 SPI2 - External DAC (AD5641 x4)
 - **Mode**: Transmit Only Master (DAC is write-only)
@@ -362,9 +367,9 @@ Create the following tasks in CubeMX:
 
 ```
 PA0  - UART4_TX (DBG)   PA8  - (free)
-PA1  - (free)           PA9  - USART1_TX
-PA2  - (free)           PA10 - USART1_RX
-PA3  - (free)           PA11 - FDCAN1_RX
+PA1  - ADC_CS3 (GPIO)   PA9  - USART1_TX
+PA2  - ADC_CS2 (GPIO)   PA10 - USART1_RX
+PA3  - ADC_CS1 (GPIO)   PA11 - FDCAN1_RX
 PA4  - SPI1_CS (GPIO)   PA12 - FDCAN1_TX
 PA5  - SPI1_SCK         PA13 - SWDIO
 PA6  - SPI1_MISO        PA14 - SWCLK
@@ -393,25 +398,30 @@ PC13 - LED_STATUS       PC14 - LED_FAULT
                    |           |
     CAN Bus <----> |PA12 PA11  | (via CAN transceiver, e.g., MCP2562)
                    |           |
-    MCP3465R <---> |PA5(SCK)   |
-    (ADC)          |PA6(MISO)  | SPI1
-                   |PA7(MOSI)  |
-                   |PA4(CS)    |
-                   |           |
-    AD5641 x4 <--- |PB13(SCK)  |
-    (DAC)          |PB15(MOSI) | SPI2
-                   |PB12(CS0)  |
-                   |PB14(CS1)  |
-                   |PB1 (CS2)  |
-                   |PB2 (CS3)  |
-                   +-----------+
+    MCP3465R x4 <-> |PA5(SCK)   |
+    (ADC)           |PA6(MISO)  | SPI1
+                    |PA7(MOSI)  |
+                    |PA4(CS0)   |
+                    |PA3(CS1)   |
+                    |PA2(CS2)   |
+                    |PA1(CS3)   |
+                    |           |
+    AD5641 x4 <---  |PB13(SCK)  |
+    (DAC)           |PB15(MOSI) | SPI2
+                    |PB12(CS0)  |
+                    |PB14(CS1)  |
+                    |PB1 (CS2)  |
+                    |PB2 (CS3)  |
+                    +-----------+
 
-    Debug <------> |PA0 (TX)    | UART4 (TX only, 115200)
-                   |           |
-    MCP3465R Channel Assignment:
-    - CH0 ~ CH3: Voltage feedback from DAC CH0 ~ CH3
-    - CH4 ~ CH7: Current sensing from DAC CH0 ~ CH3
-                  (via shunt resistor + INA180 current sense amplifier)
+    Debug <-------> |PA0 (TX)    | UART4 (TX only, 115200)
+                    |           |
+    MCP3465R x4: Each ADC is dedicated to one output channel
+    - ADC0 (CS0/PA4): CH0=voltage feedback, CH1=current sense for DAC CH0
+    - ADC1 (CS1/PA3): CH0=voltage feedback, CH1=current sense for DAC CH1
+    - ADC2 (CS2/PA2): CH0=voltage feedback, CH1=current sense for DAC CH2
+    - ADC3 (CS3/PA1): CH0=voltage feedback, CH1=current sense for DAC CH3
+    (current sense via shunt resistor + INA180 amplifier per channel)
 
     AD5641 x4: Each chip is single-channel 14-bit DAC
     - DAC0 (CS0/PB12): Channel 0 voltage output

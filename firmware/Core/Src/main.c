@@ -307,13 +307,26 @@ static void MX_GPIO_Init(void)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
 
-    /* ---- SPI1 CS (ADC) - PA4 ---- */
-    GPIO_InitStruct.Pin = ADC_CS_Pin;
+    /* ---- SPI1 CS (ADC x4) - PA4, PA3, PA2, PA1 ---- */
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(ADC_CS_GPIO_Port, &GPIO_InitStruct);
-    HAL_GPIO_WritePin(ADC_CS_GPIO_Port, ADC_CS_Pin, GPIO_PIN_SET);  /* Deselect */
+
+    GPIO_InitStruct.Pin = ADC_CS0_Pin;
+    HAL_GPIO_Init(ADC_CS0_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(ADC_CS0_GPIO_Port, ADC_CS0_Pin, GPIO_PIN_SET);
+
+    GPIO_InitStruct.Pin = ADC_CS1_Pin;
+    HAL_GPIO_Init(ADC_CS1_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(ADC_CS1_GPIO_Port, ADC_CS1_Pin, GPIO_PIN_SET);
+
+    GPIO_InitStruct.Pin = ADC_CS2_Pin;
+    HAL_GPIO_Init(ADC_CS2_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(ADC_CS2_GPIO_Port, ADC_CS2_Pin, GPIO_PIN_SET);
+
+    GPIO_InitStruct.Pin = ADC_CS3_Pin;
+    HAL_GPIO_Init(ADC_CS3_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(ADC_CS3_GPIO_Port, ADC_CS3_Pin, GPIO_PIN_SET);
 
     /* ---- SPI2 CS (DAC x4) - PB12, PB14, PB1, PB2 ---- */
     GPIO_InitStruct.Pin = DAC_CS0_Pin;

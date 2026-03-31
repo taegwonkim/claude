@@ -38,14 +38,16 @@ typedef struct {
 
 typedef struct {
     AD5641_Handle_t    *hdac;
-    MCP3465R_Handle_t  *hadc;
+    MCP3465R_Handle_t  *hadc[VCTRL_NUM_CHANNELS];  /* One ADC per channel */
     ChannelData_t       channels[VCTRL_NUM_CHANNELS];
 } VoltCtrl_Handle_t;
 
 /**
  * @brief Initialize voltage control system
+ * @param hadc Array of 4 MCP3465R handles (one per channel)
  */
-void VoltCtrl_Init(VoltCtrl_Handle_t *hctrl, AD5641_Handle_t *hdac, MCP3465R_Handle_t *hadc);
+void VoltCtrl_Init(VoltCtrl_Handle_t *hctrl, AD5641_Handle_t *hdac,
+                   MCP3465R_Handle_t *hadc[VCTRL_NUM_CHANNELS]);
 
 /**
  * @brief Set target voltage for a channel

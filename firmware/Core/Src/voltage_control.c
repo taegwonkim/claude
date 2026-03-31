@@ -1,10 +1,13 @@
 #include "voltage_control.h"
 #include <math.h>
 
-void VoltCtrl_Init(VoltCtrl_Handle_t *hctrl, AD5641_Handle_t *hdac, MCP3465R_Handle_t *hadc)
+void VoltCtrl_Init(VoltCtrl_Handle_t *hctrl, AD5641_Handle_t *hdac,
+                   MCP3465R_Handle_t *hadc[VCTRL_NUM_CHANNELS])
 {
     hctrl->hdac = hdac;
-    hctrl->hadc = hadc;
+    for (uint8_t ch = 0; ch < VCTRL_NUM_CHANNELS; ch++) {
+        hctrl->hadc[ch] = hadc[ch];
+    }
 
     for (uint8_t ch = 0; ch < VCTRL_NUM_CHANNELS; ch++) {
         hctrl->channels[ch].target_voltage = 0.0f;
@@ -61,18 +64,18 @@ void VoltCtrl_ControlLoop(VoltCtrl_Handle_t *hctrl)
         /* Skip control if fault detected */
         if (cd->state == CH_STATE_SHORT_CIRCUIT) continue;
 
-        /* 1. Read actual voltage from ADC */
+        /* 1. Read actual voltage from this channel's dedicated ADC (CH0) */
         float measured_v = 0.0f;
-        if (MCP3465R_ReadChannelVoltage(hctrl->hadc, ch, &measured_v) == HAL_OK) {
+        if (MCP3465R_ReadVoltage(hctrl->hadc[ch], &measured_v) == HAL_OK) {
             cd->actual_voltage = measured_v;
         } else {
             continue;  /* Skip this channel on ADC error */
         }
 
-        /* 2. Read current */
+        /* 2. Read current from this channel's dedicated ADC (CH1) */
         float measured_i = 0.0f;
-        if (MCP3465R_ReadChannelCurrent(hctrl->hadc, ch, &measured_i,
-                                         VCTRL_SHUNT_RESISTOR_OHM) == HAL_OK) {
+        if (MCP3465R_ReadCurrent(hctrl->hadc[ch], &measured_i,
+                                  VCTRL_SHUNT_RESISTOR_OHM) == HAL_OK) {
             cd->current_mA = measured_i;
         }
 

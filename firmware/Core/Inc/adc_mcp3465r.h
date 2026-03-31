@@ -85,9 +85,10 @@
 #define MCP3465R_VREF           3.3f   /* External VREF voltage */
 #define MCP3465R_VOLTAGE_DIVIDER_RATIO  (3.3f / 5.0f)  /* Resistor divider to scale 0-5V -> 0-3.3V */
 
-/* Number of voltage and current channels */
-#define MCP3465R_NUM_VOLT_CH    4   /* CH0~CH3: voltage feedback */
-#define MCP3465R_NUM_CURR_CH    4   /* CH4~CH7: current sensing */
+/* Per-ADC channel assignment (each MCP3465R uses CH0 for voltage, CH1 for current) */
+#define MCP3465R_VOLT_CH        0   /* VIN0: voltage feedback input */
+#define MCP3465R_CURR_CH        1   /* VIN1: current sense input */
+#define MCP3465R_NUM_DEVICES    4   /* One ADC per output channel */
 
 typedef struct {
     SPI_HandleTypeDef *hspi;
@@ -121,19 +122,19 @@ HAL_StatusTypeDef MCP3465R_SetChannel(MCP3465R_Handle_t *hadc, uint8_t vin_pos);
 HAL_StatusTypeDef MCP3465R_ReadConversion(MCP3465R_Handle_t *hadc, int32_t *raw_value);
 
 /**
- * @brief Read voltage from a specific single-ended channel (with mux switch + conversion)
- * @param ch Channel number (0-7)
+ * @brief Read voltage from this ADC's CH0 (voltage feedback input)
+ * @param hadc  Pointer to the specific ADC instance
  * @param voltage Output voltage in V (after divider compensation)
  */
-HAL_StatusTypeDef MCP3465R_ReadChannelVoltage(MCP3465R_Handle_t *hadc, uint8_t ch, float *voltage);
+HAL_StatusTypeDef MCP3465R_ReadVoltage(MCP3465R_Handle_t *hadc, float *voltage);
 
 /**
- * @brief Read current from a specific current sense channel
- * @param ch Current sense channel (4-7 mapped to load channels 0-3)
+ * @brief Read current from this ADC's CH1 (current sense input)
+ * @param hadc      Pointer to the specific ADC instance
  * @param current_mA Output current in mA
- * @param shunt_ohm Shunt resistor value in ohms
+ * @param shunt_ohm  Shunt resistor value in ohms
  */
-HAL_StatusTypeDef MCP3465R_ReadChannelCurrent(MCP3465R_Handle_t *hadc, uint8_t ch,
-                                               float *current_mA, float shunt_ohm);
+HAL_StatusTypeDef MCP3465R_ReadCurrent(MCP3465R_Handle_t *hadc,
+                                        float *current_mA, float shunt_ohm);
 
 #endif /* __ADC_MCP3465R_H */

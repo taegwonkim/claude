@@ -19,9 +19,18 @@ void Error_Handler(void);
  * Pin Definitions (matching CubeMX label assignments)
  * ======================================================================== */
 
-/* SPI1 CS - MCP3465R ADC */
-#define ADC_CS_Pin          GPIO_PIN_4
-#define ADC_CS_GPIO_Port    GPIOA
+/* SPI1 CS - MCP3465R ADC x4 (one per channel) */
+#define ADC_CS0_Pin         GPIO_PIN_4
+#define ADC_CS0_GPIO_Port   GPIOA
+
+#define ADC_CS1_Pin         GPIO_PIN_3
+#define ADC_CS1_GPIO_Port   GPIOA
+
+#define ADC_CS2_Pin         GPIO_PIN_2
+#define ADC_CS2_GPIO_Port   GPIOA
+
+#define ADC_CS3_Pin         GPIO_PIN_1
+#define ADC_CS3_GPIO_Port   GPIOA
 
 /* SPI2 CS - AD5641 DAC x4 */
 #define DAC_CS0_Pin         GPIO_PIN_12
