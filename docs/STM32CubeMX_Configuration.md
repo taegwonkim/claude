@@ -43,6 +43,7 @@
 | USART1 global interrupt      | -              | 5                   | 0            | Yes     |
 | FDCAN1 interrupt 0           | -              | 5                   | 0            | Yes     |
 | FDCAN1 interrupt 1           | -              | 5                   | 0            | Yes     |
+| UART4 global interrupt       | -              | -                   | -            | No (TX blocking) |
 
 - **Priority Grouping**: 4 bits for preemption priority (NVIC_PRIORITYGROUP_4)
 
@@ -143,7 +144,27 @@
 | TX       | PA12 | AF9 (FDCAN1_TX)   | No Pull| High  |
 | RX       | PA11 | AF9 (FDCAN1_RX)   | No Pull| High  |
 
-### 3.5 GPIO - Status LEDs & Misc
+### 3.5 UART4 - Debug Output (TX Only)
+- **Mode**: Asynchronous
+- **Direction**: TX Only (수신 불필요, 디버그 출력 전용)
+- **Baud Rate**: 115200
+- **Word Length**: 8 bits
+- **Stop Bits**: 1
+- **Parity**: None
+- **Hardware Flow Control**: None
+- **Oversampling**: 16
+- **NVIC**: UART4 interrupt **disabled** (blocking TX 사용, 인터럽트 불필요)
+
+**GPIO Pins (UART4):**
+| Function | Pin  | Mode             | Pull   | Speed  |
+|----------|------|------------------|--------|--------|
+| TX       | PA0  | AF8 (UART4_TX)   | Pull-Up| High   |
+
+> Note: UART4는 디버그 전용이므로 TX만 사용. PC에서 USB-UART 변환기로 PA0에 연결하여 모니터링.
+> Debug 출력 형식: `[DBG][TAG  ] message\r\n`
+> TAG: SYS(시스템), VCTRL(전압제어), FAULT(고장감지), COMM(통신)
+
+### 3.6 GPIO - Status LEDs & Misc
 | Label       | Pin | Mode        | Default | Purpose              |
 |-------------|-----|-------------|---------|----------------------|
 | LED_STATUS  | PC13| GPIO_Output | Low     | System heartbeat     |
@@ -339,7 +360,7 @@ Create the following tasks in CubeMX:
 ## 6. Pin Mapping Summary (STM32L552RETx LQFP64)
 
 ```
-PA0  - (free)           PA8  - (free)
+PA0  - UART4_TX (DBG)   PA8  - (free)
 PA1  - (free)           PA9  - USART1_TX
 PA2  - (free)           PA10 - USART1_RX
 PA3  - (free)           PA11 - FDCAN1_RX
@@ -384,6 +405,8 @@ PC13 - LED_STATUS       PC14 - LED_FAULT
                    |PB2 (CS3)  |
                    +-----------+
 
+    Debug <------> |PA0 (TX)    | UART4 (TX only, 115200)
+                   |           |
     MCP3465R Channel Assignment:
     - CH0 ~ CH3: Voltage feedback from DAC CH0 ~ CH3
     - CH4 ~ CH7: Current sensing from DAC CH0 ~ CH3

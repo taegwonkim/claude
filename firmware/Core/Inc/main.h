@@ -36,6 +36,10 @@ void Error_Handler(void);
 #define DAC_CS3_Pin         GPIO_PIN_2
 #define DAC_CS3_GPIO_Port   GPIOB
 
+/* UART4 Debug TX Pin */
+#define DEBUG_UART4_TX_Pin      GPIO_PIN_0
+#define DEBUG_UART4_TX_GPIO_Port GPIOA
+
 /* Status LEDs */
 #define LED_STATUS_Pin      GPIO_PIN_13
 #define LED_STATUS_GPIO_Port GPIOC

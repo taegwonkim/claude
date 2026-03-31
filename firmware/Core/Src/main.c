@@ -10,6 +10,7 @@
  *   - SPI2: AD5641 x4 (External DAC, 4-channel voltage output)
  *   - USART1: PC communication (115200 baud)
  *   - FDCAN1: CAN bus reporting (500 kbps)
+ *   - UART4:  Debug output TX only (115200 baud, PA0)
  *
  * This file is intended for STM32CubeIDE with CubeMX code generation.
  * User code sections (USER CODE BEGIN/END) are preserved during regeneration.
@@ -24,6 +25,7 @@
 #include "adc_mcp3465r.h"
 #include "voltage_control.h"
 #include "comm_handler.h"
+#include "debug_uart.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -31,6 +33,7 @@ SPI_HandleTypeDef  hspi1;
 SPI_HandleTypeDef  hspi2;
 UART_HandleTypeDef huart1;
 FDCAN_HandleTypeDef hfdcan1;
+UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 extern Comm_Handle_t g_comm;
@@ -43,6 +46,7 @@ static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_FDCAN1_Init(void);
+static void MX_UART4_Init(void);
 extern void MX_FREERTOS_Init(void);
 
 /* USER CODE BEGIN PFP */
@@ -63,11 +67,16 @@ int main(void)
     MX_SPI2_Init();
     MX_USART1_UART_Init();
     MX_FDCAN1_Init();
+    MX_UART4_Init();
 
     /* USER CODE BEGIN 2 */
 
     /* Start FDCAN */
     HAL_FDCAN_Start(&hfdcan1);
+
+    /* Initialize debug output via UART4 */
+    Debug_Init(&huart4);
+    Debug_Print("SYS", "System boot, peripherals initialized");
 
     /* USER CODE END 2 */
 
@@ -256,6 +265,30 @@ static void MX_FDCAN1_Init(void)
     sFilterConfig.FilterID2 = 0x000;  /* Accept all */
 
     if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK)
+    {
+        Error_Handler();
+    }
+}
+
+/* ========================================================================
+ * UART4 Initialization: Debug Output (TX Only)
+ * 115200 baud, 8N1, TX only on PA0 (AF8)
+ * ======================================================================== */
+static void MX_UART4_Init(void)
+{
+    huart4.Instance = UART4;
+    huart4.Init.BaudRate = 115200;
+    huart4.Init.WordLength = UART_WORDLENGTH_8B;
+    huart4.Init.StopBits = UART_STOPBITS_1;
+    huart4.Init.Parity = UART_PARITY_NONE;
+    huart4.Init.Mode = UART_MODE_TX;       /* TX only */
+    huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+    huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+    huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+    huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+
+    if (HAL_UART_Init(&huart4) != HAL_OK)
     {
         Error_Handler();
     }

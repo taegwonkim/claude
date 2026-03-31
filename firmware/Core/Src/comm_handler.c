@@ -1,4 +1,5 @@
 #include "comm_handler.h"
+#include "debug_uart.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -55,6 +56,8 @@ void Comm_ProcessCommand(Comm_Handle_t *hcomm, const char *cmd)
     int ch = 0;
     float voltage = 0.0f;
     int enable = 0;
+
+    Debug_Print("COMM", "RX CMD: %s", cmd);
 
     /* Parse command type */
     if (sscanf(cmd, "%15s", cmd_type) < 1) {
