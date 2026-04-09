@@ -1,0 +1,59 @@
+#MicroXplorer Configuration settings - do not modify
+#Sat Mar 28 00:00:00 UTC 2026
+File.Version=6
+ProjectManager.ProjectFileName=STM32L5_NoRTOS.ioc
+ProjectManager.ProjectName=STM32L5_VoltageControl_NoRTOS
+ProjectManager.TargetToolchain=STM32CubeIDE
+
+Mcu.Family=STM32L5
+Mcu.Name=STM32L552ZETxQ
+
+# No FreeRTOS / No Middleware
+# FREERTOS: 사용 안 함
+
+RCC.HSIState=1
+RCC.PLLState=1
+RCC.PLLSource=RCC_PLLSOURCE_HSI
+RCC.PLLM=1
+RCC.PLLN=10
+RCC.PLLR=RCC_PLLR_DIV2
+RCC.SYSCLKSource=RCC_SYSCLKSOURCE_PLLCLK
+RCC.AHBCLKDivider=RCC_SYSCLK_DIV1
+RCC.APB1CLKDivider=RCC_HCLK_DIV1
+RCC.APB2CLKDivider=RCC_HCLK_DIV1
+
+# USART1: 115200, 8N1, DMA RX(Circular) + TX(Normal)
+USART1.BaudRate=115200
+USART1.WordLength=UART_WORDLENGTH_8B
+USART1.Parity=UART_PARITY_NONE
+USART1.Mode=UART_MODE_TX_RX
+
+# SPI1: Master, Mode0, 10MHz
+SPI1.Mode=SPI_MODE_MASTER
+SPI1.CLKPolarity=SPI_POLARITY_LOW
+SPI1.CLKPhase=SPI_PHASE_1EDGE
+SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_8
+
+# TIM2: PWM 4채널, ARR=4095
+TIM2.Prescaler=0
+TIM2.Period=4095
+
+# TIM6: 10ms 제어 타이머 (추가!)
+TIM6.Prescaler=799
+TIM6.Period=999
+TIM6.NVIC.GlobalInterrupt=true
+
+# TIM7: 20ms ADC 타이머 (추가!)
+TIM7.Prescaler=799
+TIM7.Period=1999
+TIM7.NVIC.GlobalInterrupt=true
+
+# NVIC 우선순위 (FreeRTOS 없으므로 자유롭게 설정)
+NVIC.SysTick_IRQn=15\:0\:false
+NVIC.TIM6_IRQn=7\:0\:true
+NVIC.TIM7_IRQn=7\:0\:true
+NVIC.USART1_IRQn=6\:0\:true
+NVIC.DMA1_Channel1_IRQn=6\:0\:true
+NVIC.DMA1_Channel2_IRQn=6\:0\:true
+NVIC.SPI1_IRQn=5\:0\:true
+NVIC.EXTI9_5_IRQn=6\:0\:true
