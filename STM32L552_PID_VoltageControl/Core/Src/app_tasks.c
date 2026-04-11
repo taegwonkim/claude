@@ -8,8 +8,8 @@
  */
 #include "app_tasks.h"
 #include "channel_ctrl.h"
-#include "adc_meas.h"
-#include "pwm_out.h"
+#include "adc_meas.h"    /* MCP3465R: ADCMeas_GetVoltage_mV/Current_mA, g_adc_irq_sem */
+#include "pwm_out.h"     /* AD5641: PWMOut_SetDuty (channel_ctrl.c에서 호출) */
 #include "fdcan_comm.h"
 #include "main.h"
 
@@ -74,46 +74,35 @@ void AppTasks_Init(void)
 }
 
 /* ==========================================================
- * Task_PIDControl  (주기: 2ms, 우선순위: 5)
+ * Task_PIDControl  (이벤트 주도, 우선순위: 5)
  *
- *  루프:
- *    1. ADC 변환 완료 대기 (플래그 폴링, 최대 2ms)
- *    2. 채널별 측정값 갱신
- *    3. 채널별 PID 계산 → PWM 출력
- *    4. 다음 주기까지 대기
+ *  MCP3465R 8채널 스캔 완료 시 g_adc_irq_sem 세마포어 수신
+ *  → 채널별 측정값 갱신 → PID 계산 → AD5641 DAC 출력 갱신
+ *  최대 대기 시간(PERIOD_PID_MS)을 초과하면 이전 값으로 PID 실행
  * ========================================================== */
 void Task_PIDControl(void *pvParameters)
 {
     (void)pvParameters;
 
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-
     for (;;) {
-        /* ADC 변환 완료 대기 (최대 1ms, 그 이후면 이전 값 사용) */
-        uint32_t timeout = 100U; /* 100 * 10us = 1ms polling */
-        while (!g_adc_conv_cplt && timeout > 0U) {
-            timeout--;
-        }
-        g_adc_conv_cplt = 0U;
+        /* MCP3465R 8채널 스캔 완료 세마포어 대기 (최대 2ms) */
+        xSemaphoreTake(g_adc_irq_sem, pdMS_TO_TICKS(PERIOD_PID_MS));
 
         /* 채널 데이터 뮤텍스 취득 */
         if (xSemaphoreTake(g_channel_mutex, pdMS_TO_TICKS(1U)) == pdTRUE) {
 
             for (uint8_t ch = 0; ch < NUM_CHANNELS; ch++) {
-                /* 측정값 갱신 */
+                /* MCP3465R 변환 결과로 측정값 갱신 */
                 uint32_t v_mV = ADCMeas_GetVoltage_mV(ch);
                 uint32_t i_mA = ADCMeas_GetCurrent_mA(ch);
                 ChannelCtrl_SetMeasured(ch, v_mV, i_mA);
 
-                /* PID 계산 → PWM 출력 갱신 */
+                /* PID 계산 → AD5641 DAC 출력 갱신 */
                 ChannelCtrl_Update(ch);
             }
 
             xSemaphoreGive(g_channel_mutex);
         }
-
-        /* 2ms 주기 유지 (vTaskDelayUntil: 지터 보상) */
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(PERIOD_PID_MS));
     }
 }
 

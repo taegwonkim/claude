@@ -1,36 +1,48 @@
-/* pwm_out.c - TIM1 4채널 PWM 출력 구현
+/* pwm_out.c - AD5641 외부 DAC 구현 (SPI1)
  *
- * TIM1: Advanced timer (PCLK2 = 110 MHz)
- *   PSC=0, ARR=1099 → f_PWM = 110,000,000 / 1100 ≈ 100 kHz
+ * AD5641 SPI 전송:
+ *   1. DAC_CS_LOW(ch)
+ *   2. HAL_SPI_Transmit 16비트: {PD1:PD0:D13:...:D0}
+ *   3. DAC_CS_HIGH(ch)
  *
- * 채널 ↔ TIM1 매핑:
- *   CH0 → TIM_CHANNEL_1 (PA8)
- *   CH1 → TIM_CHANNEL_2 (PA9)
- *   CH2 → TIM_CHANNEL_3 (PA10)
- *   CH3 → TIM_CHANNEL_4 (PA11)
+ * SPI1 설정 (main.c MX_SPI1_Init):
+ *   - Mode: Master, Full-Duplex
+ *   - DataSize: 16-bit
+ *   - CPOL=HIGH (1), CPHA=1EDGE (0) → Mode 2
+ *   - NSS: Software (CS는 GPIO로 수동 제어)
+ *   - Baud: PCLK2/8 = 110MHz/8 = 13.75 MHz
  */
 #include "pwm_out.h"
 
-/* 내부 채널 TIM 매핑 테이블 */
-static const uint32_t s_tim_ch[NUM_CHANNELS] = {
-    TIM_CHANNEL_1,
-    TIM_CHANNEL_2,
-    TIM_CHANNEL_3,
-    TIM_CHANNEL_4
-};
+/* 현재 DAC 코드 캐시 */
+static uint16_t s_dac_code[NUM_CHANNELS] = {0};
 
-/* 현재 듀티 값 캐시 (0.0 ~ 1.0) */
-static float s_duty_cache[NUM_CHANNELS] = {0};
+/* ==========================================================
+ * 내부 헬퍼: SPI1로 AD5641에 16비트 워드 전송
+ * ========================================================== */
+static void ad5641_write(uint8_t ch, uint16_t word)
+{
+    /* 빅엔디안 바이트 배열로 변환 (SPI MSB First) */
+    uint8_t tx[2] = {
+        (uint8_t)(word >> 8),
+        (uint8_t)(word & 0xFF)
+    };
+
+    DAC_CS_LOW(ch);
+    HAL_SPI_Transmit(&hspi1, tx, 2, 10U);  /* 10ms timeout */
+    DAC_CS_HIGH(ch);
+}
 
 /* ==========================================================
  * PWMOut_Start
+ *   초기화: 모든 채널 DAC 코드 0으로 출력
  * ========================================================== */
 void PWMOut_Start(void)
 {
     for (uint8_t i = 0; i < NUM_CHANNELS; i++) {
-        __HAL_TIM_SET_COMPARE(&htim1, s_tim_ch[i], 0U);
-        HAL_TIM_PWM_Start(&htim1, s_tim_ch[i]);
-        s_duty_cache[i] = 0.0f;
+        s_dac_code[i] = 0U;
+        /* AD5641 정상 동작 모드, 출력=0 */
+        ad5641_write(i, AD5641_CMD_NORMAL);
     }
 }
 
@@ -40,38 +52,40 @@ void PWMOut_Start(void)
 void PWMOut_Stop(void)
 {
     for (uint8_t i = 0; i < NUM_CHANNELS; i++) {
-        HAL_TIM_PWM_Stop(&htim1, s_tim_ch[i]);
-        s_duty_cache[i] = 0.0f;
+        PWMOut_Disable(i);
     }
 }
 
 /* ==========================================================
  * PWMOut_SetDuty
+ *   duty (0.0~1.0) → DAC 코드 (0~16383) → SPI 전송
  * ========================================================== */
 void PWMOut_SetDuty(uint8_t ch, float duty)
 {
     if (ch >= NUM_CHANNELS) return;
 
-    /* 범위 클램프 */
     if (duty < 0.0f) duty = 0.0f;
     if (duty > 1.0f) duty = 1.0f;
 
-    uint32_t ccr = (uint32_t)(duty * (float)PWM_ARR);
-    __HAL_TIM_SET_COMPARE(&htim1, s_tim_ch[ch], ccr);
-    s_duty_cache[ch] = duty;
+    uint16_t code = (uint16_t)(duty * (float)AD5641_FULL_SCALE);
+    PWMOut_SetCode(ch, code);
 }
 
 /* ==========================================================
- * PWMOut_SetCCR
+ * PWMOut_SetCode
+ *   DAC 코드 직접 설정 및 전송
+ *   16비트 프레임: [PD1=0][PD0=0][D13..D0]
  * ========================================================== */
-void PWMOut_SetCCR(uint8_t ch, uint32_t ccr)
+void PWMOut_SetCode(uint8_t ch, uint16_t code)
 {
     if (ch >= NUM_CHANNELS) return;
+    if (code > AD5641_FULL_SCALE) code = AD5641_FULL_SCALE;
 
-    if (ccr > PWM_MAX_DUTY) ccr = PWM_MAX_DUTY;
+    s_dac_code[ch] = code;
 
-    __HAL_TIM_SET_COMPARE(&htim1, s_tim_ch[ch], ccr);
-    s_duty_cache[ch] = (float)ccr / (float)PWM_ARR;
+    /* AD5641_CMD_NORMAL(0x0000) | code(14비트) = 정상동작 */
+    uint16_t word = AD5641_CMD_NORMAL | (code & 0x3FFFU);
+    ad5641_write(ch, word);
 }
 
 /* ==========================================================
@@ -80,9 +94,8 @@ void PWMOut_SetCCR(uint8_t ch, uint32_t ccr)
 void PWMOut_Disable(uint8_t ch)
 {
     if (ch >= NUM_CHANNELS) return;
-
-    __HAL_TIM_SET_COMPARE(&htim1, s_tim_ch[ch], 0U);
-    s_duty_cache[ch] = 0.0f;
+    s_dac_code[ch] = 0U;
+    ad5641_write(ch, AD5641_CMD_NORMAL);   /* code=0 */
 }
 
 /* ==========================================================
@@ -91,5 +104,5 @@ void PWMOut_Disable(uint8_t ch)
 float PWMOut_GetDuty(uint8_t ch)
 {
     if (ch >= NUM_CHANNELS) return 0.0f;
-    return s_duty_cache[ch];
+    return (float)s_dac_code[ch] / (float)AD5641_FULL_SCALE;
 }
