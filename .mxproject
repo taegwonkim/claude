@@ -1,0 +1,9 @@
+[PreviousLibFiles]
+LibFiles=
+
+[Version]
+PreviousVersion=6.0.0
+
+[PreviousUsedFiles]
+SourceFiles=Core/Src/main.c;Core/Src/ad5641.c;Core/Src/mcp3465r.c;Core/Src/pid_controller.c;Core/Src/voltage_control.c;Core/Src/stm32l5xx_hal_msp.c;Core/Src/stm32l5xx_it.c;Core/Src/system_stm32l5xx.c;
+HeaderFiles=Core/Inc/main.h;Core/Inc/ad5641.h;Core/Inc/mcp3465r.h;Core/Inc/pid_controller.h;Core/Inc/voltage_control.h;Core/Inc/stm32l5xx_hal_conf.h;Core/Inc/stm32l5xx_it.h;Core/Inc/FreeRTOSConfig.h;
