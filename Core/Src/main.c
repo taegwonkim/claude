@@ -273,7 +273,7 @@ static void MX_GPIO_Init(void)
 
 /**
  * @brief  SPI1 초기화 (AD5641 DAC)
- *         Mode 3 (CPOL=High, CPHA=2Edge), 16-bit, Transmit Only Master
+ *         Mode 3 (CPOL=High, CPHA=2Edge), 8-bit, Transmit Only Master
  *         Prescaler=8 → 110MHz/8 = 13.75 MHz (AD5641 최대 30MHz 이내)
  */
 static void MX_SPI1_Init(void)
@@ -283,7 +283,7 @@ static void MX_SPI1_Init(void)
     hspi1.Instance               = SPI1;
     hspi1.Init.Mode              = SPI_MODE_MASTER;
     hspi1.Init.Direction         = SPI_DIRECTION_1LINE;  /* MOSI only */
-    hspi1.Init.DataSize          = SPI_DATASIZE_16BIT;
+    hspi1.Init.DataSize          = SPI_DATASIZE_8BIT;
     hspi1.Init.CLKPolarity       = SPI_POLARITY_HIGH;    /* CPOL=1 */
     hspi1.Init.CLKPhase          = SPI_PHASE_2EDGE;      /* CPHA=1 */
     hspi1.Init.NSS               = SPI_NSS_SOFT;

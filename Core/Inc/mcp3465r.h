@@ -90,9 +90,9 @@ extern "C" {
 /* [7:6] BOOST : 10=1× (기본)                                       */
 /* [5:3] GAIN  : 001=1×                                              */
 /* [2]   AZ_MUX: 0=auto-zero MUX 비활성                             */
-/* [1]   AZ_REF: 0                                                   */
-/* [0]   reserved                                                    */
-#define MCP3465R_CONFIG2_BOOST1_GAIN1   0x8BU   /**< BOOST=1×, GAIN=1× */
+/* [1]   AZ_REF: 0=auto-zero REF 비활성                              */
+/* [0]   reserved (0)                                                */
+#define MCP3465R_CONFIG2_BOOST1_GAIN1   0x88U   /**< BOOST=1×, GAIN=1× */
 
 /* ── CONFIG3 ─────────────────────────────────────────────────────── */
 /* [7:6] CONV_MODE  : 11=연속 변환                                   */
@@ -101,6 +101,14 @@ extern "C" {
 /* [1]   EN_CRCCOM  : 0                                              */
 /* [0]   EN_OFFCAL  : 0                                              */
 #define MCP3465R_CONFIG3_CONT_32BIT_CHID  0xF0U  /**< 연속, 32bit+CHID */
+
+/* ── IRQ ─────────────────────────────────────────────────────────── */
+/* [7:6] reserved                                                    */
+/* [5:4] IRQ_MODE: 11=IRQ핀 비활성 (High-Z)                         */
+/* [3]   EN_FASTCMD: 1=Fast command 활성                             */
+/* [2]   EN_STP: 1=변환 완료 시 STP 인터럽트 활성                    */
+/* [1:0] reserved                                                    */
+#define MCP3465R_IRQ_DEFAULT            0x37U   /**< IRQ핀 Hi-Z, Fast cmd 활성 */
 
 /* ── MUX 채널 선택값 ─────────────────────────────────────────────── */
 #define MCP3465R_MUX_CH0    0x0U

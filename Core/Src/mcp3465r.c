@@ -6,8 +6,8 @@
  * 1. Init: Full Reset → CONFIG0~3 설정 → 연속 변환 시작
  * 2. ReadChannel: MUX 레지스터 변경 → DR 핀(또는 폴링) 대기 → ADCDATA 읽기
  *
- * ※ DR(Data Ready) 인터럽트 핀 미사용. HAL_Delay로 변환 완료를 기다립니다.
- *    OSR=256, 내부 4.915MHz AMCLK 기준 변환 시간 ≒ 0.25ms → 1ms 대기로 충분.
+ * ※ DR 인터럽트 핀 미사용. STATUS byte의 DR bit 폴링 + HAL_Delay 대기.
+ *    OSR=256, 내부 4.915MHz AMCLK 기준 변환 시간 ≒ 0.25ms.
  */
 #include "mcp3465r.h"
 
@@ -61,7 +61,7 @@ static HAL_StatusTypeDef fast_cmd(MCP3465R_HandleTypeDef *hdev, uint8_t cmd)
  * 실제로는 커맨드 바이트 이후 4바이트 데이터 수신.
  */
 static HAL_StatusTypeDef read_adcdata(MCP3465R_HandleTypeDef *hdev,
-                                       int32_t *raw_out,
+                                       int16_t *adc_out,
                                        uint8_t *ch_id_out)
 {
     uint8_t tx[5] = { CMD_BYTE(MCP3465R_REG_ADCDATA, MCP3465R_CMD_STATIC_R),
@@ -76,18 +76,34 @@ static HAL_StatusTypeDef read_adcdata(MCP3465R_HandleTypeDef *hdev,
     if (ret != HAL_OK) return ret;
 
     /*
-     * rx[0] = 커맨드에 대한 응답(STATUS byte)
-     *   bit[7:4] = CHID
-     *   bit[3]   = DR (데이터 준비 플래그, 1=준비)
-     * rx[1..4] = 32-bit signed ADC 데이터 (MSB first)
+     * SPI 수신 데이터 레이아웃 (DATA_FORMAT=11, 16-bit ADC):
+     *
+     * rx[0] = STATUS byte (커맨드 바이트 전송 중 슬레이브 출력)
+     *   bit[7:4] = CHID (최근 변환된 채널 ID)
+     *   bit[3]   = DR   (1=Data Ready)
+     *
+     * rx[1..4] = ADCDATA 레지스터 (32-bit, DATA_FORMAT=11):
+     *   rx[1] bit[7:4] = CHID[3:0]    ← 채널 ID
+     *   rx[1] bit[3:0] = SGN 확장
+     *   rx[2]          = SGN 확장
+     *   rx[3]          = D15:D8       ← ADC 데이터 상위
+     *   rx[4]          = D7:D0        ← ADC 데이터 하위
+     *
+     * 16-bit ADC 유효 데이터 = rx[3]:rx[4]  (하위 16비트)
+     * CHID = rx[1] >> 4
      */
-    if (ch_id_out)  *ch_id_out = (rx[0] >> 4) & 0x0FU;
+    /* STATUS byte의 DR bit(bit[2])로 데이터 준비 확인
+     * DR=0 → 새 데이터 있음 (active-low), DR=1 → 미준비 */
+    if (rx[0] & 0x04U)
+    {
+        /* Data not ready — 이전 데이터가 아직 유효하지 않음.
+         * 호출부에서 재시도 또는 대기 시간 증가 필요 */
+        return HAL_BUSY;
+    }
 
-    int32_t raw = ((int32_t)rx[1] << 24) |
-                  ((int32_t)rx[2] << 16) |
-                  ((int32_t)rx[3] <<  8) |
-                   (int32_t)rx[4];
-    *raw_out = raw;
+    if (ch_id_out)  *ch_id_out = (rx[1] >> 4) & 0x0FU;
+
+    *adc_out = (int16_t)(((uint16_t)rx[3] << 8) | (uint16_t)rx[4]);
     return HAL_OK;
 }
 
@@ -123,11 +139,15 @@ HAL_StatusTypeDef MCP3465R_Init(MCP3465R_HandleTypeDef *hdev)
     ret = write_reg8(hdev, MCP3465R_REG_CONFIG3, MCP3465R_CONFIG3_CONT_32BIT_CHID);
     if (ret != HAL_OK) return ret;
 
-    /* 6. MUX: CH0 단일단으로 초기 설정 */
+    /* 6. IRQ: IRQ핀 비활성 (Hi-Z), Fast command 활성 */
+    ret = write_reg8(hdev, MCP3465R_REG_IRQ, MCP3465R_IRQ_DEFAULT);
+    if (ret != HAL_OK) return ret;
+
+    /* 7. MUX: CH0 단일단으로 초기 설정 */
     ret = write_reg8(hdev, MCP3465R_REG_MUX, MCP3465R_MUX_SE(0U));
     if (ret != HAL_OK) return ret;
 
-    /* 7. 변환 시작 */
+    /* 8. 변환 시작 */
     ret = fast_cmd(hdev, MCP3465R_FAST_ADC_START);
     if (ret != HAL_OK) return ret;
 
@@ -148,26 +168,37 @@ HAL_StatusTypeDef MCP3465R_ReadChannel(MCP3465R_HandleTypeDef *hdev,
     ret = write_reg8(hdev, MCP3465R_REG_MUX, MCP3465R_MUX_SE(channel));
     if (ret != HAL_OK) return ret;
 
-    /* 2. 변환 완료 대기
-     *    OSR=256 기준 변환 시간 ≒ 0.2ms → 넉넉히 2ms 대기
-     *    (DR 핀 폴링을 사용하면 HAL_Delay를 제거하고 정확하게 대기 가능) */
-    HAL_Delay(2U);
-
-    /* 3. ADC 데이터 읽기 */
-    int32_t raw   = 0;
+    /* 2. 변환 완료 대기 후 ADC 데이터 읽기
+     *    OSR=256 기준 변환 시간 ≒ 0.2ms → 1ms 대기 후 시도
+     *    STATUS DR 비트로 준비 여부를 확인하며 최대 3회 재시도 */
+    int16_t adc16 = 0;
     uint8_t ch_id = 0;
-    ret = read_adcdata(hdev, &raw, &ch_id);
-    if (ret != HAL_OK) return ret;
+    uint8_t retries = 3U;
+
+    HAL_Delay(1U);
+    do {
+        ret = read_adcdata(hdev, &adc16, &ch_id);
+        if (ret == HAL_OK) break;
+        if (ret == HAL_BUSY)
+        {
+            HAL_Delay(1U);   /* DR not ready → 1ms 추가 대기 */
+            retries--;
+        }
+        else
+        {
+            return ret;      /* SPI 통신 에러 */
+        }
+    } while (retries > 0U);
+
+    if (ret != HAL_OK) return HAL_TIMEOUT;
 
     /*
      * 단극성 단일단 입력(0V ~ Vref):
-     *   raw 범위: 0x000000 ~ 0x7FFF00 (상위 16비트가 유효 ADC 데이터)
-     *   유효 16비트 = raw >> 16  (DATA_FORMAT=11에서 부호확장된 32비트)
-     *   Vin = (int16_t)(raw >> 16) / 32768.0 * Vref
+     *   adc16 범위: 0x0000(0V) ~ 0x7FFF(Vref)
+     *   Vin = adc16 / 32768.0 * Vref
      *
      * ※ 음수 코드는 0으로 클램프(오프셋 오차, 노이즈 대응)
      */
-    int16_t adc16 = (int16_t)(raw >> 16);
     if (adc16 < 0) adc16 = 0;
 
     *voltage = ((float)adc16 / (float)MCP3465R_FULL_SCALE) * MCP3465R_VREF;

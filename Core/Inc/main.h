@@ -23,7 +23,7 @@
  * STM32CubeIDE 설정 요약
  * ───────────────────────
  *  SPI1: Mode=Transmit Only Master, CPOL=High, CPHA=2Edge,
- *        DataSize=16bit, Prescaler=적절히 (≤50MHz AD5641 최대)
+ *        DataSize=8bit, Prescaler=적절히 (≤30MHz AD5641 최대)
  *  SPI2: Mode=Full-Duplex Master, CPOL=Low, CPHA=1Edge,
  *        DataSize=8bit, Prescaler=적절히 (≤20MHz MCP3465R 최대)
  *  GPIO: PA4/PB0/PC0/PC1/PB12 → Output Push-Pull, 초기값=High
