@@ -1,22 +1,29 @@
 /**
  * example_main.c
  *
- * MCP3465R 자동 캘리브레이션 사용 예제 (STM32 HAL 기반)
+ * MCP3465R 자동 캘리브레이션 사용 예제 – 입력 범위 0 ~ 5 V (STM32 HAL 기반)
  *
  * 사용 흐름:
- *   1. MCP3465R_Init()   – ADC 레지스터 초기값 설정
- *   2. MCP3465R_AutoCalibrate()  – offset/gain 자동 측정 후 보정 레지스터 활성화
- *   3. MCP3465R_ReadADC()  – 보정이 적용된 최종 ADC 코드 읽기
+ *   1. MCP3465R_Init()          – ADC 레지스터 초기값 설정 (외부 5 V VREF)
+ *   2. MCP3465R_AutoCalibrate() – offset/gain 자동 측정 후 보정 레지스터 활성화
+ *   3. MCP3465R_ReadADC()       – 보정이 적용된 최종 ADC 코드 읽기
  *
- * 캘리브레이션 MUX 연결 요구사항:
- *   Offset phase: 내부 AGND 라우팅이므로 외부 배선 불필요
- *   Gain   phase: REFIN+ / REFIN- 핀이 외부 기준 전압에 연결되어 있어야 함
- *                 (내부 VREF 사용 시 CONFIG0_VREF_INT 설정으로 자동 연결)
+ * 필수 외부 배선:
+ *   REFIN+  → 5 V 정밀 기준 전압 (예: REF5050, LT1021-5, 또는 디커플링된 AVDD)
+ *   REFIN-  → AGND
+ *   AVDD    = 5 V  (입력 신호가 AVDD + 0.3 V 를 초과하면 안 됨)
+ *   CH0(AIN0) → 측정 대상 신호 (0 ~ 5 V)
+ *   AGND    → 신호 기준 GND
+ *
+ *   Offset 캘리브레이션: 내부 AGND 라우팅이므로 외부 배선 불필요
+ *   Gain   캘리브레이션: MUX → REFIN+/2 vs REFIN-/2 → ΔV = 2.5 V (자동)
  *
  * 전압 환산 공식:
- *   Vin_diff [V] = code × VREF / (GAIN × 2^23)
- *   예) VREF = 2.4 V, GAIN = 1, code = 0x3FFFFF
- *     → 2.4 / 8388608 × 4194303 ≈ 1.1999 V
+ *   Vin [mV] = code × VREF_mV / (GAIN × 2^23)
+ *   예) VREF = 5000 mV, GAIN = 1, code = 0x7FFFFF (풀스케일)
+ *     → 5000 / 8388608 × 8388607 ≈ 4999.9994 mV
+ *   예) code = 0x400000 (절반)
+ *     → 5000 / 8388608 × 4194304 = 2500.0 mV
  */
 
 #include "main.h"           /* CubeMX 생성 파일 (SPI/GPIO 핸들 선언 포함) */
@@ -30,9 +37,13 @@ extern SPI_HandleTypeDef hspi1;     /* CubeMX 생성 SPI 핸들          */
 #define ADC_CS_PORT     GPIOA       /* CS 핀 포트                     */
 #define ADC_CS_PIN      GPIO_PIN_4  /* CS 핀 번호                     */
 
-/* VREF 및 PGA gain – Init 설정과 일치해야 함 */
-#define ADC_VREF_MV     2400.0f     /* 내부 VREF = 2.4 V              */
-#define ADC_PGA_GAIN    1.0f        /* CONFIG2_GAIN_1 에 대응         */
+/* VREF 및 PGA gain – Init 설정 및 외부 배선과 일치해야 함 */
+#define ADC_VREF_MV     5000.0f     /* 외부 VREF = 5 V (REFIN+ 인가 전압) */
+#define ADC_PGA_GAIN    1.0f        /* CONFIG2_GAIN_1 에 대응             */
+
+/* 입력 범위 (0~5 V 단일극 단일 채널) */
+#define ADC_INPUT_MIN_MV    0.0f
+#define ADC_INPUT_MAX_MV    5000.0f
 
 /* -------------------------------------------------------------------------
  * 보정 결과를 비휘발성 메모리에 보관할 때 활용하는 전역 구조체
@@ -42,10 +53,17 @@ static MCP3465R_CalResult_t g_cal_result;
 
 /* -------------------------------------------------------------------------
  * ADC 코드 → 전압 환산 (mV)
+ *
+ * 단일극 0~5 V 입력에서 코드 범위:
+ *   0x000000 (0)       → 0.000 mV    (0 V)
+ *   0x400000 (4194304) → 2500.0 mV   (2.5 V, 중간)
+ *   0x7FFFFF (8388607) → 4999.999 mV (5 V, 풀스케일)
+ *
+ * 입력 신호 노이즈로 인해 0V 근방에서 음수 코드가 나올 수 있으므로
+ * 호출 측에서 클램핑하는 것을 권장함.
  * ------------------------------------------------------------------------- */
 static float adc_code_to_mv(int32_t code)
 {
-    /* code 범위: –8388608 (–FS) … +8388607 (+FS) */
     return (float)code * ADC_VREF_MV / (ADC_PGA_GAIN * (float)(1L << 23));
 }
 
@@ -66,13 +84,14 @@ void example_mcp3465r_main(void)
 
     /* ------------------------------------------------------------------ */
     /* 2. ADC 초기화                                                        */
-    /*    내부 VREF 2.4 V, 내부 클록, OSR=4096, 연속 변환 모드로 설정      */
+    /*    외부 VREF 5 V, 내부 클록, OSR=4096, 연속 변환 모드               */
+    /*    MUX: CH0(VIN+) vs AGND(VIN-)  → 0~5 V 단일극 입력               */
     /* ------------------------------------------------------------------ */
     if (MCP3465R_Init(&adc) != MCP3465R_OK) {
         printf("[ERROR] MCP3465R_Init failed\r\n");
         return;
     }
-    printf("[OK] MCP3465R initialized\r\n");
+    printf("[OK] MCP3465R initialized (VREF=5V ext, OSR=4096, CH0 vs AGND)\r\n");
 
     /* ------------------------------------------------------------------ */
     /* 3. 자동 캘리브레이션                                                 */
@@ -84,7 +103,7 @@ void example_mcp3465r_main(void)
     /*    MUX → REFIN+/2 vs REFIN-/2 (ΔV = VREF/2)                       */
     /*    64샘플 평균 → GAINCAL = 0x400000 × 0x800000 / mean              */
     /*                                                                     */
-    /*  완료 후: EN_OFFCAL + EN_GAINCAL 활성, MUX 복원 (CH0/CH1)          */
+    /*  완료 후: EN_OFFCAL + EN_GAINCAL 활성, MUX 복원 (CH0/AGND)         */
     /* ------------------------------------------------------------------ */
     printf("[CAL] Starting auto-calibration...\r\n");
 
@@ -101,12 +120,14 @@ void example_mcp3465r_main(void)
     } else if (cal_status == MCP3465R_ERR_CAL) {
         /*
          * GAIN 캘리브레이션 실패 원인 점검 목록:
-         *  - REFIN+/REFIN- 핀에 외부 기준 전압이 연결되어 있지 않음
-         *  - 내부 VREF 활성화 여부 확인 (CONFIG0_VREF_INT)
-         *  - 측정 코드가 기대값(0x400000) ±15 % 범위를 벗어남
+         *  - REFIN+ 에 5 V 정밀 기준 전압이 연결되어 있지 않음
+         *  - REFIN- 가 AGND 에 연결되어 있지 않음
+         *  - AVDD 가 5 V 인지 확인 (입력 범위: 0 ~ AVDD)
+         *  - 측정 코드가 기대값(0x400000 = 2.5 V / 5 V × 2^23) ±15 % 범위를 벗어남
          */
         printf("[ERROR] Gain calibration sanity check failed. "
-               "Check REFIN+/- wiring. measured=%ld, expected=0x400000\r\n",
+               "Check REFIN+/- wiring (REFIN+=5V, REFIN-=GND). "
+               "measured=%ld, expected=0x400000\r\n",
                (long)g_cal_result.gain_raw);
         printf("[WARN] Continuing with offset-only correction.\r\n");
     } else {
@@ -131,8 +152,10 @@ void example_mcp3465r_main(void)
     /*                                                                     */
     /*  ReadADC()가 반환하는 code에는 이미 하드웨어가 적용한               */
     /*  OFFSETCAL + GAINCAL 보정이 포함되어 있음                           */
+    /*  입력 범위: 0 ~ 5 V (CH0 vs AGND, 단일극)                          */
     /* ------------------------------------------------------------------ */
-    printf("[RUN] Reading calibrated ADC values (CH0 vs CH1):\r\n");
+    printf("[RUN] Reading calibrated ADC values (CH0 vs AGND, 0-5V range):\r\n");
+    printf("      code range: 0x000000 (0V) ~ 0x7FFFFF (5V)\r\n");
 
     uint32_t sample_idx = 0;
 
@@ -142,8 +165,18 @@ void example_mcp3465r_main(void)
 
         if (rd_st == MCP3465R_OK) {
             float mv = adc_code_to_mv(code);
-            printf("[%4lu] code=%8ld  voltage=%+9.4f mV\r\n",
-                   (unsigned long)sample_idx, (long)code, mv);
+
+            /* 0~5 V 범위 클램핑 (노이즈로 인한 미소 범위 이탈 처리) */
+            if (mv < ADC_INPUT_MIN_MV) mv = ADC_INPUT_MIN_MV;
+            if (mv > ADC_INPUT_MAX_MV) mv = ADC_INPUT_MAX_MV;
+
+            float pct = mv / ADC_INPUT_MAX_MV * 100.0f;
+
+            printf("[%4lu] code=0x%06lX (%8ld)  %7.2f mV  (%5.2f %%)\r\n",
+                   (unsigned long)sample_idx,
+                   (unsigned long)(code & 0xFFFFFF),
+                   (long)code,
+                   mv, pct);
         } else if (rd_st == MCP3465R_ERR_TIMEOUT) {
             printf("[%4lu] Timeout waiting for data ready\r\n",
                    (unsigned long)sample_idx);

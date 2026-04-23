@@ -2,13 +2,19 @@
  * mcp3465r.c
  *
  * MCP3465R 24-bit ADC driver + automatic offset/gain calibration.
+ * Configured for 0–5 V single-ended input (VIN+ = CH0, VIN- = AGND).
  *
  * Hardware connections (SPI, CS active-low):
- *   MOSI → SDI
- *   MISO ← SDO
- *   SCLK → SCK
+ *   MOSI  → SDI
+ *   MISO  ← SDO
+ *   SCLK  → SCK
  *   GPIOx → /CS
  *   (Optional) GPIOy ← /MDAT  – not used; driver polls IRQ register instead
+ *
+ * External VREF wiring (REQUIRED for 5 V full-scale):
+ *   REFIN+ → 5 V precision reference (e.g. REF5050 or filtered AVDD)
+ *   REFIN- → AGND
+ *   AVDD   = 5 V  (inputs must not exceed AVDD + 0.3 V)
  *
  * Calibration math:
  *   corrected = (raw + OFFSETCAL) × GAINCAL / 2^23
@@ -78,10 +84,11 @@ MCP3465R_Status_t MCP3465R_Init(MCP3465R_Handle_t *dev)
     MCP3465R_Status_t st;
 
     /*
-     * CONFIG0: internal 2.4 V VREF, internal clock (no AMCLK output),
+     * CONFIG0: external VREF (5 V on REFIN+/REFIN-), internal clock,
      *          no bias-current source on inputs, continuous conversion.
+     *          Internal 2.4 V VREF is NOT used – it cannot cover 5 V FS.
      */
-    uint8_t cfg0 = CONFIG0_VREF_INT | CONFIG0_CLK_INT | CONFIG0_CS_NONE
+    uint8_t cfg0 = CONFIG0_VREF_EXT | CONFIG0_CLK_INT | CONFIG0_CS_NONE
                  | CONFIG0_MODE_CONTINUOUS;
     st = MCP3465R_WriteReg(dev, MCP3465R_REG_CONFIG0, &cfg0, 1);
     if (st != MCP3465R_OK) return st;
@@ -117,8 +124,8 @@ MCP3465R_Status_t MCP3465R_Init(MCP3465R_Handle_t *dev)
     st = MCP3465R_SetGainCal(dev, MCP3465R_GAINCAL_UNITY);
     if (st != MCP3465R_OK) return st;
 
-    /* Default MUX: CH0 (VIN+) vs CH1 (VIN-) */
-    st = MCP3465R_SetMux(dev, MUX_VIP_CH0 | MUX_VIN_CH1);
+    /* Default MUX: single-ended – CH0 (VIN+) vs AGND (VIN-) for 0–5 V input */
+    st = MCP3465R_SetMux(dev, MUX_VIP_CH0 | MUX_VIN_AGND);
     if (st != MCP3465R_OK) return st;
 
     return MCP3465R_OK;
@@ -333,8 +340,8 @@ MCP3465R_Status_t MCP3465R_AutoCalibrate(MCP3465R_Handle_t *dev,
     st = MCP3465R_EnableCalRegisters(dev, true, true);
     if (st != MCP3465R_OK) return st;
 
-    /* Restore MUX to normal differential input CH0/CH1 */
-    st = MCP3465R_SetMux(dev, MUX_VIP_CH0 | MUX_VIN_CH1);
+    /* Restore MUX to normal single-ended input: CH0 vs AGND */
+    st = MCP3465R_SetMux(dev, MUX_VIP_CH0 | MUX_VIN_AGND);
     if (st != MCP3465R_OK) return st;
 
     if (result)
