@@ -25,6 +25,7 @@ volatile bool     g_cal_valid  = false;
 osMutexId_t       g_mcp_mutex  = NULL;
 
 static MCP3465R_CalResult_t s_cal;
+static volatile bool      s_init_complete = false;
 
 /* =========================================================================
  * Internal helpers
@@ -485,6 +486,7 @@ void Task_MCP3465R_Init(void *arg)
     reg_write(REG_CONFIG0, CONFIG0_EXT_VREF_CONV, 1);
 
     g_cal_valid = true;
+    s_init_complete = true;
     osThreadTerminate(osThreadGetId());
     return;
 
@@ -497,6 +499,7 @@ fail:
     reg_write(REG_MUX,    MUX_REG(MUX_CH0, MUX_AGND), 1);
     reg_write(REG_CONFIG0, CONFIG0_EXT_VREF_CONV, 1);
     g_cal_valid = false;
+    s_init_complete = true;
     osThreadTerminate(osThreadGetId());
 }
 
@@ -514,8 +517,8 @@ void Task_MCP3465R_Measure(void *arg)
 {
     (void)arg;
 
-    /* Wait for init task to complete calibration */
-    while (!g_cal_valid) {
+    /* Wait for init task to complete (calibration may still fail). */
+    while (!s_init_complete) {
         osDelay(100);
     }
 
