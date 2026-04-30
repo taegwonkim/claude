@@ -1,6 +1,12 @@
 #ifndef STM32L552_FLASH_H
 #define STM32L552_FLASH_H
 
+/* Target: STM32L552RCT6
+ *   Package : LQFP64
+ *   Flash   : 256KB (code "C"), dual-bank (Bank1: p0-63, Bank2: p64-127)
+ *   RAM     : 256KB
+ */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -8,11 +14,15 @@
 /* Flash memory layout */
 #define FLASH_BASE_ADDR         0x08000000UL
 #define FLASH_PAGE_SIZE         0x800U          /* 2KB per page */
-#define FLASH_TOTAL_PAGES       256U            /* 512KB total */
+#define FLASH_TOTAL_PAGES       128U            /* 256KB total, 128 pages */
+#define FLASH_BANK_PAGES        64U             /* 64 pages per bank */
+#define FLASH_BANK2_START_PAGE  64U
+#define FLASH_BANK2_BASE_ADDR   (FLASH_BASE_ADDR + (FLASH_BANK2_START_PAGE * FLASH_PAGE_SIZE))
 #define FLASH_END_ADDR          (FLASH_BASE_ADDR + (FLASH_TOTAL_PAGES * FLASH_PAGE_SIZE))
 
-/* User data storage: last 4 pages (8KB) */
-#define FLASH_USER_START_PAGE   252U
+/* User data storage: last 4 pages of Bank2 (pages 124-127, 8KB)
+ * Address range: 0x0803E000 - 0x0803FFFF */
+#define FLASH_USER_START_PAGE   124U
 #define FLASH_USER_START_ADDR   (FLASH_BASE_ADDR + (FLASH_USER_START_PAGE * FLASH_PAGE_SIZE))
 #define FLASH_USER_SIZE         (4U * FLASH_PAGE_SIZE)
 
@@ -41,13 +51,16 @@ typedef struct {
 #define FLASH_KEY1              0x45670123UL
 #define FLASH_KEY2              0xCDEF89ABUL
 
-/* NSCR bits */
+/* NSCR bits
+ * PNB[6:0] (bits [10:3]): page number within the selected bank (0-63)
+ * BKER (bit 11)         : 0 = Bank1, 1 = Bank2
+ */
 #define FLASH_NSCR_PG           (1U << 0)   /* Programming */
 #define FLASH_NSCR_PER          (1U << 1)   /* Page erase */
 #define FLASH_NSCR_MER1         (1U << 2)   /* Mass erase bank 1 */
 #define FLASH_NSCR_PNB_POS      3U
-#define FLASH_NSCR_PNB_MASK     (0xFFU << FLASH_NSCR_PNB_POS)
-#define FLASH_NSCR_BKER         (1U << 11)  /* Bank erase selection */
+#define FLASH_NSCR_PNB_MASK     (0x7FU << FLASH_NSCR_PNB_POS)  /* 7-bit page# within bank */
+#define FLASH_NSCR_BKER         (1U << 11)  /* Bank select: 0=Bank1, 1=Bank2 */
 #define FLASH_NSCR_MER2         (1U << 15)  /* Mass erase bank 2 */
 #define FLASH_NSCR_STRT         (1U << 16)  /* Start erase */
 #define FLASH_NSCR_OPTSTRT      (1U << 17)  /* Option start */

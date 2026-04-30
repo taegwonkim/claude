@@ -37,7 +37,7 @@ int example_write_config(void)
     UserConfig_t cfg = {
         .magic               = CONFIG_MAGIC,
         .version             = CONFIG_VERSION,
-        .device_name         = "STM32L552-Demo",
+        .device_name         = "STM32L552RCT6",
         .sensor_calibration  = {1000, 2000, 3000, 4000},
     };
     cfg.checksum = calc_checksum(&cfg);

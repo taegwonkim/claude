@@ -52,16 +52,25 @@ flash_status_t flash_erase_page(uint32_t page_num)
     if (status != FLASH_OK)
         return status;
 
-    /* Select page and start erase */
+    /* Resolve bank and relative page number.
+     * STM32L552RCT6 dual-bank: Bank1 pages 0-63, Bank2 pages 64-127.
+     * PNB field holds the page number within the bank (0-63). */
+    uint32_t bank_page = page_num;
+    uint32_t bker = 0;
+    if (page_num >= FLASH_BANK2_START_PAGE) {
+        bank_page = page_num - FLASH_BANK2_START_PAGE;
+        bker = FLASH_NSCR_BKER;
+    }
+
     uint32_t cr = FLASH_REGS->NSCR;
-    cr &= ~FLASH_NSCR_PNB_MASK;
-    cr |= FLASH_NSCR_PER | ((page_num << FLASH_NSCR_PNB_POS) & FLASH_NSCR_PNB_MASK);
+    cr &= ~(FLASH_NSCR_PNB_MASK | FLASH_NSCR_BKER);
+    cr |= FLASH_NSCR_PER | ((bank_page << FLASH_NSCR_PNB_POS) & FLASH_NSCR_PNB_MASK) | bker;
     FLASH_REGS->NSCR = cr;
     FLASH_REGS->NSCR |= FLASH_NSCR_STRT;
 
     status = wait_for_idle();
 
-    FLASH_REGS->NSCR &= ~(FLASH_NSCR_PER | FLASH_NSCR_PNB_MASK);
+    FLASH_REGS->NSCR &= ~(FLASH_NSCR_PER | FLASH_NSCR_PNB_MASK | FLASH_NSCR_BKER);
 
     if (status != FLASH_OK)
         return FLASH_ERR_ERASE;
