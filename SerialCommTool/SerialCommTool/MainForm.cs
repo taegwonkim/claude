@@ -143,6 +143,10 @@ namespace SerialCommTool
                 if (chkHexSend.Checked)
                 {
                     data = HexStringToBytes(input);
+                    if (chkAppendNewLine.Checked)
+                    {
+                        data = data.Concat(new byte[] { 0x0D, 0x0A }).ToArray();
+                    }
                 }
                 else
                 {

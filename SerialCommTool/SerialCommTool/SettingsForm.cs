@@ -32,13 +32,13 @@ namespace SerialCommTool
             cmbPort.Items.Clear();
             cmbPort.Items.AddRange(SerialPort.GetPortNames().OrderBy(p => p).ToArray());
 
-            if (cmbPort.Items.Contains(Settings.PortName))
-            {
-                cmbPort.SelectedItem = Settings.PortName;
-            }
-            else if (previouslySelected != null && cmbPort.Items.Contains(previouslySelected))
+            if (previouslySelected != null && cmbPort.Items.Contains(previouslySelected))
             {
                 cmbPort.SelectedItem = previouslySelected;
+            }
+            else if (cmbPort.Items.Contains(Settings.PortName))
+            {
+                cmbPort.SelectedItem = Settings.PortName;
             }
             else if (cmbPort.Items.Count > 0)
             {
