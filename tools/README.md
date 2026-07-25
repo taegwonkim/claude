@@ -105,3 +105,34 @@ PC라면 `sudo ip link set can0 up type can bitrate 500000 dbitrate 8000000 fd o
 
 옵션은 `can_tool.py`와 1:1로 동일합니다 (`-c/--channel`, `--no-fd`, `--extended`,
 `--count`, `--interval`).
+
+## can_echo.c
+
+PC가 보낸 프레임을 받아서 그대로 되돌려 보내는 에코 서버입니다. 보드(can0/can1이 붙은 쪽)에서
+실행해두면, PC가 PEAK PCAN-USB(FD)로 프레임을 보낼 때마다 동일한 ID/데이터가 그대로 되돌아옵니다.
+
+### 빌드
+
+```bash
+gcc -O2 -Wall -o can_echo tools/can_echo.c
+```
+
+### 사용법
+
+```bash
+./can_echo -c can0
+```
+
+PC 쪽에서 `can_tool`(또는 candump/cansend)로 보내고 받는 걸 동시에 확인하면 됩니다.
+
+```bash
+# PC 쪽 터미널 1: 수신 대기
+./can_tool recv -c can0
+
+# PC 쪽 터미널 2: 전송 (보드의 can_echo가 그대로 되돌려줌)
+./can_tool send -c can0 123 DEADBEEF
+```
+
+SocketCAN 원시 소켓은 기본적으로 자신이 보낸 프레임을 다시 수신하지 않으므로
+(`CAN_RAW_RECV_OWN_MSGS` 미설정) 에코 프레임 때문에 보드 쪽에서 무한 재전송 루프가
+생기지는 않습니다. `--no-fd`로 클래식 CAN 프레임만 처리하도록 제한할 수 있습니다.
