@@ -1,9 +1,10 @@
 /**
  * app_eeprom.h
  *
- * Wireless/server configuration storage in external I2C EEPROM.
- * Parameters are received from the PC over the config UART (see
- * app_pc_uart.c) and persisted here so they survive power cycles.
+ * Wireless/server configuration storage in external SPI NOR flash
+ * (Winbond W25Q40CL). Parameters are received from the PC over the
+ * config UART (see app_pc_uart.c) and persisted here so they survive
+ * power cycles.
  */
 #ifndef APP_EEPROM_H
 #define APP_EEPROM_H
