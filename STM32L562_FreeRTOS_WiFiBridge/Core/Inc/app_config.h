@@ -81,14 +81,22 @@ extern DMA_HandleTypeDef  hdma_usart3_rx;
 
 #define ESP32_UART_RX_RINGBUF_SIZE (512U)
 #define ESP32_AT_LINE_MAX_LEN      (256U)
+#define ESP32_MAC_STR_LEN           (18U)   /* "xx:xx:xx:xx:xx:xx\0" */
 #define ESP32_DEFAULT_AT_TIMEOUT_MS (2000U)
 #define ESP32_WIFI_JOIN_TIMEOUT_MS  (15000U)
 #define ESP32_TCP_CONNECT_TIMEOUT_MS (10000U)
 #define ESP32_SEND_TIMEOUT_MS       (5000U)
+/* upper bound for App_Esp32_ConnectAndWait(): join + tcp-connect + margin */
+#define ESP32_CONNECT_WAIT_TIMEOUT_MS \
+    (ESP32_WIFI_JOIN_TIMEOUT_MS + ESP32_TCP_CONNECT_TIMEOUT_MS + 3000U)
 
 #define FPGA_FRAME_MAX_LEN       (1024U)  /* max Cyclone IV payload bytes */
 #define FPGA_RX_IDLE_TIMEOUT_MS  (200U)
-#define FPGA_RX_TOTAL_TIMEOUT_MS (1000U)  /* max wait for a full frame after trigger */
+#define FPGA_RX_TOTAL_TIMEOUT_MS (1000U)  /* max wait for a full data frame after trigger */
+#define FPGA_CMD_START_MEASURE   (0x01U)  /* STM32 -> Cyclone IV: "start a measurement" opcode
+                                            * (placeholder - adjust to your FPGA's actual command) */
+#define FPGA_MEASURE_TIMEOUT_MS  (5000U)  /* max wait for the trigger after sending START */
+#define FPGA_RECONNECT_RETRY_DELAY_MS (2000U) /* pause between Wi-Fi reconnect attempts */
 
 /* ------------------------------------------------------------------------ *
  * FreeRTOS task priorities / stack sizes (in words)

@@ -23,6 +23,8 @@ static uint8_t       s_rxByte;
 static char          s_atBuf[ESP32_AT_LINE_MAX_LEN + 1];
 static uint16_t      s_atLen;
 
+static char          s_macAddr[ESP32_MAC_STR_LEN] = "00:00:00:00:00:00";
+
 static osMessageQueueId_t s_reqQueue;
 static osSemaphoreId_t    s_sendDoneSem;
 static osEventFlagsId_t   s_connFlags;
@@ -86,6 +88,8 @@ static bool Esp32_SendCommand(const char *cmd, const char *expect_token, uint32_
     return Esp32_WaitForToken(expect_token, timeout_ms);
 }
 
+static bool Esp32_DoSend(const uint8_t *data, uint16_t len); /* fwd decl, defined below */
+
 static bool Esp32_Ping(void)
 {
     for (int i = 0; i < 3; i++) {
@@ -97,8 +101,38 @@ static bool Esp32_Ping(void)
     return false;
 }
 
+/**
+ * Read the module's station MAC address (AT+CIPSTAMAC?) into s_macAddr.
+ * Must be called after "AT+CWMODE=1" (station mode) - the query fails on
+ * some AT firmware builds otherwise. s_atBuf still holds the raw response
+ * from the Esp32_SendCommand() call, e.g.:
+ *   +CIPSTAMAC:"7c:df:a1:xx:xx:xx"\r\n\r\nOK\r\n
+ */
+static bool Esp32_ReadMac(void)
+{
+    if (!Esp32_SendCommand("AT+CIPSTAMAC?", "OK", 2000U)) {
+        return false;
+    }
+
+    char *start = strchr(s_atBuf, '\"');
+    if (start == NULL) {
+        return false;
+    }
+    start++;
+    char *end = strchr(start, '\"');
+    if (end == NULL || (size_t)(end - start) >= sizeof(s_macAddr)) {
+        return false;
+    }
+
+    memcpy(s_macAddr, start, (size_t)(end - start));
+    s_macAddr[end - start] = '\0';
+    return true;
+}
+
 /* ------------------------------------------------------------------------ *
- * Connect sequence: join AP (DHCP or static), open TCP session to server.
+ * Connect sequence: read the module's MAC, join AP (DHCP or static), open
+ * a TCP session to the server, then send a one-line identification frame
+ * so the server knows which device the session belongs to.
  * ------------------------------------------------------------------------ */
 static bool Esp32_DoConnect(const AppConfig_t *cfg)
 {
@@ -111,6 +145,7 @@ static bool Esp32_DoConnect(const AppConfig_t *cfg)
     if (!Esp32_Ping())                                    return false;
     if (!Esp32_SendCommand("ATE0", "OK", 1000U))          return false;
     if (!Esp32_SendCommand("AT+CWMODE=1", "OK", 1000U))   return false;
+    if (!Esp32_ReadMac())                                 return false;
 
     if (cfg->dhcp_enable) {
         if (!Esp32_SendCommand("AT+CWDHCP=1,1", "OK", 1000U)) return false;
@@ -132,6 +167,16 @@ static bool Esp32_DoConnect(const AppConfig_t *cfg)
              cfg->server_ip, (unsigned)cfg->server_port);
     if (!Esp32_SendCommand(cmd, "OK", ESP32_TCP_CONNECT_TIMEOUT_MS)) {
         return false;
+    }
+
+    /* Best-effort identification frame; the measurement loop still starts
+     * even if the server doesn't care about / drops this line. */
+    {
+        char idMsg[40];
+        int idLen = snprintf(idMsg, sizeof(idMsg), "ID:%s\r\n", s_macAddr);
+        if (idLen > 0) {
+            (void)Esp32_DoSend((const uint8_t *)idMsg, (uint16_t)idLen);
+        }
     }
 
     return true;
@@ -179,6 +224,22 @@ bool App_Esp32_RequestConnect(void)
     return (osMessageQueuePut(s_reqQueue, &req, 0, 0) == osOK);
 }
 
+bool App_Esp32_ConnectAndWait(uint32_t timeout_ms)
+{
+    if (!App_Esp32_RequestConnect()) {
+        return false;
+    }
+
+    uint32_t start = HAL_GetTick();
+    while (!App_Esp32_IsConnected()) {
+        if ((HAL_GetTick() - start) >= timeout_ms) {
+            return false;
+        }
+        osDelay(100);
+    }
+    return true;
+}
+
 bool App_Esp32_SendMeasurementData(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
 {
     /* drain any stale completion signal from a previous timed-out call */
@@ -198,6 +259,19 @@ bool App_Esp32_SendMeasurementData(const uint8_t *data, uint16_t len, uint32_t t
 bool App_Esp32_IsConnected(void)
 {
     return (osEventFlagsGet(s_connFlags) & ESP32_WIFI_CONNECTED_BIT) != 0U;
+}
+
+void App_Esp32_GetMacAddress(char *out, size_t out_size)
+{
+    if (out_size == 0U) {
+        return;
+    }
+    size_t n = strlen(s_macAddr);
+    if (n >= out_size) {
+        n = out_size - 1U;
+    }
+    memcpy(out, s_macAddr, n);
+    out[n] = '\0';
 }
 
 void App_Esp32_Task(void *argument)

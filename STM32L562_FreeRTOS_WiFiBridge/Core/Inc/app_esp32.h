@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "app_config.h"
 
 #ifdef __cplusplus
@@ -42,6 +43,14 @@ void App_Esp32_UART_RxCpltCallback(void);
 bool App_Esp32_RequestConnect(void);
 
 /**
+ * Same as App_Esp32_RequestConnect(), but blocks the calling task
+ * (polling App_Esp32_IsConnected()) until the link comes up or
+ * timeout_ms elapses. Intended for the measurement loop in
+ * app_fpga_if.c to wait out a reconnect before starting the next cycle.
+ */
+bool App_Esp32_ConnectAndWait(uint32_t timeout_ms);
+
+/**
  * Hand a measurement data buffer (e.g. forwarded from Cyclone IV, see
  * app_fpga_if.c) to the ESP32 task for transmission to the server via
  * AT+CIPSEND. Blocks the calling task until the transfer completes or
@@ -54,6 +63,15 @@ bool App_Esp32_SendMeasurementData(const uint8_t *data, uint16_t len, uint32_t t
 
 /** True if the module currently has an active Wi-Fi + TCP server session. */
 bool App_Esp32_IsConnected(void);
+
+/**
+ * Copy the ESP32-C3's station MAC address (as read from AT+CIPSTAMAC?
+ * during the last successful connect) into out as a NUL-terminated
+ * "xx:xx:xx:xx:xx:xx" string. out_size should be >= ESP32_MAC_STR_LEN.
+ * Returns the default "00:00:00:00:00:00" placeholder if no successful
+ * connect has happened yet.
+ */
+void App_Esp32_GetMacAddress(char *out, size_t out_size);
 
 #ifdef __cplusplus
 }

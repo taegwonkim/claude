@@ -7,16 +7,23 @@ STM32L562를 FreeRTOS로 구동하며, 아래 흐름을 구현하는 애플리�
                                    |
                                    +--USART2(AT명령)--> [ESP32-C3-WROOM] --Wi-Fi--> [서버]
                                    |
+[STM32L562] --USART3(시작명령)-->  [Cyclone IV]
 [Cyclone IV] --GPIO(트리거,falling edge)--> [STM32L562]
 [Cyclone IV] --USART3(측정데이터)--------->  [STM32L562] --(위 ESP32 경로로 즉시 전달)--> [서버]
 ```
 
+**설정(1회성, 필요할 때만)**
 1. PC가 USART1로 AP SSID/PW, DHCP 여부, 정적 IP/GW/Mask, 서버 IP/Port를 텍스트 명령으로 전송
 2. STM32L562가 파싱 후 SPI NOR 플래시(Winbond W25Q40CL)에 저장
-3. 저장 완료(`CFG:SAVE`) 또는 `CFG:CONNECT` 시 ESP32-C3-WROOM에 AT 명령으로 Wi-Fi 접속 + 서버 TCP 접속
-4. Cyclone IV가 측정 완료 시 트리거 GPIO를 low edge로 펄스
-5. STM32L562가 USART3로 Cyclone IV의 측정 데이터를 수신
-6. 수신 즉시 ESP32-C3-WROOM에 `AT+CIPSEND`로 전달 → 서버로 무선 전송
+
+**부팅 후 자동으로 계속 도는 메인 루프** (`fpgaIfTask`, `app_fpga_if.c`)
+1. ESP32-C3-WROOM의 **MAC 주소를 먼저 조회**(`AT+CIPSTAMAC?`)
+2. Wi-Fi AP 접속 + 서버 TCP 접속 (`AT+CWJAP`, `AT+CIPSTART`), 접속 직후 MAC 기반 식별 프레임 1회 전송
+3. Cyclone IV에 **측정 시작 명령**을 USART3로 전송
+4. Cyclone IV가 측정 완료 시 트리거 GPIO를 low edge로 펄스 → STM32L562가 USART3로 측정 데이터 수신
+5. 수신 즉시 ESP32-C3-WROOM에 `AT+CIPSEND`로 전달 → 서버로 무선 전송
+6. 3번으로 돌아가 **무선 연결이 유지되는 한 계속 반복**
+7. 도중에 Wi-Fi/서버 연결이 끊기면(전송 실패로 감지) 다음 사이클 진입 전에 **재접속을 완료할 때까지 대기**한 뒤 3번부터 재개
 
 이 저장소는 STM32CubeIDE에서 바로 열어 빌드할 수 있는 형태로 애플리케이션 계층
 (`app_*`)뿐 아니라 `main.c`/`main.h`/`freertos.c`/`freertos.h`/`FreeRTOSConfig.h`
@@ -146,30 +153,58 @@ void MX_FREERTOS_Init(void)
 < OK
 ```
 
-## Cyclone IV 인터페이스
+## Cyclone IV 인터페이스 및 측정 루프 (`app_fpga_if.c`, `fpgaIfTask`)
 
-- Cyclone IV는 측정이 끝나면 트리거 GPIO(PB0)를 **low edge**로 펄스합니다 (EXTI falling edge).
-- STM32L562는 트리거를 받으면 즉시 USART3 DMA 수신(`HAL_UARTEx_ReceiveToIdle_DMA`, IDLE 라인 검출)을
-  준비하고, Cyclone IV가 뒤이어 전송하는 측정 데이터를 수신합니다.
-- 프레임 최대 길이는 `FPGA_FRAME_MAX_LEN`(기본 1024바이트)이며, 트리거 이후
-  `FPGA_RX_TOTAL_TIMEOUT_MS`(기본 1000ms) 내에 데이터가 도착하지 않으면 수신을 중단하고
-  다음 트리거를 기다립니다.
+`fpgaIfTask`는 부팅 직후부터 다음 루프를 무한 반복합니다 (의사코드):
+
+```c
+for (;;) {
+    while (!App_Esp32_IsConnected()) {
+        if (!App_Esp32_ConnectAndWait(ESP32_CONNECT_WAIT_TIMEOUT_MS))
+            osDelay(FPGA_RECONNECT_RETRY_DELAY_MS);   /* 재접속 재시도 대기 */
+    }
+
+    Fpga_SendStartCommand();                            /* USART3로 시작 명령 */
+
+    if (trigger 대기 실패 (FPGA_MEASURE_TIMEOUT_MS 초과))
+        continue;                                        /* 이번 사이클 스킵, 다시 처음부터 */
+
+    USART3 DMA(IDLE 검출)로 측정 데이터 수신;
+    App_Esp32_SendMeasurementData(data, len, ...);        /* 서버로 전달 */
+}
+```
+
+- **시작 명령**: `FPGA_CMD_START_MEASURE`(`app_config.h`, 기본 `0x01` 1바이트)를 USART3로
+  전송합니다. Cyclone IV 쪽에 실제로 정의된 커맨드 코드/프레임 포맷이 있다면 이 값과
+  `Fpga_SendStartCommand()`를 그에 맞게 수정하세요.
+- **측정 완료 신호**: Cyclone IV는 측정이 끝나면 트리거 GPIO(PB0)를 **low edge**로 펄스합니다
+  (EXTI falling edge). 시작 명령 전송 후 `FPGA_MEASURE_TIMEOUT_MS`(기본 5000ms) 안에 트리거가
+  오지 않으면 이번 사이클을 포기하고 루프 처음(연결 상태 확인)으로 돌아갑니다.
+- **데이터 수신**: 트리거 직후 USART3 DMA 수신(`HAL_UARTEx_ReceiveToIdle_DMA`, IDLE 라인 검출)을
+  준비해 Cyclone IV가 뒤이어 보내는 측정 데이터를 받습니다. 프레임 최대 길이는
+  `FPGA_FRAME_MAX_LEN`(기본 1024바이트), 트리거 후 `FPGA_RX_TOTAL_TIMEOUT_MS`(기본 1000ms) 내에
+  데이터가 도착하지 않으면 수신을 중단합니다.
 - 수신된 프레임은 별도 가공 없이 그대로 `App_Esp32_SendMeasurementData()`로 전달되어
   ESP32-C3-WROOM을 통해 서버로 전송됩니다. Cyclone IV 쪽 프레임 포맷(헤더/길이/체크섬 등)이
-  정해져 있다면 `app_fpga_if.c`의 수신 완료 지점에서 해당 포맷대로 파싱/검증을 추가하세요.
+  정해져 있다면 수신 완료 지점에서 해당 포맷대로 파싱/검증을 추가하세요.
+- **무선 재접속**: 전송이 실패하면(`App_Esp32_SendMeasurementData()`가 false 반환) ESP32 모듈이
+  내부적으로 연결 플래그를 내리고, 다음 루프 반복의 맨 앞(`App_Esp32_IsConnected()` 확인)에서
+  자동으로 재접속을 시도·대기한 뒤 측정 루프를 재개합니다 — 별도의 사용자 개입이 필요 없습니다.
 
 ## ESP32-C3-WROOM AT 시퀀스 (USART2)
 
-접속(`App_Esp32_RequestConnect()` → 내부 `Esp32_DoConnect()`):
+접속(`App_Esp32_RequestConnect()` / `App_Esp32_ConnectAndWait()` → 내부 `Esp32_DoConnect()`):
 
 ```
 AT                                   (모듈 응답 확인, 최대 3회 재시도)
 ATE0                                 (에코 끄기)
 AT+CWMODE=1                          (Station 모드)
+AT+CIPSTAMAC?                        (① MAC 주소 조회 - 가장 먼저 수행)
 AT+CWDHCP=1,1  또는  AT+CWDHCP=1,0 + AT+CIPSTA="ip","gw","mask"
-AT+CWJAP="<ssid>","<pass>"
+AT+CWJAP="<ssid>","<pass>"           (② Wi-Fi AP 접속)
 AT+CIPMUX=0
-AT+CIPSTART="TCP","<server_ip>",<server_port>
+AT+CIPSTART="TCP","<server_ip>",<server_port>   (③ 서버 TCP 접속)
+AT+CIPSEND=...  "ID:<mac>"           (④ 접속 직후 식별 프레임 1회 전송, 실패해도 무시)
 ```
 
 데이터 전송(`App_Esp32_SendMeasurementData()` → 내부 `Esp32_DoSend()`):
@@ -181,6 +216,7 @@ AT+CIPSEND=<len>       ('>' 프롬프트 대기)
 ```
 
 링크가 끊겨 있으면 전송 요청 시 자동으로 재접속을 한 번 시도한 뒤 전송합니다.
+읽어온 MAC 주소는 `App_Esp32_GetMacAddress()`로 다른 모듈에서도 조회할 수 있습니다.
 
 ## EEPROM(W25Q40CL SPI NOR 플래시) 레이아웃 및 저장 절차
 
@@ -216,9 +252,16 @@ W25Q40CL은 **NOR 플래시**라서 EEPROM과 달리 임의 바이트 덮어쓰�
   펌웨어의 정확한 응답 토큰에 맞춰 `app_esp32.c`의 `Esp32_SendCommand()` 호출부 토큰을
   조정하십시오.
 - USART3 보레이트(921600)는 측정 데이터량/주기에 맞춰 조정하세요.
-- 서버로의 전송 실패/재시도 정책(예: 큐잉, 재전송 횟수)은 현재 "실패 시 다음 트리거까지
-  드롭"으로 단순화되어 있습니다. 데이터 유실이 허용되지 않는 응용이라면 `app_fpga_if.c`에
-  재시도/로컬 버퍼링 로직을 추가해야 합니다.
+- 서버로의 전송 실패/재시도 정책(예: 큐잉, 재전송 횟수)은 현재 "전송 실패한 측정값은
+  버리고, 다음 루프 반복에서 재접속 후 새 측정 사이클부터 재개"로 단순화되어 있습니다.
+  실패한 측정값 자체를 재전송해야 하는 응용이라면 `app_fpga_if.c`에 로컬 버퍼링/재시도
+  로직을 추가해야 합니다.
+- `FPGA_CMD_START_MEASURE`(기본 `0x01`)는 Cyclone IV와 아직 확정되지 않은 임의의 1바이트
+  플레이스홀더 명령입니다. 실제 시작 명령 프로토콜(옵코드, 파라미터, 응답 유무 등)이 있다면
+  `app_fpga_if.c`의 `Fpga_SendStartCommand()`를 그에 맞게 수정하세요.
+- ESP32에 보내는 식별 프레임(`"ID:<mac>\r\n"`)은 서버가 이를 요구한다는 명시적 스펙이 없어
+  임의로 추가한 것입니다. 서버 프로토콜에 맞는 형식이 따로 있다면 `app_esp32.c`의
+  `Esp32_DoConnect()` 마지막 블록을 수정/제거하세요.
 - W25Q40CL SPI 클럭은 `main.c`의 `MX_SPI1_Init()`에서 보수적인 프리스케일러
   (`SPI_BAUDRATEPRESCALER_16`)를 기본값으로 사용합니다. 실제 배선 길이/노이즈 환경에
   따라 CubeMX Clock Configuration에서 계산되는 SPI1 클럭 기준으로 필요 시 더 높여도 됩니다
