@@ -92,10 +92,14 @@ extern DMA_HandleTypeDef  hdma_usart3_rx;
 
 #define FPGA_FRAME_MAX_LEN       (1024U)  /* max Cyclone IV payload bytes */
 #define FPGA_RX_IDLE_TIMEOUT_MS  (200U)
-#define FPGA_RX_TOTAL_TIMEOUT_MS (1000U)  /* max wait for a full data frame after trigger */
-#define FPGA_CMD_START_MEASURE   (0x01U)  /* STM32 -> Cyclone IV: "start a measurement" opcode
-                                            * (placeholder - adjust to your FPGA's actual command) */
-#define FPGA_MEASURE_TIMEOUT_MS  (5000U)  /* max wait for the trigger after sending START */
+#define FPGA_RX_TOTAL_TIMEOUT_MS (1000U)  /* max wait for a full data frame after a trigger */
+#define FPGA_CMD_START_MEASURE   (0x01U)  /* STM32 -> Cyclone IV: "start free-running measurement"
+                                            * opcode, sent once per connection session (placeholder -
+                                            * adjust to your FPGA's actual command) */
+/* Cyclone IV free-runs on its own period after FPGA_CMD_START_MEASURE and
+ * paces the trigger itself; this is just how often the loop wakes up to
+ * re-check the Wi-Fi/server link while idle, not a per-cycle deadline. */
+#define FPGA_TRIGGER_WAIT_TIMEOUT_MS  (30000U)
 #define FPGA_RECONNECT_RETRY_DELAY_MS (2000U) /* pause between Wi-Fi reconnect attempts */
 
 /* ------------------------------------------------------------------------ *

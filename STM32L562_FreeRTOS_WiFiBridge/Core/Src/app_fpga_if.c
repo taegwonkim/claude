@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "app_fpga_if.h"
 #include "app_esp32.h"
 #include "cmsis_os2.h"
@@ -26,7 +27,7 @@ void App_FpgaIf_RxEventISR(uint16_t size)
     osSemaphoreRelease(s_rxDoneSem);
 }
 
-/** STM32 -> Cyclone IV: "start a measurement" command (see FPGA_CMD_START_MEASURE). */
+/** STM32 -> Cyclone IV: "start free-running measurement" command (see FPGA_CMD_START_MEASURE). */
 static void Fpga_SendStartCommand(void)
 {
     uint8_t cmd = FPGA_CMD_START_MEASURE;
@@ -34,35 +35,45 @@ static void Fpga_SendStartCommand(void)
 }
 
 /**
- * Continuous measurement loop:
+ * Main loop:
  *   1) make sure the ESP32 Wi-Fi + server link is up (reconnect + wait if not)
- *   2) tell Cyclone IV to start a measurement
- *   3) wait for its "measurement complete" trigger (falling edge) + data (USART3)
- *   4) forward the data to the server via the ESP32 link
- *   5) repeat immediately - runs continuously as long as the link stays up;
- *      if it drops, step 1 blocks here until reconnected before resuming.
+ *   2) the FIRST time the link comes up (boot, or after a reconnect), send
+ *      Cyclone IV a single "start" command - it then free-runs on its own
+ *      period and does NOT need to be re-armed every cycle
+ *   3) wait for Cyclone IV's periodic "measurement complete" trigger
+ *      (falling edge) + data (USART3); a wait timeout just means no
+ *      measurement happened yet, so loop back and keep waiting
+ *   4) forward received data to the server via the ESP32 link
+ *   5) repeat from 3 without resending START, for as long as the link
+ *      stays up. If it drops, step 1 blocks until reconnected and step 2
+ *      fires once more to (re)kick Cyclone IV off.
  */
 void App_FpgaIf_Task(void *argument)
 {
     (void)argument;
+    bool linkWasUp = false;
 
     for (;;) {
-        while (!App_Esp32_IsConnected()) {
+        if (!App_Esp32_IsConnected()) {
+            linkWasUp = false;
             if (!App_Esp32_ConnectAndWait(ESP32_CONNECT_WAIT_TIMEOUT_MS)) {
                 osDelay(FPGA_RECONNECT_RETRY_DELAY_MS);
+                continue;
             }
         }
 
-        /* drain any stale trigger/rx-done signal left over from a previous,
-         * aborted cycle before starting a fresh one */
-        osSemaphoreAcquire(s_triggerSem, 0);
-        osSemaphoreAcquire(s_rxDoneSem, 0);
+        if (!linkWasUp) {
+            /* Link just came up (first boot or a reconnect) - kick off
+             * Cyclone IV's free-running measurement cycle exactly once. */
+            osSemaphoreAcquire(s_triggerSem, 0); /* drop any stale trigger */
+            osSemaphoreAcquire(s_rxDoneSem, 0);
+            Fpga_SendStartCommand();
+            linkWasUp = true;
+        }
 
-        Fpga_SendStartCommand();
-
-        if (osSemaphoreAcquire(s_triggerSem, FPGA_MEASURE_TIMEOUT_MS) != osOK) {
-            /* Cyclone IV didn't respond to this cycle's START - try again;
-             * the top-of-loop connection check also re-runs. */
+        if (osSemaphoreAcquire(s_triggerSem, FPGA_TRIGGER_WAIT_TIMEOUT_MS) != osOK) {
+            /* No trigger yet this period - not an error, Cyclone IV paces
+             * itself. Loop back (also re-checks the link) and keep waiting. */
             continue;
         }
 
@@ -73,8 +84,8 @@ void App_FpgaIf_Task(void *argument)
             if (s_frameLen > 0U) {
                 /* Forward straight to the ESP32 link -> server. A failed
                  * send means the link dropped mid-cycle; the next loop
-                 * iteration's connection check will reconnect before the
-                 * following measurement is started. */
+                 * iteration's connection check will reconnect and re-send
+                 * START before the following measurement is expected. */
                 (void)App_Esp32_SendMeasurementData(s_frameBuf, s_frameLen,
                                                      ESP32_SEND_TIMEOUT_MS + 1000U);
             }
