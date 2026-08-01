@@ -1,26 +1,11 @@
 /**
  * app_pc_uart.h
  *
- * PC configuration link (USART1). Accepts a simple line-based text
- * protocol used to provision Wi-Fi AP credentials, DHCP/static-IP
- * settings and the target server IP/port, then stores them in EEPROM.
- *
- * Protocol (one command per line, terminated by '\n' or "\r\n"):
- *
- *   CFG:SSID=<ssid>               up to 32 chars
- *   CFG:PASS=<password>           up to 64 chars
- *   CFG:DHCP=<0|1>                1 = use DHCP, 0 = use static IP fields
- *   CFG:IP=<a.b.c.d>              static IP   (used when DHCP=0)
- *   CFG:GW=<a.b.c.d>              static gateway
- *   CFG:MASK=<a.b.c.d>            static netmask
- *   CFG:SERVERIP=<a.b.c.d>        remote server IP
- *   CFG:SERVERPORT=<0-65535>      remote server TCP port
- *   CFG:SAVE                      commit pending fields to EEPROM and
- *                                 (re)connect ESP32-C3 to Wi-Fi + server
- *   CFG:CONNECT                   force a (re)connect using the last
- *                                 saved EEPROM configuration
- *
- * Each command is acknowledged with "OK\r\n" or "ERR:<reason>\r\n".
+ * PC configuration link over USART1. This is one of two parallel
+ * transports for the shared CFG: protocol (see app_cfg_protocol.h) - the
+ * other is USB CDC (app_usb_cdc.h). Both feed complete lines into
+ * CfgProtocol_HandleLine(); this file only owns USART1 byte I/O and line
+ * framing.
  */
 #ifndef APP_PC_UART_H
 #define APP_PC_UART_H

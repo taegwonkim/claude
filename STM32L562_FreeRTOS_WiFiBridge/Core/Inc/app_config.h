@@ -25,6 +25,9 @@ extern "C" {
  * Peripheral handle bindings
  *
  *  USART1 - PC configuration link      (PA9 = TX, PA10 = RX)   115200 8N1
+ *  USB FS - PC configuration link #2   (PA11=DM, PA12=DP), CDC-ACM class
+ *           (runs IN PARALLEL with USART1 - both feed the same shared
+ *           CFG: parser, see app_cfg_protocol.h)
  *  USART2 - ESP32-C3-WROOM AT link     (PA2 = TX, PA3  = RX)   115200 8N1
  *  USART3 - Cyclone IV measurement link(PB10 = TX, PB11 = RX)  921600 8N1
  *  SPI1   - EEPROM: Winbond W25Q40CL   (PA5=SCK, PA6=MISO, PA7=MOSI, PA4=CS/GPIO)
@@ -79,6 +82,10 @@ extern DMA_HandleTypeDef  hdma_usart3_rx;
 #define PC_UART_RX_RINGBUF_SIZE  (256U)
 #define PC_UART_LINE_MAX_LEN     (128U)
 
+#define USB_CDC_RX_RINGBUF_SIZE  (256U)
+#define USB_CDC_LINE_MAX_LEN     (128U)
+#define USB_CDC_TX_RETRY_TIMEOUT_MS (200U) /* how long to retry CDC_Transmit_FS() while USBD_BUSY */
+
 #define ESP32_UART_RX_RINGBUF_SIZE (512U)
 #define ESP32_AT_LINE_MAX_LEN      (256U)
 #define ESP32_MAC_STR_LEN           (18U)   /* "xx:xx:xx:xx:xx:xx\0" */
@@ -106,10 +113,12 @@ extern DMA_HandleTypeDef  hdma_usart3_rx;
  * FreeRTOS task priorities / stack sizes (in words)
  * ------------------------------------------------------------------------ */
 #define TASK_PRIO_PC_UART   (osPriorityNormal)
+#define TASK_PRIO_USB_CDC   (osPriorityNormal)
 #define TASK_PRIO_ESP32     (osPriorityAboveNormal)
 #define TASK_PRIO_FPGA_IF   (osPriorityAboveNormal1)
 
 #define TASK_STACK_PC_UART  (384U)
+#define TASK_STACK_USB_CDC  (384U)
 #define TASK_STACK_ESP32    (512U)
 #define TASK_STACK_FPGA_IF  (384U)
 

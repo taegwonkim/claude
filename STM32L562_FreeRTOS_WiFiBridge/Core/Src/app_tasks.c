@@ -1,7 +1,9 @@
 #include "app_tasks.h"
 #include "app_config.h"
 #include "app_eeprom.h"
+#include "app_cfg_protocol.h"
 #include "app_pc_uart.h"
+#include "app_usb_cdc.h"
 #include "app_esp32.h"
 #include "app_fpga_if.h"
 #include "cmsis_os2.h"
@@ -9,7 +11,9 @@
 void App_Init(void)
 {
     App_Eeprom_Init();
-    App_PcUart_Init();
+    CfgProtocol_Init();   /* shared CFG: parser used by both PC channels below */
+    App_PcUart_Init();    /* PC config channel #1: USART1        */
+    App_UsbCdc_Init();    /* PC config channel #2: USB CDC-ACM   */
     App_Esp32_Init();
     App_FpgaIf_Init();
 }
@@ -20,6 +24,11 @@ void App_CreateTasks(void)
         .name = "pcUartTask",
         .stack_size = TASK_STACK_PC_UART * 4U,
         .priority = TASK_PRIO_PC_UART,
+    };
+    const osThreadAttr_t usbCdcAttr = {
+        .name = "usbCdcTask",
+        .stack_size = TASK_STACK_USB_CDC * 4U,
+        .priority = TASK_PRIO_USB_CDC,
     };
     const osThreadAttr_t esp32Attr = {
         .name = "esp32Task",
@@ -33,6 +42,7 @@ void App_CreateTasks(void)
     };
 
     osThreadNew(App_PcUart_Task, NULL, &pcUartAttr);
+    osThreadNew(App_UsbCdc_Task, NULL, &usbCdcAttr);
     osThreadNew(App_Esp32_Task,  NULL, &esp32Attr);
     osThreadNew(App_FpgaIf_Task, NULL, &fpgaIfAttr);
 }

@@ -11,9 +11,19 @@
  * IMPORTANT - two sections in this file are best-effort reference
  * values, NOT guaranteed to be bit-exact for your specific board/silicon
  * revision; let CubeMX regenerate them and prefer its output:
- *   1) SystemClock_Config()  - PLL dividers / Flash latency
+ *   1) SystemClock_Config()  - PLL dividers / Flash latency / HSI48+CRS
+ *      setup for the USB 48MHz clock
  *   2) MX_DMA_Init()         - exact DMA channel + DMAMUX request macro
  *      for USART3_RX (CubeMX auto-assigns these)
+ *
+ * USB CDC: this file only calls MX_USB_DEVICE_Init() - the function
+ * itself, plus usb_device.c/usbd_conf.c/usbd_desc.c, are ST/CubeMX
+ * middleware generated automatically once you add the USB_DEVICE
+ * (Communication Device Class) middleware in CubeMX and are NOT
+ * included in this repo (exact PCD instance/IRQ names are family- and
+ * CubeMX-version-specific, so hand-authoring them here would be
+ * unreliable). The one file you DO need to edit by hand is
+ * USB_DEVICE/App/usbd_cdc_if.c's CDC_Receive_FS() - see README.md.
  * Everything else (GPIO AF mapping, UART/SPI parameters, task wiring)
  * follows the pin table in README.md and standard STM32 HAL usage.
  */
@@ -21,6 +31,7 @@
 #include "app_config.h"
 #include "freertos.h"
 #include "cmsis_os2.h"
+#include "usb_device.h"
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -48,6 +59,7 @@ int main(void)
     MX_USART2_UART_Init();
     MX_USART3_UART_Init();
     MX_SPI1_Init();
+    MX_USB_DEVICE_Init();   /* USB CDC-ACM virtual COM port, parallel PC config channel */
 
     /* USER CODE BEGIN 2 */
     /* USER CODE END 2 */
@@ -66,6 +78,8 @@ int main(void)
 
 /**
  * System clock: HSI16 -> PLL -> SYSCLK 80 MHz, Range 1 (no boost mode).
+ * Also enables HSI48 + CRS (trimmed against the USB SOF signal) as the
+ * USB 48MHz clock source, so no external crystal is needed for USB.
  * VERIFY against STM32CubeMX's "Clock Configuration" tab for your exact
  * part/board before relying on this in production.
  */
@@ -73,12 +87,15 @@ static void SystemClock_Config(void)
 {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+    RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+    RCC_CRSInitTypeDef RCC_CRSInitStruct = {0};
 
     HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_HSI48;
     RCC_OscInitStruct.HSIState       = RCC_HSI_ON;
     RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.HSI48State      = RCC_HSI48_ON;   /* USB 48MHz source */
     RCC_OscInitStruct.PLL.PLLState   = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource  = RCC_PLLSOURCE_HSI;
     RCC_OscInitStruct.PLL.PLLM       = 4;   /* 16MHz / 4   =   4 MHz VCO in  */
@@ -99,6 +116,25 @@ static void SystemClock_Config(void)
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
         Error_Handler();
     }
+
+    /* Route USB to HSI48 (not the main PLL) */
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+    PeriphClkInit.UsbClockSelection    = RCC_USBCLKSOURCE_HSI48;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
+        Error_Handler();
+    }
+
+    /* Clock Recovery System: trims HSI48 against USB Start-Of-Frame
+     * pulses so it meets the USB spec's +/-0.25% clock accuracy
+     * requirement without an external crystal. */
+    __HAL_RCC_CRS_CLK_ENABLE();
+    RCC_CRSInitStruct.Prescaler = RCC_CRS_SYNC_DIV1;
+    RCC_CRSInitStruct.Source = RCC_CRS_SYNC_SOURCE_USB;
+    RCC_CRSInitStruct.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
+    RCC_CRSInitStruct.ReloadValue = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000, 1000);
+    RCC_CRSInitStruct.ErrorLimitValue = 34;
+    RCC_CRSInitStruct.HSI48CalibrationValue = 32;
+    HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
 }
 
 static void MX_GPIO_Init(void)
