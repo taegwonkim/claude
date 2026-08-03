@@ -13,8 +13,42 @@ osMessageQueueId_t g_cfgEventQueueId;
 osMessageQueueId_t g_wifiEventQueueId;
 osMessageQueueId_t g_measQueueId;
 
-/* WiFi 재접속 재시도 최소 간격 (LINK_DOWN/WIFI_UP 상태에서 자동 재시도) */
+/* WiFi/TCP 끊김 감지 후 재접속 재시도 최소 간격 */
 #define ESP32_RECONNECT_RETRY_MS (5000U)
+
+/* 링크 상태 변화(끊김/재연결)를 PC(USART3+USB)에 이벤트 라인으로 알린다 (가시성 확보용). */
+static void ReportLinkStateChange(Esp32_LinkState_t prev, Esp32_LinkState_t cur)
+{
+    if (cur == prev) {
+        return;
+    }
+
+    if (cur == ESP32_LINK_DOWN) {
+        PcComm_BroadcastLine("EVENT WIFI_DISCONNECTED");
+    } else if (cur == ESP32_WIFI_UP) {
+        PcComm_BroadcastLine((prev == ESP32_TCP_UP) ? "EVENT TCP_CLOSED" : "EVENT WIFI_CONNECTED");
+    } else if (cur == ESP32_TCP_UP) {
+        PcComm_BroadcastLine("EVENT TCP_CONNECTED");
+    }
+}
+
+/* cur_state에 맞춰 필요한 단계부터 AT 커맨드로 재접속을 시도한다.
+ * LINK_DOWN: AT+CWJAP부터 다시 (WiFi 재접속) -> 성공 시 TCP도 재연결.
+ * WIFI_UP(=WiFi는 붙어있는데 TCP만 끊김): AT+CIPSTART만 재시도. */
+static bool Esp32_TryReconnect(const NetConfig_t *cfg, Esp32_LinkState_t cur_state)
+{
+    bool ok = true;
+
+    if (cur_state == ESP32_LINK_DOWN) {
+        ok = Esp32_ConnectWifi(cfg);
+        if (ok) {
+            ok = Esp32_TcpConnect(cfg);
+        }
+    } else if (cur_state == ESP32_WIFI_UP) {
+        ok = Esp32_TcpConnect(cfg);
+    }
+    return ok;
+}
 
 static void Esp32TaskBody(void *argument)
 {
@@ -24,6 +58,7 @@ static void Esp32TaskBody(void *argument)
     bool have_cfg = false;
     MeasurementMsg_t msg;
     uint32_t last_retry = 0U;
+    Esp32_LinkState_t prev_state = ESP32_LINK_DOWN;
 
     Esp32_Init();
     osDelay(2000U); /* ESP32 모듈 자체 부팅 시간 대기 */
@@ -44,6 +79,7 @@ static void Esp32TaskBody(void *argument)
                     Esp32_TcpConnect(&last_cfg);
                 }
             }
+            last_retry = HAL_GetTick(); /* 방금 시도했으니 재시도 타이머도 리셋 */
         }
 
         if (osMessageQueueGet(g_measQueueId, &msg, NULL, 100U) == osOK) {
@@ -57,18 +93,20 @@ static void Esp32TaskBody(void *argument)
             /* TCP 미연결 시 서버 전송은 스킵됨(PC 미러는 FpgaLink_Task가 별도로 이미 처리) */
         }
 
-        Esp32_PollUrc();
+        Esp32_PollUrc(); /* WIFI DISCONNECT / CLOSED 등 URC를 반영해 링크 상태 갱신 */
 
-        if (have_cfg && (HAL_GetTick() - last_retry) > ESP32_RECONNECT_RETRY_MS) {
-            Esp32_LinkState_t st = Esp32_GetLinkState();
-            if (st == ESP32_LINK_DOWN) {
+        {
+            Esp32_LinkState_t cur_state = Esp32_GetLinkState();
+
+            ReportLinkStateChange(prev_state, cur_state);
+            prev_state = cur_state;
+
+            /* WiFi 또는 TCP가 끊긴 상태로 감지되면, 저장된 마지막 설정(last_cfg)으로
+             * AT 커맨드(AT+CWJAP / AT+CIPSTART)를 통해 재접속을 시도한다. */
+            if (have_cfg && cur_state != ESP32_TCP_UP &&
+                (HAL_GetTick() - last_retry) >= ESP32_RECONNECT_RETRY_MS) {
                 last_retry = HAL_GetTick();
-                if (Esp32_ConnectWifi(&last_cfg)) {
-                    Esp32_TcpConnect(&last_cfg);
-                }
-            } else if (st == ESP32_WIFI_UP) {
-                last_retry = HAL_GetTick();
-                Esp32_TcpConnect(&last_cfg);
+                (void)Esp32_TryReconnect(&last_cfg, cur_state);
             }
         }
     }
