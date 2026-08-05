@@ -7,13 +7,14 @@ using System.Windows.Forms;
 using Stm32WifiConfigTool.Models;
 using Stm32WifiConfigTool.Services;
 
-namespace Stm32WifiConfigTool.Forms
+namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// FPGA 측정값("DATA ...") 표시 창. USB/UART 채널을 선택해 어느 쪽(또는 둘 다) 라인을
+    /// FPGA 측정값("DATA ...") 표시 패널. USB/UART 채널을 선택해 어느 쪽(또는 둘 다) 라인을
     /// 화면에 표시할지 고를 수 있고, 별도 영역에 WIFI/TCP 관련 EVENT 라인 로그도 보여준다.
+    /// MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
-    public class MeasurementForm : Form
+    public class MeasurementPanel : UserControl
     {
         private const int MaxRows = 5000; // 메모리 보호용 상한, 초과 시 오래된 행부터 제거
 
@@ -28,16 +29,11 @@ namespace Stm32WifiConfigTool.Forms
         private readonly Label _countLabel;
         private readonly CheckBox _autoScrollCheck;
 
-        public MeasurementForm(ConnectionManager conn)
+        public MeasurementPanel(ConnectionManager conn)
         {
             _conn = conn;
 
-            Text = "측정값 보기";
-            Width = 780;
-            Height = 560;
-            StartPosition = FormStartPosition.CenterParent;
-
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(8) };
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(6) };
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -106,12 +102,6 @@ namespace Stm32WifiConfigTool.Forms
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
-
-            FormClosed += (s, e) =>
-            {
-                _conn.Usb.LineReceived -= OnLineReceived;
-                _conn.Uart.LineReceived -= OnLineReceived;
-            };
         }
 
         private bool IsChannelSelected(LinkChannel channel)
@@ -214,6 +204,16 @@ namespace Stm32WifiConfigTool.Forms
                     MessageBox.Show(this, "저장 실패: " + ex.Message, "CSV로 저장", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _conn.Usb.LineReceived -= OnLineReceived;
+                _conn.Uart.LineReceived -= OnLineReceived;
+            }
+            base.Dispose(disposing);
         }
     }
 }

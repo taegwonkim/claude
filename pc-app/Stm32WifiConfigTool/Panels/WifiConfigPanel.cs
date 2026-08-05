@@ -4,13 +4,14 @@ using System.Windows.Forms;
 using Stm32WifiConfigTool.Models;
 using Stm32WifiConfigTool.Services;
 
-namespace Stm32WifiConfigTool.Forms
+namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 설정 창.
+    /// WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 설정 패널.
     /// "현재값 읽기"로 MCU의 GET CONFIG 응답을 화면에 채우고, "저장"으로 SET+SAVE를 순차 전송한다.
+    /// MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
-    public class WifiConfigForm : Form
+    public class WifiConfigPanel : UserControl
     {
         private readonly ConnectionManager _conn;
 
@@ -30,19 +31,11 @@ namespace Stm32WifiConfigTool.Forms
         private readonly NumericUpDown _cmdTimeoutBox;
         private readonly TextBox _logBox;
 
-        public WifiConfigForm(ConnectionManager conn)
+        public WifiConfigPanel(ConnectionManager conn)
         {
             _conn = conn;
 
-            Text = "WiFi 설정";
-            Width = 520;
-            Height = 620;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterParent;
-
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(10) };
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(6) };
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -164,7 +157,7 @@ namespace Stm32WifiConfigTool.Forms
             {
                 return true;
             }
-            MessageBox.Show(this, "선택한 채널(" + (_channelUsb.Checked ? "USB" : "UART") + ")이 연결되어 있지 않습니다.\n포트 설정 창에서 먼저 연결하세요.",
+            MessageBox.Show(this, "선택한 채널(" + (_channelUsb.Checked ? "USB" : "UART") + ")이 연결되어 있지 않습니다.\n포트 설정에서 먼저 연결하세요.",
                 "WiFi 설정", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }

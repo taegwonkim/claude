@@ -3,53 +3,34 @@ using System.IO.Ports;
 using System.Windows.Forms;
 using Stm32WifiConfigTool.Services;
 
-namespace Stm32WifiConfigTool.Forms
+namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// COM 포트 선택, Baud Rate, 읽기/쓰기 통신 타임아웃 설정 창.
+    /// COM 포트 선택, Baud Rate, 읽기/쓰기 통신 타임아웃 설정 패널.
     /// USB(CDC)와 UART(USART3, 보통 USB-시리얼 변환기 경유)를 각각 독립적으로 연결/해제한다.
+    /// MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
-    public class PortSettingsForm : Form
+    public class PortSettingsPanel : UserControl
     {
-        private readonly ConnectionManager _conn;
-        private readonly ChannelPanel _usbPanel;
-        private readonly ChannelPanel _uartPanel;
-
-        public PortSettingsForm(ConnectionManager conn)
+        public PortSettingsPanel(ConnectionManager conn)
         {
-            _conn = conn;
-
-            Text = "포트 설정";
-            Width = 460;
-            Height = 380;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterParent;
-
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                Padding = new Padding(10)
+                Padding = new System.Windows.Forms.Padding(6)
             };
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
 
-            _usbPanel = new ChannelPanel("USB (CDC)", _conn.Usb, 115200);
-            _uartPanel = new ChannelPanel("UART (USART3)", _conn.Uart, 115200);
+            var usbPanel = new ChannelPanel("USB (CDC)", conn.Usb, 115200) { Dock = DockStyle.Fill };
+            var uartPanel = new ChannelPanel("UART (USART3)", conn.Uart, 115200) { Dock = DockStyle.Fill };
 
-            layout.Controls.Add(_usbPanel, 0, 0);
-            layout.Controls.Add(_uartPanel, 0, 1);
+            layout.Controls.Add(usbPanel, 0, 0);
+            layout.Controls.Add(uartPanel, 0, 1);
 
             Controls.Add(layout);
-
-            FormClosed += (s, e) =>
-            {
-                _usbPanel.Dispose();
-                _uartPanel.Dispose();
-            };
         }
 
         /// <summary>채널 하나(USB 또는 UART)의 포트/보레이트/타임아웃/연결 UI.</summary>
@@ -68,7 +49,7 @@ namespace Stm32WifiConfigTool.Forms
                 _link = link;
                 Text = title;
                 Dock = DockStyle.Fill;
-                Padding = new Padding(8);
+                Padding = new System.Windows.Forms.Padding(8);
 
                 var layout = new TableLayoutPanel
                 {
