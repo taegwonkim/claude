@@ -9,6 +9,7 @@
 #define ESP32_AT_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include "net_config_store.h"
 #include "usart.h" /* UART_HandleTypeDef */
@@ -76,6 +77,13 @@ Esp32_LinkState_t Esp32_GetLinkState(void);
  *        ESP32_Task 루프에서 주기적으로(또는 응답 대기 사이사이) 호출.
  */
 void Esp32_PollUrc(void);
+
+/**
+ * @brief 마지막으로 캐시된 ESP32 station IP/MAC 주소를 복사해 반환한다(뮤텍스로 보호되어
+ *        ESP32_Task가 아닌 다른 태스크에서 호출해도 안전함, 예: FpgaLink_Task가 PC 프레임 조립 시).
+ *        WiFi 연결 전에는 "0.0.0.0"/"00:00:00:00:00:00"이 채워진다.
+ */
+void Esp32_GetCachedNetInfo(char *ip_out, size_t ip_size, char *mac_out, size_t mac_size);
 
 #ifdef __cplusplus
 }

@@ -20,10 +20,10 @@ int MeasurementMsg_BuildDataLine(char *out, size_t out_size, const MeasurementMs
     return n;
 }
 
-int MeasurementMsg_BuildCsvFields(char *out, size_t out_size, const MeasurementMsg_t *msg)
+int MeasurementMsg_BuildPcCsvFields(char *out, size_t out_size, const MeasurementMsg_t *msg,
+                                     const char *dc_ip, const char *dc_mac)
 {
-    int n = snprintf(out, out_size, "DATA,%lu,%lu",
-                      (unsigned long)msg->seq, (unsigned long)msg->timestamp_ms);
+    int n = snprintf(out, out_size, "%s,%s", dc_ip, dc_mac);
 
     if (n < 0) {
         return n;

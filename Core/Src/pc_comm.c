@@ -205,12 +205,12 @@ static void ProcessGetConfig(void)
 
 static void ProcessStatus(void)
 {
-    char buf[64];
+    char buf[32];
     Esp32_LinkState_t st = Esp32_GetLinkState();
 
-    snprintf(buf, sizeof(buf), "STATUS,%s,%s",
-             (st >= ESP32_WIFI_UP) ? "UP" : "DOWN",
-             (st == ESP32_TCP_UP) ? "UP" : "DOWN");
+    /* Status Number = Esp32_LinkState_t 값 그대로: 0=DOWN, 1=WIFI_UP, 2=TCP_UP
+     * (docs/프로토콜_명세.md §1). ESP32_Task가 이 값을 주기적으로도 브로드캐스트한다. */
+    snprintf(buf, sizeof(buf), "STATUS,%d", (int)st);
     PcComm_BroadcastFrame(buf);
 }
 

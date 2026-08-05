@@ -7,7 +7,8 @@ namespace Stm32WifiConfigTool.Services
 {
     /// <summary>
     /// SET/SAVE/GET CONFIG/STATUS 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
-    /// DATA/EVENT 프레임은 비동기 텔레메트리이므로 커맨드 응답으로 취급하지 않고 건너뛴다.
+    /// 측정값/EVENT/STATUS 프레임은 비동기 텔레메트리(브로드캐스트)이므로 일반 커맨드 응답으로
+    /// 취급하지 않고 건너뛴다(<see cref="Stm32Protocol.IsReplyFrame"/> 화이트리스트 참고).
     /// STX가 없는(깨진/잡음) 라인도 응답으로 취급하지 않고 무시한다.
     /// 한 번에 하나의 커맨드만 진행 중이라고 가정한다(폼에서 버튼 클릭 시 순차 호출).
     ///
@@ -20,8 +21,9 @@ namespace Stm32WifiConfigTool.Services
     /// </summary>
     public static class Stm32Commands
     {
-        /// <summary>command(STX로 시작하는 프레임 문자열)를 보내고, DATA/EVENT가 아닌 첫 응답
-        /// 프레임의 필드 배열을 반환한다.</summary>
+        /// <summary>command(STX로 시작하는 프레임 문자열)를 보내고, 커맨드 응답 프레임
+        /// (OK/ERR/SAVED/CONFIG/HELP)만 골라 그 필드 배열을 반환한다. 측정값/STATUS/EVENT
+        /// 브로드캐스트는 무시하므로, 그것들이 응답 사이사이에 섞여 도착해도 안전하다.</summary>
         public static async Task<string[]> SendAndWaitReplyAsync(SerialLinkService link, string command, int timeoutMs)
         {
             var tcs = new TaskCompletionSource<string[]>();
@@ -36,9 +38,9 @@ namespace Stm32WifiConfigTool.Services
                 {
                     return; /* STX 없는 잡음/깨진 프레임 - 무시 */
                 }
-                if (Stm32Protocol.IsDataFrame(fields) || Stm32Protocol.IsEventFrame(fields))
+                if (!Stm32Protocol.IsReplyFrame(fields))
                 {
-                    return;
+                    return; /* 측정값/STATUS/EVENT 브로드캐스트 - 이 커맨드의 응답이 아님 */
                 }
                 tcs.TrySetResult(fields);
             }
@@ -126,17 +128,44 @@ namespace Stm32WifiConfigTool.Services
             await Step(Stm32Protocol.CmdSave);
         }
 
-        /// <summary>STATUS를 보내고 "STATUS,&lt;WIFI UP/DOWN&gt;,&lt;TCP UP/DOWN&gt;" 응답을
-        /// 사람이 읽기 쉬운 "STATUS WIFI=.. TCP=.." 문자열로 변환해 반환한다.</summary>
-        public static async Task<string> GetStatusAsync(SerialLinkService link, int timeoutMs)
+        /// <summary>STATUS 커맨드를 보내고 다음으로 도착하는 STATUS,&lt;번호&gt; 프레임을 기다린다.
+        /// STATUS는 주기적으로도 브로드캐스트되므로(<see cref="Stm32Protocol.IsReplyFrame"/> 화이트리스트에
+        /// 포함하지 않음) SendAndWaitReplyAsync 대신 전용 대기 로직을 사용한다.</summary>
+        public static async Task<int> GetStatusAsync(SerialLinkService link, int timeoutMs)
         {
-            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdStatus, timeoutMs);
+            var tcs = new TaskCompletionSource<int>();
 
-            if (fields.Length >= 3 && fields[0] == "STATUS")
+            void Handler(LinkChannel ch, string line)
             {
-                return "STATUS WIFI=" + fields[1] + " TCP=" + fields[2];
+                if (ch != link.Channel)
+                {
+                    return;
+                }
+                if (!Stm32Protocol.TryParseFrame(line, out string[] fields))
+                {
+                    return;
+                }
+                if (Stm32Protocol.TryParseStatus(fields, out int statusNumber))
+                {
+                    tcs.TrySetResult(statusNumber);
+                }
             }
-            return string.Join(",", fields);
+
+            link.LineReceived += Handler;
+            try
+            {
+                link.SendLine(Stm32Protocol.CmdStatus);
+                Task completed = await Task.WhenAny(tcs.Task, Task.Delay(timeoutMs));
+                if (completed != tcs.Task)
+                {
+                    throw new TimeoutException("STATUS 응답 타임아웃");
+                }
+                return tcs.Task.Result;
+            }
+            finally
+            {
+                link.LineReceived -= Handler;
+            }
         }
     }
 }

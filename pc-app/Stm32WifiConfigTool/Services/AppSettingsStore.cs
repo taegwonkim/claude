@@ -36,6 +36,7 @@ namespace Stm32WifiConfigTool.Services
                 settings.WifiCommandTimeoutMs = GetInt(map, "WifiCommandTimeoutMs", settings.WifiCommandTimeoutMs);
                 settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
+                settings.EspStatusDisplayChannel = GetString(map, "EspStatusDisplayChannel", settings.EspStatusDisplayChannel);
 
                 return settings;
             }
@@ -68,7 +69,8 @@ namespace Stm32WifiConfigTool.Services
                 "WifiCommandChannel=" + settings.WifiCommandChannel,
                 "WifiCommandTimeoutMs=" + settings.WifiCommandTimeoutMs,
                 "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
-                "MeasurementAutoScroll=" + settings.MeasurementAutoScroll
+                "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,
+                "EspStatusDisplayChannel=" + settings.EspStatusDisplayChannel
             };
 
             File.WriteAllLines(FilePath, lines);

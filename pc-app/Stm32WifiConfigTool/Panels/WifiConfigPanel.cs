@@ -263,9 +263,10 @@ namespace Stm32WifiConfigTool.Panels
             }
             try
             {
-                string reply = await Stm32Commands.GetStatusAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
-                _statusValueLabel.Text = reply;
-                Log(reply);
+                int statusNumber = await Stm32Commands.GetStatusAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                string text = "STATUS " + statusNumber + " (" + Stm32Protocol.DescribeStatus(statusNumber) + ")";
+                _statusValueLabel.Text = text;
+                Log(text);
             }
             catch (Exception ex)
             {

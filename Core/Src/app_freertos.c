@@ -8,6 +8,7 @@
 #include "status_led.h"
 #include "cmsis_os2.h"
 #include <string.h>
+#include <stdio.h>
 #include <stdbool.h>
 
 osMessageQueueId_t g_cfgEventQueueId;
@@ -61,6 +62,7 @@ static void Esp32TaskBody(void *argument)
     bool have_cfg = false;
     MeasurementMsg_t msg;
     uint32_t last_retry = 0U;
+    uint32_t last_status_broadcast = 0U;
     Esp32_LinkState_t prev_state = ESP32_LINK_DOWN;
 
     Esp32_Init();
@@ -119,6 +121,15 @@ static void Esp32TaskBody(void *argument)
                 (HAL_GetTick() - last_retry) >= ESP32_RECONNECT_RETRY_MS) {
                 last_retry = HAL_GetTick();
                 (void)Esp32_TryReconnect(&last_cfg, cur_state);
+            }
+
+            /* PC로 ESP32 상태(STATUS,<num>)를 주기적으로 브로드캐스트한다. 측정값(DATA) 전송과는
+             * 별개 타이머라 자연스럽게 그 사이사이에 끼어 전송된다 (docs/프로토콜_명세.md §1). */
+            if ((HAL_GetTick() - last_status_broadcast) >= APP_ESP32_STATUS_BROADCAST_MS) {
+                char status_buf[32];
+                last_status_broadcast = HAL_GetTick();
+                snprintf(status_buf, sizeof(status_buf), "STATUS,%d", (int)cur_state);
+                PcComm_BroadcastFrame(status_buf);
             }
         }
     }

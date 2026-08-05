@@ -26,5 +26,8 @@ namespace Stm32WifiConfigTool.Models
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
         public string MeasurementDisplayChannel { get; set; } = "Both";
         public bool MeasurementAutoScroll { get; set; } = true;
+
+        /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
+        public string EspStatusDisplayChannel { get; set; } = "Both";
     }
 }

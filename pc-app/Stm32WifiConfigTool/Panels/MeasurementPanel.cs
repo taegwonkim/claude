@@ -10,8 +10,9 @@ using Stm32WifiConfigTool.Services;
 namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// FPGA 측정값("DATA ...") 표시 패널. USB/UART 채널을 선택해 어느 쪽(또는 둘 다) 라인을
-    /// 화면에 표시할지 고를 수 있고, 별도 영역에 WIFI/TCP 관련 EVENT 라인 로그도 보여준다.
+    /// FPGA 측정값("&lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6" 프레임) 표시 패널. USB/UART 채널을
+    /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있고, 별도 영역에 WIFI/TCP 관련
+    /// EVENT 라인 로그도 보여준다. ESP32 상태(STATUS,&lt;번호&gt;)는 별도 EspStatusPanel에서 표시한다.
     /// MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
     public class MeasurementPanel : UserControl
@@ -81,9 +82,9 @@ namespace Stm32WifiConfigTool.Panels
             };
             _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "수신 시각", DataPropertyName = "ReceivedAt", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "HH:mm:ss.fff" } });
             _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "채널", DataPropertyName = "SourceChannel", Width = 60 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Seq", DataPropertyName = "Seq", Width = 70 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Timestamp(ms)", DataPropertyName = "TimestampMs", Width = 100 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Samples", DataPropertyName = "SamplesText", Width = 260, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "DC IP", DataPropertyName = "DcIp", Width = 110 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "MAC", DataPropertyName = "MacAddress", Width = 130 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Data1..6", DataPropertyName = "SamplesText", Width = 260, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             root.Controls.Add(_grid, 0, 1);
 
             var eventLabel = new Label { Text = "이벤트 로그 (WIFI/TCP 상태 등)", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 6, 0, 2) };
@@ -149,7 +150,7 @@ namespace Stm32WifiConfigTool.Panels
                 return; /* STX 없는 잡음/깨진 프레임 - 무시 */
             }
 
-            if (Stm32Protocol.TryParseDataRecord(fields, ChannelLabel(channel), out MeasurementRecord record))
+            if (Stm32Protocol.TryParseMeasurementRecord(fields, ChannelLabel(channel), out MeasurementRecord record))
             {
                 _records.Add(record);
                 while (_records.Count > MaxRows)
@@ -196,14 +197,14 @@ namespace Stm32WifiConfigTool.Panels
                 {
                     using (var writer = new StreamWriter(dialog.FileName, false, Encoding.UTF8))
                     {
-                        writer.WriteLine("ReceivedAt,Channel,Seq,TimestampMs,Samples");
+                        writer.WriteLine("ReceivedAt,Channel,DcIp,MacAddress,Samples");
                         foreach (MeasurementRecord r in _records)
                         {
                             writer.WriteLine(
                                 r.ReceivedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") + "," +
                                 r.SourceChannel + "," +
-                                r.Seq + "," +
-                                r.TimestampMs + "," +
+                                r.DcIp + "," +
+                                r.MacAddress + "," +
                                 "\"" + r.SamplesText + "\"");
                         }
                     }

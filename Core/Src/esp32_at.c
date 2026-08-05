@@ -15,13 +15,20 @@ static uint8_t s_rbStorage[APP_UART_RB_SIZE * 2U];
 static UartLineRx_t s_rx;
 static volatile Esp32_LinkState_t s_linkState = ESP32_LINK_DOWN;
 
+/* PC 프레임(§1)의 DC IP/MAC 필드용 캐시. ESP32_Task가 WiFi 연결 성공 시 갱신하고,
+ * FpgaLink_Task 등 다른 태스크는 Esp32_GetCachedNetInfo()로만 읽는다(뮤텍스 보호). */
+static char s_cachedIp[16] = "0.0.0.0";
+static char s_cachedMac[18] = "00:00:00:00:00:00";
+static osMutexId_t s_netInfoMutex;
+
 /* AT 드라이버 함수들은 ESP32_Task 단일 스레드에서만 호출됨을 전제로 하며(스레드-세이프 아님),
- * 그 외 태스크는 Esp32_GetLinkState()만 안전하게 호출할 수 있다. */
+ * 그 외 태스크는 Esp32_GetLinkState()/Esp32_GetCachedNetInfo()만 안전하게 호출할 수 있다. */
 
 void Esp32_Init(void)
 {
     UartLineRx_Init(&s_rx, &huart1, s_dmaBuf, sizeof(s_dmaBuf), s_rbStorage, sizeof(s_rbStorage));
     UartLineRx_Start(&s_rx);
+    s_netInfoMutex = osMutexNew(NULL);
 }
 
 void Esp32_HardReset(void)
@@ -87,6 +94,94 @@ static bool WaitForToken(const char *token, uint32_t timeout_ms)
     return false;
 }
 
+/* haystack에서 "key"뒤에 오는 "..." 안의 값을 out에 복사한다 (예: key="STAIP,", haystack에
+ * ...STAIP,"192.168.1.100"... 포함 시 out="192.168.1.100"). 못 찾으면 false. */
+static bool ExtractQuoted(const char *haystack, const char *key, char *out, size_t out_size)
+{
+    const char *p = strstr(haystack, key);
+
+    if (p == NULL) {
+        return false;
+    }
+    p += strlen(key);
+    if (*p != '"') {
+        return false;
+    }
+    p++;
+
+    size_t i = 0;
+    while (*p != '"' && *p != '\0' && i < (out_size - 1U)) {
+        out[i++] = *p++;
+    }
+    out[i] = '\0';
+    return (*p == '"');
+}
+
+/* AT+CIFSR로 station IP/MAC을 조회해 s_cachedIp/s_cachedMac을 갱신한다.
+ * ESP32_Task에서만 호출(WaitForToken과 동일하게 s_rx.rb를 직접 소비). */
+static bool Esp32_QueryNetInfo(void)
+{
+    char window[160];
+    uint32_t win_len = 0;
+    uint32_t start = HAL_GetTick();
+    bool got_ok = false;
+
+    window[0] = '\0';
+    SendCmd("AT+CIFSR\r\n");
+
+    while ((HAL_GetTick() - start) < APP_AT_RESP_TIMEOUT_MS) {
+        uint8_t byte;
+
+        while (RingBuffer_Read(&s_rx.rb, &byte, 1U) == 1U) {
+            if (win_len < (sizeof(window) - 1U)) {
+                window[win_len++] = (char)byte;
+            } else {
+                memmove(window, window + 1, sizeof(window) - 2U);
+                window[sizeof(window) - 2U] = (char)byte;
+            }
+            window[win_len] = '\0';
+
+            if (strstr(window, "OK") != NULL) {
+                got_ok = true;
+            }
+        }
+        if (got_ok) {
+            break;
+        }
+        osDelay(2);
+    }
+
+    if (!got_ok) {
+        return false;
+    }
+
+    char ip[sizeof(s_cachedIp)];
+    char mac[sizeof(s_cachedMac)];
+    bool have_ip = ExtractQuoted(window, "STAIP,", ip, sizeof(ip));
+    bool have_mac = ExtractQuoted(window, "STAMAC,", mac, sizeof(mac));
+
+    if (have_ip && have_mac) {
+        osMutexAcquire(s_netInfoMutex, osWaitForever);
+        strncpy(s_cachedIp, ip, sizeof(s_cachedIp) - 1U);
+        s_cachedIp[sizeof(s_cachedIp) - 1U] = '\0';
+        strncpy(s_cachedMac, mac, sizeof(s_cachedMac) - 1U);
+        s_cachedMac[sizeof(s_cachedMac) - 1U] = '\0';
+        osMutexRelease(s_netInfoMutex);
+        return true;
+    }
+    return false;
+}
+
+void Esp32_GetCachedNetInfo(char *ip_out, size_t ip_size, char *mac_out, size_t mac_size)
+{
+    osMutexAcquire(s_netInfoMutex, osWaitForever);
+    strncpy(ip_out, s_cachedIp, ip_size - 1U);
+    ip_out[ip_size - 1U] = '\0';
+    strncpy(mac_out, s_cachedMac, mac_size - 1U);
+    mac_out[mac_size - 1U] = '\0';
+    osMutexRelease(s_netInfoMutex);
+}
+
 bool Esp32_Probe(void)
 {
     SendCmd("AT\r\n");
@@ -127,6 +222,7 @@ bool Esp32_ConnectWifi(const NetConfig_t *cfg)
     }
 
     s_linkState = ESP32_WIFI_UP;
+    (void)Esp32_QueryNetInfo(); /* PC 프레임의 DC IP/MAC 캐시 갱신 - 실패해도 WiFi 연결 자체는 성공 처리 */
     return true;
 }
 

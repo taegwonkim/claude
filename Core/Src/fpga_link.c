@@ -4,6 +4,7 @@
 #include "app_freertos.h" /* g_measQueueId */
 #include "measurement_msg.h"
 #include "pc_comm.h"
+#include "esp32_at.h" /* Esp32_GetCachedNetInfo (PC 프레임의 DC IP/MAC) */
 #include "main.h" /* FROM_FPGA_Pin (CubeMX 핀 라벨 "FROM_FPGA", PH1) */
 #include "cmsis_os2.h"
 #include <string.h>
@@ -110,8 +111,12 @@ void FpgaLink_Task(void *argument)
             continue;
         }
 
+        char dc_ip[16];
+        char dc_mac[18];
+        Esp32_GetCachedNetInfo(dc_ip, sizeof(dc_ip), dc_mac, sizeof(dc_mac));
+
         char out[APP_PC_LINE_MAX];
-        MeasurementMsg_BuildCsvFields(out, sizeof(out), &msg);
+        MeasurementMsg_BuildPcCsvFields(out, sizeof(out), &msg, dc_ip, dc_mac);
         PcComm_BroadcastFrame(out); /* PC(USART3+USB) 즉시 미러, STX+CRLF 프레이밍은 내부에서 처리 */
 
         (void)osMessageQueuePut(g_measQueueId, &msg, 0U, 0U); /* ESP32_Task -> 서버 전송, 큐 가득 차면 드롭 */
