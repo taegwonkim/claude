@@ -29,16 +29,29 @@ HAL/CMSIS/USB 미들웨어/FreeRTOS 커널 소스 등 벤더 생성 코드는 �
 - **ESP32 연동 방식**: Espressif 표준 **ESP-AT** 펌웨어 사용 (MCU가 AT 커맨드로 제어). ESP32 측
   펌웨어 개발 불필요, ESP32에 [espressif/esp-at](https://github.com/espressif/esp-at) 펌웨어를
   플래싱한다고 가정.
-- **FPGA→MCU ADC 데이터 채널**: FPGA가 자체적으로 ADC를 읽어, GPIO EXTI(falling edge, 예: PB0)로
-  트리거 신호를 먼저 보낸 뒤, 측정값을 **USART2**(FPGA→MCU 전용 UART, ASCII 라인 프로토콜)로
-  전송합니다 (SPI2는 플래시 전용). MCU는 트리거 인터럽트 후 USART2로 도착하는 한 줄(`ADC ...`)을
-  타임아웃 내에 수신해 파싱합니다.
+- **FPGA→MCU ADC 데이터 채널**: FPGA가 자체적으로 ADC를 읽어, GPIO EXTI(falling edge, PH1,
+  핀 라벨 `FROM_FPGA`)로 트리거 신호를 먼저 보낸 뒤, 측정값을 **USART2**(FPGA→MCU 전용 UART,
+  ASCII 라인 프로토콜)로 전송합니다 (SPI2는 플래시 전용). MCU는 트리거 인터럽트 후 USART2로
+  도착하는 한 줄(`ADC ...`)을 타임아웃 내에 수신해 파싱합니다.
 - **PC ↔ MCU 설정 프로토콜**: 사람이 읽기 쉬운 ASCII 라인 커맨드(`\r\n` 종료). 상세는
   `docs/프로토콜_명세.md` 참고.
 - ADC 측정값 포맷: FPGA가 트리거 후 `ADC <seq> <sample0> [sample1 ...]\r\n` 형식의 ASCII 라인을
   USART2로 보낸다고 가정. 정확한 포맷은 `docs/프로토콜_명세.md` §3에서 조정 가능.
 
 위 가정과 다르게 구현하고 싶은 부분이 있으면 알려주시면 반영하겠습니다.
+
+## 하드웨어 핀 배정 (고정, 실제 보드 기준)
+
+| 신호 | 핀 | CubeMX User Label |
+|---|---|---|
+| ESP32 하드웨어 리셋 | PA8 | `ESP32_NRST` |
+| FPGA 트리거 입력 | PH1 | `FROM_FPGA` |
+| W25Q40 Flash CS | PB12 | `EEP_NSS` |
+| 상태 LED(하트비트) | PC13 | `LED_RUN` |
+| WiFi(서버 TCP) 상태 LED | PC14 | `LED_WIFI` |
+| ESP32 AT 통신(USART1) | PA9(TX)/PA10(RX) | - (흐름제어 사용 안 함) |
+
+전체 핀맵/주변장치 설정은 `docs/CubeMX_설정가이드.md` §2 참고.
 
 ## 폴더 구조
 
@@ -55,7 +68,8 @@ Core/Inc/
   net_config_store.h    - 설정 구조체 + CRC32 + 플래시 로드/세이브
   esp32_at.h            - ESP32(USART1) AT 커맨드 드라이버
   pc_comm.h             - PC 커맨드 파서 (USART3 + USB CDC 공용)
-  fpga_link.h           - FPGA 트리거(EXTI)/ADC(USART2) 수신
+  fpga_link.h           - FPGA 트리거(EXTI, PH1)/ADC(USART2) 수신
+  status_led.h          - LED_RUN(PC13) 하트비트, LED_WIFI(PC14) 연결 표시
   app_freertos.h        - 태스크/큐 생성 진입점 (freertos.c에서 호출)
 Core/Src/
   (위 헤더들의 구현)
@@ -70,8 +84,8 @@ Core/Src/
 2. 생성된 프로젝트의 `Core/Inc`, `Core/Src`에 이 리포지토리의 동일 파일들을 복사(병합).
 3. `Core/Src/freertos.c`의 `USER CODE BEGIN Application` 영역에서 `App_FreeRTOS_Init()` 호출
    (자세한 위치는 `app_freertos.c` 상단 주석 참고).
-4. `Core/Src/stm32l5xx_it.c`, `USB_DEVICE/App/usbd_cdc_if.c`의 콜백 연결은
-   `docs/CubeMX_설정가이드.md`의 "콜백 연결" 절 참고.
+4. `Core/Src/stm32l5xx_it.c`, `USB_DEVICE/App/usbd_cdc_if.c`, `StartDefaultTask()`(LED_RUN
+   하트비트)의 훅 연결은 `docs/CubeMX_설정가이드.md` §11 "콜백 연결" 절 참고.
 5. STM32CubeIDE에서 빌드 후 ST-LINK로 플래싱.
 
 ## 테스트 방법

@@ -5,6 +5,7 @@
 #include "esp32_at.h"
 #include "pc_comm.h"
 #include "fpga_link.h"
+#include "status_led.h"
 #include "cmsis_os2.h"
 #include <string.h>
 #include <stdbool.h>
@@ -16,7 +17,7 @@ osMessageQueueId_t g_measQueueId;
 /* WiFi/TCP 끊김 감지 후 재접속 재시도 최소 간격 */
 #define ESP32_RECONNECT_RETRY_MS (5000U)
 
-/* 링크 상태 변화(끊김/재연결)를 PC(USART3+USB)에 이벤트 라인으로 알린다 (가시성 확보용). */
+/* 링크 상태 변화(끊김/재연결)를 PC(USART3+USB)에 이벤트 라인으로 알리고, LED_WIFI(PC14)를 갱신한다. */
 static void ReportLinkStateChange(Esp32_LinkState_t prev, Esp32_LinkState_t cur)
 {
     if (cur == prev) {
@@ -30,6 +31,8 @@ static void ReportLinkStateChange(Esp32_LinkState_t prev, Esp32_LinkState_t cur)
     } else if (cur == ESP32_TCP_UP) {
         PcComm_BroadcastLine("EVENT TCP_CONNECTED");
     }
+
+    StatusLed_SetWifi(cur == ESP32_TCP_UP);
 }
 
 /* cur_state에 맞춰 필요한 단계부터 AT 커맨드로 재접속을 시도한다.
@@ -61,9 +64,18 @@ static void Esp32TaskBody(void *argument)
     Esp32_LinkState_t prev_state = ESP32_LINK_DOWN;
 
     Esp32_Init();
-    osDelay(2000U); /* ESP32 모듈 자체 부팅 시간 대기 */
-    while (!Esp32_Probe()) {
-        osDelay(1000U);
+    Esp32_HardReset(); /* ESP32_NRST(PA8) 리셋 펄스 + 부팅 대기, 이전 세션 상태 정리 */
+    {
+        uint32_t probe_fail_count = 0U;
+
+        while (!Esp32_Probe()) {
+            osDelay(1000U);
+            probe_fail_count++;
+            if (probe_fail_count >= 5U) { /* 5회 연속 무응답이면 하드 리셋 재시도 */
+                probe_fail_count = 0U;
+                Esp32_HardReset();
+            }
+        }
     }
 
     for (;;) {

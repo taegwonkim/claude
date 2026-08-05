@@ -2,8 +2,8 @@
  * w25q40.h
  *
  * Winbond W25Q40CLSNIG (4Mbit SPI NOR Flash) 드라이버. SPI2(Master, CS=GPIO 소프트웨어 제어) 사용.
- * CubeMX가 생성하는 hspi2 핸들과 FLASH_CS_GPIO_Port/FLASH_CS_Pin 매크로(main.h, 핀 라벨을
- * "FLASH_CS"로 지정 시 자동 생성)를 사용한다고 가정한다.
+ * CubeMX가 생성하는 hspi2 핸들과 EEP_NSS_GPIO_Port/EEP_NSS_Pin 매크로(main.h, PB12, 핀 라벨을
+ * "EEP_NSS"로 지정 시 자동 생성)를 사용한다고 가정한다.
  */
 #ifndef W25Q40_H
 #define W25Q40_H

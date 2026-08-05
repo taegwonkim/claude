@@ -22,29 +22,36 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
   정확히 48.000MHz가 되도록 맞춥니다 (CubeMX가 자동 계산).
 - SYSCLK: 110MHz (STM32L562 최대) 권장, HCLK/PCLK1/PCLK2 CubeMX 기본 자동계산 사용.
 
-## 2. GPIO / 인터페이스 핀 배정 (예시 — 실제 보드 핀맵에 맞게 조정)
+## 2. GPIO / 인터페이스 핀 배정 (실제 보드 핀맵)
 
-| 기능 | 페리퍼럴 | 핀(예시) | 비고 |
-|---|---|---|---|
-| PC 커맨드/데이터 | USART3 | PB10(TX)/PB11(RX) | 115200 8N1 |
-| PC 커맨드/데이터(백업) | USB OTG_FS (Device, CDC) | PA11(DM)/PA12(DP) | Virtual COM Port |
-| ESP32 AT 통신 | USART1 | PA9(TX)/PA10(RX) | 115200 8N1, 흐름제어 필요시 PA11/PA12 대신 별도 CTS/RTS 핀 사용 |
-| ESP32 리셋(옵션) | GPIO Output | PC13 | Low active reset |
-| FPGA 트리거 입력 | GPIO EXTI | PB0 | Falling edge, Pull-up |
-| FPGA ADC 데이터 | USART2 | PA2(TX, 미사용)/PA3(RX) | FPGA(자체 ADC 리드)→MCU 단방향, 115200 8N1 |
-| W25Q40 Flash | SPI2 (Master) | PB13(SCK)/PB14(MISO)/PB15(MOSI), CS: PB12(GPIO Output) | Flash 전용, CS는 SW 제어 |
-| 상태 LED(옵션) | GPIO Output | PA8 | 동작 확인용 |
+| 기능 | 페리퍼럴 | 핀 | User Label | 비고 |
+|---|---|---|---|---|
+| PC 커맨드/데이터 | USART3 | PB10(TX)/PB11(RX) | - | 115200 8N1 |
+| PC 커맨드/데이터(백업) | USB OTG_FS (Device, CDC) | PA11(DM)/PA12(DP) | - | Virtual COM Port |
+| ESP32 AT 통신 | USART1 | PA9(TX)/PA10(RX) | - | 115200 8N1, **흐름제어(RTS/CTS) 사용 안 함** |
+| ESP32 하드웨어 리셋 | GPIO Output | PA8 | `ESP32_NRST` | Low active reset (ESP32 EN/RST 핀에 연결) |
+| FPGA 트리거 입력 | GPIO EXTI | PH1 | `FROM_FPGA` | Falling edge, Pull-up |
+| FPGA ADC 데이터 | USART2 | PA2(TX, 미사용)/PA3(RX) | - | FPGA(자체 ADC 리드)→MCU 단방향, 115200 8N1 |
+| W25Q40 Flash | SPI2 (Master) | PB13(SCK)/PB14(MISO)/PB15(MOSI) | - | Flash 전용 |
+| W25Q40 Flash CS | GPIO Output | PB12 | `EEP_NSS` | SW 제어 |
+| 상태 LED(동작 확인) | GPIO Output | PC13 | `LED_RUN` | 1Hz 토글(heartbeat) |
+| WiFi 상태 LED | GPIO Output | PC14 | `LED_WIFI` | 서버 TCP 연결 시 ON |
 
-> **GPIO User Label 필수 지정**: Pinout 뷰에서 핀을 우클릭 → "Enter User Label"로 아래 두 개는
-> **반드시** 지정된 이름을 그대로 사용하세요. CubeMX가 `main.h`에 `<Label>_GPIO_Port` /
-> `<Label>_Pin` 매크로를 자동 생성하며, 본 리포지토리 코드(`w25q40.c`, `fpga_link.c`)가 이
-> 매크로 이름을 그대로 참조합니다.
-> - PB12(SPI2 CS) → User Label `FLASH_CS`
-> - PB0(FPGA 트리거) → User Label `FPGA_TRIG`
+> **GPIO User Label 필수 지정**: Pinout 뷰에서 핀을 우클릭 → "Enter User Label"로 위 표의
+> `User Label` 열 이름을 **정확히 그대로** 입력하세요. CubeMX가 `main.h`에
+> `<Label>_GPIO_Port` / `<Label>_Pin` 매크로를 자동 생성하며, 본 리포지토리 코드
+> (`esp32_at.c`, `w25q40.c`, `fpga_link.c`, `status_led.c`)가 이 매크로 이름을 그대로 참조합니다.
+> - PA8(ESP32 리셋) → `ESP32_NRST`
+> - PH1(FPGA 트리거) → `FROM_FPGA`
+> - PB12(SPI2 CS) → `EEP_NSS`
+> - PC13(상태 LED) → `LED_RUN`
+> - PC14(WiFi 상태 LED) → `LED_WIFI`
 
 ## 3. USART1 (ESP32, AT 커맨드)
 
-- Mode: Asynchronous, Baud Rate 115200, Word Length 8, Parity None, Stop 1.
+- Mode: Asynchronous, Baud Rate 115200, Word Length 8, Parity None, Stop 1,
+  **Hardware Flow Control: Disable**(RTS/CTS 미사용 — ESP-AT 모듈도 `AT+UART_CUR`로 흐름제어
+  없는 상태인지 확인할 것).
 - NVIC: USART1 global interrupt Enable.
 - DMA 탭: USART1_RX → DMA1 Channel(임의), Mode **Circular**, Data Width Byte
   (Idle-line 검출 + 순환 DMA 수신 방식으로 가변 길이 AT 응답 처리).
@@ -71,9 +78,9 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 - NVIC: USART2 global interrupt Enable.
 - DMA 탭: USART2_RX → DMA, Mode **Circular**, Data Width Byte (USART1/3와 동일하게
   idle-line 검출 + 순환 DMA 수신 방식 사용, `HAL_UARTEx_ReceiveToIdle_DMA`).
-- NVIC: EXTI line(트리거 핀, PB0) interrupt Enable.
+- NVIC: EXTI line(트리거 핀, PH1 → `EXTI1_IRQn`) interrupt Enable.
 
-> 트리거(EXTI, PB0)와 ADC 값(USART2)은 **별개의 신호**입니다. FPGA는 ADC를 직접 읽어(자체 ADC IP
+> 트리거(EXTI, PH1/`FROM_FPGA`)와 ADC 값(USART2)은 **별개의 신호**입니다. FPGA는 ADC를 직접 읽어(자체 ADC IP
 > 또는 외부 ADC 칩을 FPGA가 제어) falling-edge 펄스로 "측정 완료/전송 시작"을 알린 뒤,
 > 곧이어 USART2로 측정값 라인을 전송합니다. MCU는 EXTI 인터럽트로 깨어난 뒤 USART2 수신을
 > 타임아웃(`APP_AT_RESP_TIMEOUT_MS`류 상수, `fpga_link.c`에서 별도 상수 사용)과 함께 대기합니다.
@@ -81,15 +88,16 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 ## 7. SPI2 (W25Q40CLSNIG, Master)
 
 - Mode: **Full-Duplex Master**.
-- Hardware NSS: **Disable** (CS는 GPIO Output(PB12)로 소프트웨어 제어 — 멀티바이트 커맨드 시퀀스 제어에 유리).
+- Hardware NSS: **Disable** (CS는 GPIO Output(PB12, User Label `EEP_NSS`)로 소프트웨어 제어 —
+  멀티바이트 커맨드 시퀀스 제어에 유리).
 - Data Size: 8 bits, CPOL=Low, CPHA=1 Edge (W25Q4x 표준 SPI Mode 0).
 - Prescaler: 플래시 최대 클럭(104MHz 등) 이내로, PCLK 기준 적당히 분주 (예: 10~20MHz로 설정).
 - DMA는 선택사항(설정값 저장은 소용량이라 폴링/IT로 충분). 필요시 SPI2 RX/TX DMA Normal 추가.
 
 ## 8. EXTI (FPGA 트리거)
 
-- GPIO PB0을 GPIO_EXTI0로 설정, Pull-up, Trigger: **Falling edge**.
-- NVIC → EXTI0 interrupt Enable, Preemption Priority는 아래 "인터럽트 우선순위" 절 참고.
+- GPIO PH1(`FROM_FPGA`)을 GPIO_EXTI1로 설정, Pull-up, Trigger: **Falling edge**.
+- NVIC → EXTI1 interrupt Enable, Preemption Priority는 아래 "인터럽트 우선순위" 절 참고.
 
 ## 9. FreeRTOS (Middleware → FREERTOS)
 
@@ -123,11 +131,16 @@ CubeMX Tasks and Queues 탭은 건드리지 않고 비워둬도 됩니다).
 | `ESP32_Task` | `osPriorityAboveNormal` | 1024 | AT 커맨드 송수신, WiFi/TCP 연결, 측정값 서버 전송 |
 | `PCComm_Task` | `osPriorityNormal` | 768 | USART3+USB 커맨드 파싱, 설정 변경 큐잉, 측정값 PC 에코 |
 | `Config_Task` | `osPriorityBelowNormal` | 512 | W25Q40 플래시 R/W(뮤텍스 보호), 설정 CRC 검증 |
-| `defaultTask`(CubeMX 기본) | `osPriorityLow` | 128(기본) | 워치독 킥 등 저부하 백그라운드(옵션) |
+| `defaultTask`(CubeMX 기본) | `osPriorityLow` | 128(기본) | `LED_RUN` 하트비트 토글(`StatusLed_HeartbeatTick()`) 등 저부하 백그라운드 |
 
 우선순위 근거: FPGA 트리거/ADC 라인은 늦게 처리하면 다음 트리거와 뒤섞여 데이터 유실이므로 최우선. ESP32/TCP는
 초당 다회 응답을 놓치면 재시도 비용이 크므로 그 다음. PC 커맨드 처리와 플래시 저장은
 사람 입력/저빈도 이벤트라 여유 있게 낮은 우선순위로도 충분합니다.
+
+`ESP32_Task`는 시작 시 `ESP32_NRST`(PA8)를 통해 ESP32를 하드웨어 리셋(`Esp32_HardReset()`,
+`esp32_at.c`)한 뒤 부팅 대기 → `AT` 프로브 순서로 진행합니다. 이렇게 하면 MCU 리셋/재플래싱 후
+ESP32가 이전 세션의 어중간한 상태(예: 이전 TCP 연결이 반쯤 열린 상태)로 남아있지 않고 항상
+깨끗한 상태에서 AT 커맨드 시퀀스를 시작합니다.
 
 ### 인터럽트(NVIC) 우선순위 — Core → NVIC 탭
 
@@ -138,7 +151,7 @@ FreeRTOS와 함께 쓸 때 `configLIBRARY_LOWEST_INTERRUPT_PRIORITY`(보통 15)�
 
 | 인터럽트 | Preemption Priority | Sub Priority |
 |---|---|---|
-| EXTI0 (FPGA 트리거) | 5 | 0 |
+| EXTI1 (FPGA 트리거, PH1) | 5 | 0 |
 | USART2 (FPGA ADC 데이터) + DMA | 5 | 1 |
 | USART1 (ESP32) + DMA | 6 | 0 |
 | USART3 (PC) + DMA | 6 | 1 |
@@ -171,7 +184,7 @@ SRAM 256KB 대비 위 사용량은 여유가 충분하므로 별도 MPU 세밀 �
      또는 `StartDefaultTask()` 시작부에서 호출하면 됩니다.
 
 2. **`Core/Src/stm32l5xx_it.c`**
-   - `EXTI0_IRQHandler`, `USARTx_IRQHandler` 모두 CubeMX가 생성한 그대로 두면 됩니다
+   - `EXTI1_IRQHandler`, `USARTx_IRQHandler` 모두 CubeMX가 생성한 그대로 두면 됩니다
      (내부에서 `HAL_GPIO_EXTI_IRQHandler`/`HAL_UART_IRQHandler`를 호출 → 아래 콜백으로 이어짐).
    - 수정 불필요. `HAL_GPIO_EXTI_Callback()`과 `HAL_UARTEx_RxEventCallback()`은
      `Core/Src/app_it_callbacks.c`(본 리포지토리 신규 파일)에 **한 곳에만** 정의되어 있으며,
@@ -184,5 +197,14 @@ SRAM 256KB 대비 위 사용량은 여유가 충분하므로 별도 MPU 세밀 �
      `USER CODE BEGIN 6` 영역에서 `PC_Comm_FeedUSB(Buf, *Len);` 호출 추가
      (`#include "pc_comm.h"` 필요). 본 리포지토리의 `pc_comm.c`가 이 함수를 제공합니다.
 
-위 4개 지점 외에는 CubeMX 재생성(Generate Code) 시에도 `Core/Inc`, `Core/Src`의 본 리포지토리
+4. **`Core/Src/freertos.c`의 `StartDefaultTask()`**
+   - `for(;;) { ... }` 루프의 `USER CODE BEGIN StartDefaultTask` 영역에서
+     `StatusLed_HeartbeatTick();` 호출 추가(`#include "status_led.h"` 필요). `LED_RUN`(PC13)을
+     내부적으로 약 500ms 간격(1Hz 토글)으로 켜고 끕니다. 루프의 `osDelay(...)` 값은 CubeMX 기본값을
+     그대로 둬도 되며(예: `osDelay(1)`), `StatusLed_HeartbeatTick()`이 자체적으로 경과 시간을
+     확인하므로 호출 주기가 짧아도 무방합니다.
+   - `LED_WIFI`(PC14)는 `ESP32_Task`(`app_freertos.c`)가 링크 상태가 바뀔 때마다
+     `StatusLed_SetWifi()`를 호출해 갱신하므로 여기서는 건드릴 필요 없습니다.
+
+위 5개 지점 외에는 CubeMX 재생성(Generate Code) 시에도 `Core/Inc`, `Core/Src`의 본 리포지토리
 파일들은 영향받지 않습니다 (USER CODE 마커 밖에 위치한 신규 파일이므로 CubeMX가 덮어쓰지 않음).

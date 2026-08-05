@@ -29,6 +29,13 @@ typedef enum {
 void Esp32_Init(void);
 
 /**
+ * @brief ESP32_NRST(PA8, Low active)를 통해 ESP32를 하드웨어 리셋한다. 리셋 펄스 후 모듈이
+ *        부팅을 마칠 때까지 블로킹 대기(osDelay)하므로 태스크 컨텍스트에서만 호출할 것.
+ *        보통 Esp32_Init() 직후, Esp32_Probe() 이전에 1회 호출해 이전 세션 상태를 정리한다.
+ */
+void Esp32_HardReset(void);
+
+/**
  * @brief HAL_UARTEx_RxEventCallback에서 huart 종류에 상관없이 호출. 내부에서 USART1 여부 확인.
  */
 void Esp32_OnUartRxEvent(UART_HandleTypeDef *huart, uint16_t pos);

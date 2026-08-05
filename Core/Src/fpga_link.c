@@ -4,7 +4,7 @@
 #include "app_freertos.h" /* g_measQueueId */
 #include "measurement_msg.h"
 #include "pc_comm.h"
-#include "main.h" /* FPGA_TRIG_Pin (CubeMX 핀 라벨 "FPGA_TRIG") */
+#include "main.h" /* FROM_FPGA_Pin (CubeMX 핀 라벨 "FROM_FPGA", PH1) */
 #include "cmsis_os2.h"
 #include <string.h>
 #include <stdio.h>
@@ -29,7 +29,7 @@ void FpgaLink_OnExti(uint16_t gpio_pin)
 {
     /* s_trigSem은 FpgaLink_Init()에서 생성됨. GPIO/EXTI NVIC는 main()에서 그보다 먼저
      * 활성화되므로, 극히 이른 타이밍의 트리거에 대비해 NULL 체크를 둔다. */
-    if (gpio_pin == FPGA_TRIG_Pin && s_trigSem != NULL) {
+    if (gpio_pin == FROM_FPGA_Pin && s_trigSem != NULL) {
         osSemaphoreRelease(s_trigSem);
     }
 }

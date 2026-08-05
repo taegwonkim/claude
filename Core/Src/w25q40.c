@@ -1,5 +1,5 @@
 #include "w25q40.h"
-#include "main.h"   /* FLASH_CS_GPIO_Port / FLASH_CS_Pin (CubeMX, 핀 라벨 "FLASH_CS") */
+#include "main.h"   /* EEP_NSS_GPIO_Port / EEP_NSS_Pin (CubeMX, 핀 라벨 "EEP_NSS", PB12) */
 #include "cmsis_os2.h"
 #include <string.h>
 
@@ -15,8 +15,8 @@
 #define W25Q40_SPI_TIMEOUT_MS     (100U)
 #define W25Q40_ERASE_TIMEOUT_MS   (400U)  /* 4KB sector erase, 데이터시트 typ 45ms / max 400ms */
 
-static void CS_Low(void)  { HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_RESET); }
-static void CS_High(void) { HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET); }
+static void CS_Low(void)  { HAL_GPIO_WritePin(EEP_NSS_GPIO_Port, EEP_NSS_Pin, GPIO_PIN_RESET); }
+static void CS_High(void) { HAL_GPIO_WritePin(EEP_NSS_GPIO_Port, EEP_NSS_Pin, GPIO_PIN_SET); }
 
 static bool SPI_TxRx(const uint8_t *tx, uint8_t *rx, uint32_t len)
 {

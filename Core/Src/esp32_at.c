@@ -2,9 +2,13 @@
 #include "uart_line_rx.h"
 #include "app_config.h"
 #include "usart.h" /* huart1 */
+#include "main.h"  /* ESP32_NRST_GPIO_Port / ESP32_NRST_Pin (CubeMX 핀 라벨 "ESP32_NRST", PA8) */
 #include "cmsis_os2.h"
 #include <string.h>
 #include <stdio.h>
+
+#define ESP32_RESET_PULSE_MS (100U)  /* NRST Low 유지 시간 */
+#define ESP32_BOOT_WAIT_MS   (2000U) /* NRST 해제 후 ESP32 부팅 완료까지 대기 시간 */
 
 static uint8_t s_dmaBuf[APP_UART_RB_SIZE];
 static uint8_t s_rbStorage[APP_UART_RB_SIZE * 2U];
@@ -18,6 +22,15 @@ void Esp32_Init(void)
 {
     UartLineRx_Init(&s_rx, &huart1, s_dmaBuf, sizeof(s_dmaBuf), s_rbStorage, sizeof(s_rbStorage));
     UartLineRx_Start(&s_rx);
+}
+
+void Esp32_HardReset(void)
+{
+    HAL_GPIO_WritePin(ESP32_NRST_GPIO_Port, ESP32_NRST_Pin, GPIO_PIN_RESET);
+    osDelay(ESP32_RESET_PULSE_MS);
+    HAL_GPIO_WritePin(ESP32_NRST_GPIO_Port, ESP32_NRST_Pin, GPIO_PIN_SET);
+    osDelay(ESP32_BOOT_WAIT_MS);
+    s_linkState = ESP32_LINK_DOWN;
 }
 
 void Esp32_OnUartRxEvent(UART_HandleTypeDef *huart, uint16_t pos)

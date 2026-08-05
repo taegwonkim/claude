@@ -1,8 +1,8 @@
 /**
  * fpga_link.h
  *
- * FPGA -> MCU 인터페이스: GPIO EXTI falling-edge 트리거 + USART2로 도착하는
- * ADC 측정값 라인("ADC <seq> <sample0> ...\r\n") 수신. docs/프로토콜_명세.md §3 참고.
+ * FPGA -> MCU 인터페이스: GPIO EXTI falling-edge 트리거(PH1, 핀 라벨 "FROM_FPGA") + USART2로
+ * 도착하는 ADC 측정값 라인("ADC <seq> <sample0> ...\r\n") 수신. docs/프로토콜_명세.md §3 참고.
  */
 #ifndef FPGA_LINK_H
 #define FPGA_LINK_H

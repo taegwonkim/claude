@@ -4,7 +4,7 @@
  * 애플리케이션 전역 상수: FreeRTOS 태스크 우선순위/스택/큐 크기,
  * 프로토콜 파라미터, 핀 매핑. CubeMX가 생성한 main.h의 핀 정의(GPIO_Pin/GPIO_Port)와
  * 이름이 겹치지 않도록 APP_ 접두어를 사용한다. CubeMX .ioc에서 핀 라벨을
- * 아래 이름(FPGA_TRIG, FLASH_CS 등)으로 지정해두면 main.h에 동일 이름 매크로가
+ * 아래 이름(FROM_FPGA, EEP_NSS, ESP32_NRST, LED_RUN, LED_WIFI 등)으로 지정해두면 main.h에 동일 이름 매크로가
  * 자동 생성되어 이 파일과 자연히 맞물린다 (docs/CubeMX_설정가이드.md 참고).
  */
 #ifndef APP_CONFIG_H
