@@ -29,7 +29,7 @@ namespace Stm32WifiConfigTool.Panels
         private readonly Label _countLabel;
         private readonly CheckBox _autoScrollCheck;
 
-        public MeasurementPanel(ConnectionManager conn)
+        public MeasurementPanel(ConnectionManager conn, AppSettings settings)
         {
             _conn = conn;
 
@@ -42,9 +42,12 @@ namespace Stm32WifiConfigTool.Panels
             // 상단: 채널 선택 + 도구 버튼
             var topRow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false };
             var channelGroup = new GroupBox { Text = "표시 채널", AutoSize = true, Height = 50, Width = 220 };
-            _showUsb = new RadioButton { Text = "USB", Left = 10, Top = 20, AutoSize = true };
-            _showUart = new RadioButton { Text = "UART", Left = 70, Top = 20, AutoSize = true };
-            _showBoth = new RadioButton { Text = "둘 다", Left = 140, Top = 20, AutoSize = true, Checked = true };
+            _showUsb = new RadioButton { Text = "USB", Left = 10, Top = 20, AutoSize = true, Checked = settings.MeasurementDisplayChannel == "Usb" };
+            _showUart = new RadioButton { Text = "UART", Left = 70, Top = 20, AutoSize = true, Checked = settings.MeasurementDisplayChannel == "Uart" };
+            _showBoth = new RadioButton { Text = "둘 다", Left = 140, Top = 20, AutoSize = true, Checked = settings.MeasurementDisplayChannel != "Usb" && settings.MeasurementDisplayChannel != "Uart" };
+            _showUsb.CheckedChanged += (s, e) => { if (_showUsb.Checked) settings.MeasurementDisplayChannel = "Usb"; };
+            _showUart.CheckedChanged += (s, e) => { if (_showUart.Checked) settings.MeasurementDisplayChannel = "Uart"; };
+            _showBoth.CheckedChanged += (s, e) => { if (_showBoth.Checked) settings.MeasurementDisplayChannel = "Both"; };
             channelGroup.Controls.Add(_showUsb);
             channelGroup.Controls.Add(_showUart);
             channelGroup.Controls.Add(_showBoth);
@@ -58,7 +61,8 @@ namespace Stm32WifiConfigTool.Panels
             exportButton.Click += ExportButton_Click;
             topRow.Controls.Add(exportButton);
 
-            _autoScrollCheck = new CheckBox { Text = "자동 스크롤", AutoSize = true, Checked = true, Margin = new Padding(10, 20, 3, 3) };
+            _autoScrollCheck = new CheckBox { Text = "자동 스크롤", AutoSize = true, Checked = settings.MeasurementAutoScroll, Margin = new Padding(10, 20, 3, 3) };
+            _autoScrollCheck.CheckedChanged += (s, e) => settings.MeasurementAutoScroll = _autoScrollCheck.Checked;
             topRow.Controls.Add(_autoScrollCheck);
 
             root.Controls.Add(topRow, 0, 0);

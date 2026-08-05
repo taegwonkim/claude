@@ -31,7 +31,7 @@ namespace Stm32WifiConfigTool.Panels
         private readonly NumericUpDown _cmdTimeoutBox;
         private readonly TextBox _logBox;
 
-        public WifiConfigPanel(ConnectionManager conn)
+        public WifiConfigPanel(ConnectionManager conn, AppSettings settings)
         {
             _conn = conn;
 
@@ -41,9 +41,12 @@ namespace Stm32WifiConfigTool.Panels
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
             // 채널 선택
+            bool useUart = settings.WifiCommandChannel == "Uart";
             var channelGroup = new GroupBox { Text = "명령 전송 채널", Dock = DockStyle.Top, Height = 55 };
-            _channelUsb = new RadioButton { Text = "USB", Left = 15, Top = 22, Checked = true, AutoSize = true };
-            _channelUart = new RadioButton { Text = "UART", Left = 100, Top = 22, AutoSize = true };
+            _channelUsb = new RadioButton { Text = "USB", Left = 15, Top = 22, Checked = !useUart, AutoSize = true };
+            _channelUart = new RadioButton { Text = "UART", Left = 100, Top = 22, Checked = useUart, AutoSize = true };
+            _channelUsb.CheckedChanged += (s, e) => { if (_channelUsb.Checked) settings.WifiCommandChannel = "Usb"; };
+            _channelUart.CheckedChanged += (s, e) => { if (_channelUart.Checked) settings.WifiCommandChannel = "Uart"; };
             channelGroup.Controls.Add(_channelUsb);
             channelGroup.Controls.Add(_channelUart);
             root.Controls.Add(channelGroup, 0, 0);
@@ -110,7 +113,9 @@ namespace Stm32WifiConfigTool.Panels
             buttonRow.Controls.Add(saveButton);
             buttonRow.Controls.Add(statusButton);
             buttonRow.Controls.Add(new Label { Text = "  커맨드 타임아웃(ms)", AutoSize = true, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0, 8, 0, 0) });
-            _cmdTimeoutBox = new NumericUpDown { Minimum = 200, Maximum = 30000, Increment = 100, Value = 3000, Width = 80 };
+            _cmdTimeoutBox = new NumericUpDown { Minimum = 200, Maximum = 30000, Increment = 100, Width = 80 };
+            _cmdTimeoutBox.Value = ClampDecimal(settings.WifiCommandTimeoutMs, _cmdTimeoutBox.Minimum, _cmdTimeoutBox.Maximum);
+            _cmdTimeoutBox.ValueChanged += (s, e) => settings.WifiCommandTimeoutMs = (int)_cmdTimeoutBox.Value;
             buttonRow.Controls.Add(_cmdTimeoutBox);
             bottom.Controls.Add(buttonRow, 0, 0);
 
@@ -130,6 +135,13 @@ namespace Stm32WifiConfigTool.Panels
             root.Controls.Add(bottom, 0, 2);
 
             Controls.Add(root);
+        }
+
+        private static decimal ClampDecimal(int value, decimal min, decimal max)
+        {
+            if (value < min) return min;
+            if (value > max) return max;
+            return value;
         }
 
         private static void AddRow(TableLayoutPanel layout, ref int row, string labelText, Control control)

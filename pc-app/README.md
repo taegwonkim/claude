@@ -38,13 +38,30 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
    - 하단 "이벤트 로그"에는 `EVENT WIFI_DISCONNECTED` / `EVENT WIFI_CONNECTED` /
      `EVENT TCP_CONNECTED` / `EVENT TCP_CLOSED` 등 MCU의 비동기 알림이 표시됩니다.
 
+## 설정값 저장 (포트/보레이트/타임아웃 등)
+
+포트 설정(각 채널의 COM 포트/Baud Rate/읽기·쓰기 타임아웃), WiFi 설정 패널의 명령 전송
+채널·커맨드 타임아웃, 측정값 보기 패널의 표시 채널·자동 스크롤 여부는 프로그램을 닫을 때
+자동으로 다음 위치에 저장되고, 다음 실행 시 그대로 복원됩니다:
+
+```
+%AppData%\Stm32WifiConfigTool\settings.ini
+```
+
+`Services/AppSettingsStore.cs`가 담당하며, 외부 패키지 없이 단순 `key=value` 텍스트 형식이라
+필요하면 직접 열어 수정해도 됩니다. 파일이 없거나 손상된 경우 기본값으로 안전하게 대체합니다.
+
+**SSID/비밀번호/서버 IP 등 WiFi 접속 정보는 이 파일에 저장하지 않습니다** — 그 값들의 원본은
+MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "현재값 읽기"(`GET CONFIG`)로 항상 MCU에서
+다시 조회합니다. 특히 비밀번호를 PC에 평문으로 남기지 않기 위한 의도적인 설계입니다.
+
 ## 프로젝트 구조
 
 ```
 Stm32WifiConfigTool/
   Stm32WifiConfigTool.csproj
   Program.cs               - 진입점
-  MainForm.cs               - 단일 메인 창, 3개 패널을 도킹 배치 + ConnectionManager 소유
+  MainForm.cs               - 단일 메인 창, 3개 패널을 도킹 배치 + ConnectionManager/설정 소유
   Panels/                   - 예전에는 별도 팝업 Form이었던 것을 UserControl로 전환해 도킹
     PortSettingsPanel.cs
     WifiConfigPanel.cs
@@ -55,9 +72,11 @@ Stm32WifiConfigTool/
     ConnectionManager.cs    - Usb/Uart SerialLinkService 2개를 앱 전체에서 공유
     Stm32Protocol.cs        - 커맨드 문자열 빌더 / DATA·EVENT 라인 파서
     Stm32Commands.cs        - SET/SAVE/GET CONFIG/STATUS async 요청-응답 헬퍼
+    AppSettingsStore.cs     - PC측 UI 설정 로드/저장 (%AppData%\Stm32WifiConfigTool\settings.ini)
   Models/
     NetConfig.cs
     MeasurementRecord.cs
+    AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
 
 ## 프로토콜 참고

@@ -1,6 +1,7 @@
 using System;
 using System.IO.Ports;
 using System.Windows.Forms;
+using Stm32WifiConfigTool.Models;
 using Stm32WifiConfigTool.Services;
 
 namespace Stm32WifiConfigTool.Panels
@@ -8,11 +9,13 @@ namespace Stm32WifiConfigTool.Panels
     /// <summary>
     /// COM 포트 선택, Baud Rate, 읽기/쓰기 통신 타임아웃 설정 패널.
     /// USB(CDC)와 UART(USART3, 보통 USB-시리얼 변환기 경유)를 각각 독립적으로 연결/해제한다.
+    /// 값이 바뀔 때마다 전달받은 <see cref="ChannelSettings"/>에 실시간 반영되며, 앱 종료 시
+    /// MainForm이 AppSettingsStore.Save()로 파일에 저장해 다음 실행에서 그대로 복원된다.
     /// MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
     public class PortSettingsPanel : UserControl
     {
-        public PortSettingsPanel(ConnectionManager conn)
+        public PortSettingsPanel(ConnectionManager conn, AppSettings settings)
         {
             var layout = new TableLayoutPanel
             {
@@ -24,8 +27,8 @@ namespace Stm32WifiConfigTool.Panels
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
 
-            var usbPanel = new ChannelPanel("USB (CDC)", conn.Usb, 115200) { Dock = DockStyle.Fill };
-            var uartPanel = new ChannelPanel("UART (USART3)", conn.Uart, 115200) { Dock = DockStyle.Fill };
+            var usbPanel = new ChannelPanel("USB (CDC)", conn.Usb, settings.Usb) { Dock = DockStyle.Fill };
+            var uartPanel = new ChannelPanel("UART (USART3)", conn.Uart, settings.Uart) { Dock = DockStyle.Fill };
 
             layout.Controls.Add(usbPanel, 0, 0);
             layout.Controls.Add(uartPanel, 0, 1);
@@ -36,7 +39,10 @@ namespace Stm32WifiConfigTool.Panels
         /// <summary>채널 하나(USB 또는 UART)의 포트/보레이트/타임아웃/연결 UI.</summary>
         private sealed class ChannelPanel : GroupBox
         {
+            private static readonly int[] BaudRates = { 9600, 19200, 38400, 57600, 115200, 230400 };
+
             private readonly SerialLinkService _link;
+            private readonly ChannelSettings _settings;
             private readonly ComboBox _portCombo;
             private readonly ComboBox _baudCombo;
             private readonly NumericUpDown _readTimeout;
@@ -44,9 +50,10 @@ namespace Stm32WifiConfigTool.Panels
             private readonly Button _connectButton;
             private readonly Label _statusLabel;
 
-            public ChannelPanel(string title, SerialLinkService link, int defaultBaud)
+            public ChannelPanel(string title, SerialLinkService link, ChannelSettings settings)
             {
                 _link = link;
+                _settings = settings;
                 Text = title;
                 Dock = DockStyle.Fill;
                 Padding = new System.Windows.Forms.Padding(8);
@@ -70,11 +77,13 @@ namespace Stm32WifiConfigTool.Panels
                 _portCombo.Width = 150;
 
                 _baudCombo = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
-                _baudCombo.Items.AddRange(new object[] { 9600, 19200, 38400, 57600, 115200, 230400 });
-                _baudCombo.SelectedItem = defaultBaud;
+                _baudCombo.Items.AddRange(Array.ConvertAll(BaudRates, b => (object)b));
+                _baudCombo.SelectedItem = Array.IndexOf(BaudRates, settings.BaudRate) >= 0 ? settings.BaudRate : 115200;
 
-                _readTimeout = new NumericUpDown { Dock = DockStyle.Fill, Minimum = 100, Maximum = 60000, Increment = 100, Value = 3000 };
-                _writeTimeout = new NumericUpDown { Dock = DockStyle.Fill, Minimum = 100, Maximum = 60000, Increment = 100, Value = 2000 };
+                _readTimeout = new NumericUpDown { Dock = DockStyle.Fill, Minimum = 100, Maximum = 60000, Increment = 100 };
+                _readTimeout.Value = Clamp(settings.ReadTimeoutMs, _readTimeout.Minimum, _readTimeout.Maximum);
+                _writeTimeout = new NumericUpDown { Dock = DockStyle.Fill, Minimum = 100, Maximum = 60000, Increment = 100 };
+                _writeTimeout.Value = Clamp(settings.WriteTimeoutMs, _writeTimeout.Minimum, _writeTimeout.Maximum);
 
                 _connectButton = new Button { Text = "연결", Dock = DockStyle.Fill };
                 _connectButton.Click += ConnectButton_Click;
@@ -94,6 +103,31 @@ namespace Stm32WifiConfigTool.Panels
                 _link.ConnectionChanged += Link_ConnectionChanged;
 
                 RefreshPorts();
+
+                // 값이 바뀔 때마다 전달받은 ChannelSettings에 실시간 반영 (저장은 앱 종료 시 MainForm이 일괄 수행)
+                _portCombo.SelectedIndexChanged += (s, e) =>
+                {
+                    if (_portCombo.SelectedItem is string port)
+                    {
+                        _settings.PortName = port;
+                    }
+                };
+                _baudCombo.SelectedIndexChanged += (s, e) =>
+                {
+                    if (_baudCombo.SelectedItem is int baud)
+                    {
+                        _settings.BaudRate = baud;
+                    }
+                };
+                _readTimeout.ValueChanged += (s, e) => _settings.ReadTimeoutMs = (int)_readTimeout.Value;
+                _writeTimeout.ValueChanged += (s, e) => _settings.WriteTimeoutMs = (int)_writeTimeout.Value;
+            }
+
+            private static decimal Clamp(int value, decimal min, decimal max)
+            {
+                if (value < min) return min;
+                if (value > max) return max;
+                return value;
             }
 
             private static void AddRow(TableLayoutPanel layout, int row, string labelText, Control control)
@@ -108,10 +142,10 @@ namespace Stm32WifiConfigTool.Panels
 
             private void RefreshPorts()
             {
-                string current = _portCombo.SelectedItem as string;
+                string current = _portCombo.SelectedItem as string ?? _settings.PortName;
                 _portCombo.Items.Clear();
                 _portCombo.Items.AddRange(SerialPort.GetPortNames());
-                if (current != null && _portCombo.Items.Contains(current))
+                if (!string.IsNullOrEmpty(current) && _portCombo.Items.Contains(current))
                 {
                     _portCombo.SelectedItem = current;
                 }
