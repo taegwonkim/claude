@@ -33,8 +33,9 @@ HAL/CMSIS/USB 미들웨어/FreeRTOS 커널 소스 등 벤더 생성 코드는 �
   핀 라벨 `FROM_FPGA`)로 트리거 신호를 먼저 보낸 뒤, 측정값을 **USART2**(FPGA→MCU 전용 UART,
   ASCII 라인 프로토콜)로 전송합니다 (SPI2는 플래시 전용). MCU는 트리거 인터럽트 후 USART2로
   도착하는 한 줄(`ADC ...`)을 타임아웃 내에 수신해 파싱합니다.
-- **PC ↔ MCU 설정 프로토콜**: 사람이 읽기 쉬운 ASCII 라인 커맨드(`\r\n` 종료). 상세는
-  `docs/프로토콜_명세.md` 참고.
+- **PC ↔ MCU 설정 프로토콜**: `STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A)` 프레임
+  (필드는 콤마로 구분). ESP32 AT/FPGA 링크/TCP 서버 페이로드에는 적용하지 않고 USART3+USB CDC
+  전용. 상세는 `docs/프로토콜_명세.md` §1 참고.
 - ADC 측정값 포맷: FPGA가 트리거 후 `ADC <seq> <sample0> [sample1 ...]\r\n` 형식의 ASCII 라인을
   USART2로 보낸다고 가정. 정확한 포맷은 `docs/프로토콜_명세.md` §3에서 조정 가능.
 
@@ -58,7 +59,7 @@ HAL/CMSIS/USB 미들웨어/FreeRTOS 커널 소스 등 벤더 생성 코드는 �
 ```
 docs/
   CubeMX_설정가이드.md   - .ioc 설정 항목 (클럭/핀맵/USART/SPI/USB/FreeRTOS 태스크,우선순위,메모리)
-  프로토콜_명세.md        - PC 커맨드셋, 플래시 메모리 맵, ESP32 AT 시퀀스, FPGA 프레임 포맷
+  프로토콜_명세.md        - PC↔MCU STX+CSV+CRLF 프레임 커맨드셋, 플래시 메모리 맵, ESP32 AT 시퀀스, FPGA 프레임 포맷
 Core/Inc/
   app_config.h         - 태스크 우선순위/스택/큐 크기, 프로토콜 상수, 핀 매핑 정의
   ring_buffer.h         - SPSC 바이트 링버퍼
@@ -67,6 +68,7 @@ Core/Inc/
   w25q40.h              - SPI2 NOR 플래시(W25Q40CLSNIG) 드라이버
   net_config_store.h    - 설정 구조체 + CRC32 + 플래시 로드/세이브
   esp32_at.h            - ESP32(USART1) AT 커맨드 드라이버
+  pc_frame.h            - PC↔MCU STX+CSV+CRLF 프레임 빌드/파싱
   pc_comm.h             - PC 커맨드 파서 (USART3 + USB CDC 공용)
   fpga_link.h           - FPGA 트리거(EXTI, PH1)/ADC(USART2) 수신
   status_led.h          - LED_RUN(PC13) 하트비트, LED_WIFI(PC14) 연결 표시

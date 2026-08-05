@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Stm32WifiConfigTool.Models;
@@ -7,8 +6,9 @@ using Stm32WifiConfigTool.Models;
 namespace Stm32WifiConfigTool.Services
 {
     /// <summary>
-    /// SET/SAVE/GET CONFIG/STATUS 커맨드를 보내고 응답 라인을 기다리는 async 헬퍼.
-    /// DATA/EVENT 라인은 비동기 텔레메트리이므로 커맨드 응답으로 취급하지 않고 건너뛴다.
+    /// SET/SAVE/GET CONFIG/STATUS 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
+    /// DATA/EVENT 프레임은 비동기 텔레메트리이므로 커맨드 응답으로 취급하지 않고 건너뛴다.
+    /// STX가 없는(깨진/잡음) 라인도 응답으로 취급하지 않고 무시한다.
     /// 한 번에 하나의 커맨드만 진행 중이라고 가정한다(폼에서 버튼 클릭 시 순차 호출).
     ///
     /// NOTE: 의도적으로 ConfigureAwait(false)를 쓰지 않는다. 이 클래스는 항상 WinForms 버튼
@@ -20,10 +20,11 @@ namespace Stm32WifiConfigTool.Services
     /// </summary>
     public static class Stm32Commands
     {
-        /// <summary>command를 보내고, DATA/EVENT가 아닌 첫 응답 줄을 반환한다.</summary>
-        public static async Task<string> SendAndWaitReplyAsync(SerialLinkService link, string command, int timeoutMs)
+        /// <summary>command(STX로 시작하는 프레임 문자열)를 보내고, DATA/EVENT가 아닌 첫 응답
+        /// 프레임의 필드 배열을 반환한다.</summary>
+        public static async Task<string[]> SendAndWaitReplyAsync(SerialLinkService link, string command, int timeoutMs)
         {
-            var tcs = new TaskCompletionSource<string>();
+            var tcs = new TaskCompletionSource<string[]>();
 
             void Handler(LinkChannel ch, string line)
             {
@@ -31,11 +32,15 @@ namespace Stm32WifiConfigTool.Services
                 {
                     return;
                 }
-                if (Stm32Protocol.IsDataLine(line) || Stm32Protocol.IsEventLine(line))
+                if (!Stm32Protocol.TryParseFrame(line, out string[] fields))
+                {
+                    return; /* STX 없는 잡음/깨진 프레임 - 무시 */
+                }
+                if (Stm32Protocol.IsDataFrame(fields) || Stm32Protocol.IsEventFrame(fields))
                 {
                     return;
                 }
-                tcs.TrySetResult(line);
+                tcs.TrySetResult(fields);
             }
 
             link.LineReceived += Handler;
@@ -45,7 +50,7 @@ namespace Stm32WifiConfigTool.Services
                 Task completed = await Task.WhenAny(tcs.Task, Task.Delay(timeoutMs));
                 if (completed != tcs.Task)
                 {
-                    throw new TimeoutException("응답 타임아웃: " + command);
+                    throw new TimeoutException("응답 타임아웃: " + Stm32Protocol.DisplayText(command));
                 }
                 return tcs.Task.Result;
             }
@@ -55,94 +60,50 @@ namespace Stm32WifiConfigTool.Services
             }
         }
 
-        /// <summary>GET CONFIG를 보내고 8개 키(SSID/PASS/SERVER_IP/SERVER_PORT/DHCP/IP/GATEWAY/MASK)가
-        /// 모두 도착할 때까지 기다려 NetConfig로 조립한다.</summary>
+        /// <summary>GET,CONFIG를 보내고 단일 프레임 응답
+        /// "CONFIG,ssid,pass_masked,server_ip,server_port,dhcp,ip,gateway,mask"을 NetConfig로 변환한다.</summary>
         public static async Task<NetConfig> GetConfigAsync(SerialLinkService link, int timeoutMs)
         {
-            var cfg = new NetConfig();
-            var receivedKeys = new HashSet<string>();
-            var tcs = new TaskCompletionSource<bool>();
-            string[] expectedKeys = { "SSID", "PASS", "SERVER_IP", "SERVER_PORT", "DHCP", "IP", "GATEWAY", "MASK" };
+            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdGetConfig, timeoutMs);
 
-            void Handler(LinkChannel ch, string line)
+            if (fields.Length == 0 || fields[0] != "CONFIG")
             {
-                if (ch != link.Channel)
-                {
-                    return;
-                }
-                if (!Stm32Protocol.TryParseKeyValue(line, out string key, out string value))
-                {
-                    return;
-                }
-
-                switch (key)
-                {
-                    case "SSID":
-                        cfg.Ssid = value;
-                        break;
-                    case "PASS":
-                        break; /* 마스킹된 값("****")이므로 무시 */
-                    case "SERVER_IP":
-                        cfg.ServerIp = value;
-                        break;
-                    case "SERVER_PORT":
-                        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int port))
-                        {
-                            cfg.ServerPort = port;
-                        }
-                        break;
-                    case "DHCP":
-                        cfg.DhcpEnabled = string.Equals(value, "ON", StringComparison.OrdinalIgnoreCase);
-                        break;
-                    case "IP":
-                        cfg.StaticIp = value;
-                        break;
-                    case "GATEWAY":
-                        cfg.Gateway = value;
-                        break;
-                    case "MASK":
-                        cfg.Netmask = value;
-                        break;
-                    default:
-                        return; /* 알 수 없는 키는 응답 카운트에 포함하지 않음 */
-                }
-
-                receivedKeys.Add(key);
-                if (receivedKeys.Count >= expectedKeys.Length)
-                {
-                    tcs.TrySetResult(true);
-                }
+                throw new InvalidOperationException("GET CONFIG 응답 형식 오류: " + string.Join(",", fields));
+            }
+            if (fields.Length < 9)
+            {
+                throw new InvalidOperationException("GET CONFIG 응답 필드 부족 (" + fields.Length + "/9)");
             }
 
-            link.LineReceived += Handler;
-            try
+            int.TryParse(fields[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out int port);
+
+            return new NetConfig
             {
-                link.SendLine(Stm32Protocol.CmdGetConfig);
-                Task completed = await Task.WhenAny(tcs.Task, Task.Delay(timeoutMs));
-                if (completed != tcs.Task)
-                {
-                    throw new TimeoutException("GET CONFIG 응답 타임아웃 (받은 필드: " + receivedKeys.Count + "/" + expectedKeys.Length + ")");
-                }
-                return cfg;
-            }
-            finally
-            {
-                link.LineReceived -= Handler;
-            }
+                Ssid = fields[1],
+                /* fields[2] = MCU가 마스킹해서 보낸 "****" - 실제 비밀번호는 절대 돌려주지 않음 */
+                ServerIp = fields[3],
+                ServerPort = port,
+                DhcpEnabled = string.Equals(fields[5], "ON", StringComparison.OrdinalIgnoreCase),
+                StaticIp = fields[6],
+                Gateway = fields[7],
+                Netmask = fields[8]
+            };
         }
 
-        /// <summary>cfg를 SET 커맨드들로 순차 전송 후 SAVE까지 수행한다. 비밀번호는
+        /// <summary>cfg를 SET 프레임들로 순차 전송 후 SAVE까지 수행한다. 비밀번호는
         /// cfg.Password가 비어있지 않을 때만 전송한다(비어있으면 MCU에 저장된 기존 값 유지).
         /// DHCP=OFF일 때만 정적 IP/Gateway/Mask를 전송한다. 각 단계 로그는 log 콜백으로 전달.</summary>
         public static async Task SetConfigAsync(SerialLinkService link, NetConfig cfg, int timeoutMs, Action<string> log)
         {
             async Task Step(string command)
             {
-                string reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
-                log?.Invoke(command + " -> " + reply);
-                if (Stm32Protocol.IsErrorLine(reply))
+                string[] reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
+                string cmdText = Stm32Protocol.DisplayText(command);
+                string replyText = string.Join(",", reply);
+                log?.Invoke(cmdText + " -> " + replyText);
+                if (Stm32Protocol.IsErrorFrame(reply))
                 {
-                    throw new InvalidOperationException(command + " 실패: " + reply);
+                    throw new InvalidOperationException(cmdText + " 실패: " + replyText);
                 }
             }
 
@@ -165,10 +126,17 @@ namespace Stm32WifiConfigTool.Services
             await Step(Stm32Protocol.CmdSave);
         }
 
-        /// <summary>STATUS 커맨드를 보내고 "STATUS WIFI=.. TCP=.." 원문을 그대로 반환한다.</summary>
-        public static Task<string> GetStatusAsync(SerialLinkService link, int timeoutMs)
+        /// <summary>STATUS를 보내고 "STATUS,&lt;WIFI UP/DOWN&gt;,&lt;TCP UP/DOWN&gt;" 응답을
+        /// 사람이 읽기 쉬운 "STATUS WIFI=.. TCP=.." 문자열로 변환해 반환한다.</summary>
+        public static async Task<string> GetStatusAsync(SerialLinkService link, int timeoutMs)
         {
-            return SendAndWaitReplyAsync(link, Stm32Protocol.CmdStatus, timeoutMs);
+            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdStatus, timeoutMs);
+
+            if (fields.Length >= 3 && fields[0] == "STATUS")
+            {
+                return "STATUS WIFI=" + fields[1] + " TCP=" + fields[2];
+            }
+            return string.Join(",", fields);
         }
     }
 }

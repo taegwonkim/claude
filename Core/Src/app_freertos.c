@@ -25,11 +25,11 @@ static void ReportLinkStateChange(Esp32_LinkState_t prev, Esp32_LinkState_t cur)
     }
 
     if (cur == ESP32_LINK_DOWN) {
-        PcComm_BroadcastLine("EVENT WIFI_DISCONNECTED");
+        PcComm_BroadcastFrame("EVENT,WIFI_DISCONNECTED");
     } else if (cur == ESP32_WIFI_UP) {
-        PcComm_BroadcastLine((prev == ESP32_TCP_UP) ? "EVENT TCP_CLOSED" : "EVENT WIFI_CONNECTED");
+        PcComm_BroadcastFrame((prev == ESP32_TCP_UP) ? "EVENT,TCP_CLOSED" : "EVENT,WIFI_CONNECTED");
     } else if (cur == ESP32_TCP_UP) {
-        PcComm_BroadcastLine("EVENT TCP_CONNECTED");
+        PcComm_BroadcastFrame("EVENT,TCP_CONNECTED");
     }
 
     StatusLed_SetWifi(cur == ESP32_TCP_UP);

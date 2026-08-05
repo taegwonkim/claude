@@ -111,8 +111,8 @@ void FpgaLink_Task(void *argument)
         }
 
         char out[APP_PC_LINE_MAX];
-        MeasurementMsg_BuildDataLine(out, sizeof(out), &msg);
-        PcComm_BroadcastLine(out); /* PC(USART3+USB) 즉시 미러 */
+        MeasurementMsg_BuildCsvFields(out, sizeof(out), &msg);
+        PcComm_BroadcastFrame(out); /* PC(USART3+USB) 즉시 미러, STX+CRLF 프레이밍은 내부에서 처리 */
 
         (void)osMessageQueuePut(g_measQueueId, &msg, 0U, 0U); /* ESP32_Task -> 서버 전송, 큐 가득 차면 드롭 */
     }

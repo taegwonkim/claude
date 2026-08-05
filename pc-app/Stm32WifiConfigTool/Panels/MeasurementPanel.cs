@@ -144,7 +144,12 @@ namespace Stm32WifiConfigTool.Panels
                 return;
             }
 
-            if (Stm32Protocol.TryParseDataLine(line, ChannelLabel(channel), out MeasurementRecord record))
+            if (!Stm32Protocol.TryParseFrame(line, out string[] fields))
+            {
+                return; /* STX 없는 잡음/깨진 프레임 - 무시 */
+            }
+
+            if (Stm32Protocol.TryParseDataRecord(fields, ChannelLabel(channel), out MeasurementRecord record))
             {
                 _records.Add(record);
                 while (_records.Count > MaxRows)
@@ -158,9 +163,10 @@ namespace Stm32WifiConfigTool.Panels
                     _grid.FirstDisplayedScrollingRowIndex = _grid.Rows.Count - 1;
                 }
             }
-            else if (Stm32Protocol.IsEventLine(line))
+            else if (Stm32Protocol.IsEventFrame(fields))
             {
-                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] " + line + Environment.NewLine);
+                string eventText = string.Join(",", fields);
+                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] " + eventText + Environment.NewLine);
             }
         }
 

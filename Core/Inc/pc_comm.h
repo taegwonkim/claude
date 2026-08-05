@@ -3,6 +3,7 @@
  *
  * PC와의 시리얼 커맨드/데이터 인터페이스. USART3(HW UART)와 USB(CDC, Virtual COM)를
  * 동시에 입력 채널로 받고, 출력(설정 응답 + 측정값 미러)은 두 채널 모두로 보낸다.
+ * 프레임 포맷: STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A) (docs/프로토콜_명세.md §1).
  */
 #ifndef PC_COMM_H
 #define PC_COMM_H
@@ -31,10 +32,11 @@ void PC_Comm_FeedUSB(uint8_t *buf, uint32_t len);
 void PcComm_Task(void *argument);
 
 /**
- * @brief 널 종단 문자열 line(개행 미포함)을 "\r\n"을 붙여 USART3와 USB CDC 양쪽으로 전송.
- *        다른 태스크(FPGA_Task 등)에서도 측정값 미러 출력을 위해 호출한다.
+ * @brief csv_payload(콤마로 이미 join된 필드들, 예: "OK", "ERR,INVALID_IP", "DATA,1,1234,567")를
+ *        STX + csv_payload + CR + LF로 감싸 USART3와 USB CDC 양쪽으로 전송한다.
+ *        다른 태스크(FPGA_Task, ESP32_Task 등)에서도 측정값/이벤트 알림 출력을 위해 호출한다.
  */
-void PcComm_BroadcastLine(const char *line);
+void PcComm_BroadcastFrame(const char *csv_payload);
 
 #ifdef __cplusplus
 }

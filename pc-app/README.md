@@ -13,9 +13,10 @@ STM32L562C + FreeRTOS 펌웨어(리포지토리 루트의 `Core/`, `docs/프로�
 ## 구성 (창 1개, 패널 3개 동시 표시)
 
 MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기 경유)** 두 채널에 항상
-동일한 데이터를 미러링합니다(`docs/프로토콜_명세.md`). 이 도구는 두 채널을 완전히 독립적으로
-연결·해제할 수 있고, 별도 팝업 창을 띄우지 않고 **메인 창 하나 안에서 세 패널을 항상 동시에**
-볼 수 있게 도킹 배치했습니다: 좌상단 포트 설정, 우상단 WiFi 설정, 하단 전체 폭 측정값 보기.
+동일한 데이터를 미러링합니다. 두 채널 모두 `STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A)`
+프레임 포맷을 사용합니다(필드는 콤마로 구분, `docs/프로토콜_명세.md` §1). 이 도구는 두 채널을
+완전히 독립적으로 연결·해제할 수 있고, 별도 팝업 창을 띄우지 않고 **메인 창 하나 안에서 세 패널을
+항상 동시에** 볼 수 있게 도킹 배치했습니다: 좌상단 포트 설정, 우상단 WiFi 설정, 하단 전체 폭 측정값 보기.
 
 1. **포트 설정** (좌상단, `Panels/PortSettingsPanel.cs`)
    USB/UART 각각 COM 포트, Baud Rate, 읽기/쓰기 타임아웃(ms)을 설정하고 연결/해제합니다.
@@ -23,20 +24,20 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
 
 2. **WiFi 설정** (우상단, `Panels/WifiConfigPanel.cs`)
    SSID/비밀번호, 서버 IP·Port, DHCP on/off, DHCP off일 때의 정적 IP/Gateway/Netmask를 설정합니다.
-   - "현재값 읽기": `GET CONFIG`를 보내 MCU에 저장된 값을 화면에 채웁니다(비밀번호는 MCU가
+   - "현재값 읽기": `GET,CONFIG` 프레임을 보내 MCU에 저장된 값을 화면에 채웁니다(비밀번호는 MCU가
      마스킹해서 돌려주므로 표시되지 않습니다 — 바꾸려면 "비밀번호 변경" 체크 후 새로 입력).
-   - "저장(SET+SAVE)": 변경된 값을 `SET ...` 커맨드들로 순차 전송 후 `SAVE`까지 수행합니다.
+   - "저장(SET+SAVE)": 변경된 값을 `SET,...` 프레임들로 순차 전송 후 `SAVE`까지 수행합니다.
      저장되면 MCU가 자동으로 WiFi/서버 재접속을 시도합니다.
-   - "상태 조회": `STATUS`를 보내 WIFI/TCP 연결 상태를 즉시 확인합니다.
+   - "상태 조회": `STATUS` 프레임을 보내 WIFI/TCP 연결 상태를 즉시 확인합니다.
    - 상단 "명령 전송 채널"에서 USB/UART 중 커맨드를 보낼 채널을 고릅니다.
 
 3. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
-   FPGA 트리거 결과로 MCU가 보내는 `DATA <seq> <timestamp_ms> <sample...>` 라인을 표로 보여줍니다.
+   FPGA 트리거 결과로 MCU가 보내는 `DATA,<seq>,<timestamp_ms>,<sample...>` 프레임을 표로 보여줍니다.
    - "표시 채널": USB / UART / 둘 다 — 어느 채널에서 온 데이터를 그릴지 선택.
    - "지우기": 그리드와 이벤트 로그를 모두 비웁니다.
    - "CSV로 저장": 현재까지 쌓인 측정값을 CSV 파일로 내보냅니다.
-   - 하단 "이벤트 로그"에는 `EVENT WIFI_DISCONNECTED` / `EVENT WIFI_CONNECTED` /
-     `EVENT TCP_CONNECTED` / `EVENT TCP_CLOSED` 등 MCU의 비동기 알림이 표시됩니다.
+   - 하단 "이벤트 로그"에는 `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` /
+     `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED` 등 MCU의 비동기 알림이 표시됩니다.
 
 ## 설정값 저장 (포트/보레이트/타임아웃 등)
 
@@ -70,7 +71,7 @@ Stm32WifiConfigTool/
     LinkChannel.cs          - Usb/Uart 채널 구분
     SerialLinkService.cs    - 시리얼 연결 1개(연결/해제, 라인 단위 수신, 타임아웃)
     ConnectionManager.cs    - Usb/Uart SerialLinkService 2개를 앱 전체에서 공유
-    Stm32Protocol.cs        - 커맨드 문자열 빌더 / DATA·EVENT 라인 파서
+    Stm32Protocol.cs        - STX+CSV+CRLF 프레임 빌더/파서
     Stm32Commands.cs        - SET/SAVE/GET CONFIG/STATUS async 요청-응답 헬퍼
     AppSettingsStore.cs     - PC측 UI 설정 로드/저장 (%AppData%\Stm32WifiConfigTool\settings.ini)
   Models/
