@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
@@ -13,100 +12,70 @@ namespace Stm32WifiConfigTool.Panels
     /// FPGA 측정값("&lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6" 프레임) 표시 패널. USB/UART 채널을
     /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있고, 별도 영역에 WIFI/TCP 관련
     /// EVENT 라인 로그도 보여준다. ESP32 상태(STATUS,&lt;번호&gt;)는 별도 EspStatusPanel에서 표시한다.
+    /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
+    /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
+    /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
     /// MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
-    public class MeasurementPanel : UserControl
+    public partial class MeasurementPanel : UserControl
     {
         private const int MaxRows = 5000; // 메모리 보호용 상한, 초과 시 오래된 행부터 제거
 
-        private readonly ConnectionManager _conn;
         private readonly BindingList<MeasurementRecord> _records = new BindingList<MeasurementRecord>();
+        private ConnectionManager _conn;
+        private AppSettings _settings;
 
-        private readonly RadioButton _showUsb;
-        private readonly RadioButton _showUart;
-        private readonly RadioButton _showBoth;
-        private readonly DataGridView _grid;
-        private readonly TextBox _eventLogBox;
-        private readonly Label _countLabel;
-        private readonly CheckBox _autoScrollCheck;
+        public MeasurementPanel()
+        {
+            InitializeComponent();
+            _grid.DataSource = _records;
+        }
 
-        public MeasurementPanel(ConnectionManager conn, AppSettings settings)
+        /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.</summary>
+        public void Initialize(ConnectionManager conn, AppSettings settings)
         {
             _conn = conn;
+            _settings = settings;
 
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(6) };
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
-
-            // 상단: 채널 선택 + 도구 버튼
-            var topRow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false };
-            var channelGroup = new GroupBox { Text = "표시 채널", AutoSize = true, Height = 50, Width = 220 };
-            _showUsb = new RadioButton { Text = "USB", Left = 10, Top = 20, AutoSize = true, Checked = settings.MeasurementDisplayChannel == "Usb" };
-            _showUart = new RadioButton { Text = "UART", Left = 70, Top = 20, AutoSize = true, Checked = settings.MeasurementDisplayChannel == "Uart" };
-            _showBoth = new RadioButton { Text = "둘 다", Left = 140, Top = 20, AutoSize = true, Checked = settings.MeasurementDisplayChannel != "Usb" && settings.MeasurementDisplayChannel != "Uart" };
-            _showUsb.CheckedChanged += (s, e) => { if (_showUsb.Checked) settings.MeasurementDisplayChannel = "Usb"; };
-            _showUart.CheckedChanged += (s, e) => { if (_showUart.Checked) settings.MeasurementDisplayChannel = "Uart"; };
-            _showBoth.CheckedChanged += (s, e) => { if (_showBoth.Checked) settings.MeasurementDisplayChannel = "Both"; };
-            channelGroup.Controls.Add(_showUsb);
-            channelGroup.Controls.Add(_showUart);
-            channelGroup.Controls.Add(_showBoth);
-            topRow.Controls.Add(channelGroup);
-
-            var clearButton = new Button { Text = "지우기", AutoSize = true, Margin = new Padding(10, 15, 3, 3) };
-            clearButton.Click += ClearButton_Click;
-            topRow.Controls.Add(clearButton);
-
-            var exportButton = new Button { Text = "CSV로 저장", AutoSize = true, Margin = new Padding(3, 15, 3, 3) };
-            exportButton.Click += ExportButton_Click;
-            topRow.Controls.Add(exportButton);
-
-            _autoScrollCheck = new CheckBox { Text = "자동 스크롤", AutoSize = true, Checked = settings.MeasurementAutoScroll, Margin = new Padding(10, 20, 3, 3) };
-            _autoScrollCheck.CheckedChanged += (s, e) => settings.MeasurementAutoScroll = _autoScrollCheck.Checked;
-            topRow.Controls.Add(_autoScrollCheck);
-
-            root.Controls.Add(topRow, 0, 0);
-
-            // 측정값 그리드
-            _grid = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                ReadOnly = true,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AutoGenerateColumns = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                RowHeadersVisible = false,
-                DataSource = _records
-            };
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "수신 시각", DataPropertyName = "ReceivedAt", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "HH:mm:ss.fff" } });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "채널", DataPropertyName = "SourceChannel", Width = 60 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "DC IP", DataPropertyName = "DcIp", Width = 110 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "MAC", DataPropertyName = "MacAddress", Width = 130 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Data1..6", DataPropertyName = "SamplesText", Width = 260, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-            root.Controls.Add(_grid, 0, 1);
-
-            var eventLabel = new Label { Text = "이벤트 로그 (WIFI/TCP 상태 등)", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 6, 0, 2) };
-            root.Controls.Add(eventLabel, 0, 2);
-
-            _eventLogBox = new TextBox
-            {
-                Dock = DockStyle.Fill,
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Font = new Font(FontFamily.GenericMonospace, 8.5f)
-            };
-            root.Controls.Add(_eventLogBox, 0, 3);
-
-            _countLabel = new Label { Text = "0건", Dock = DockStyle.Bottom, TextAlign = ContentAlignment.MiddleRight };
-            Controls.Add(_countLabel);
-
-            Controls.Add(root);
+            _showUsb.Checked = settings.MeasurementDisplayChannel == "Usb";
+            _showUart.Checked = settings.MeasurementDisplayChannel == "Uart";
+            _showBoth.Checked = settings.MeasurementDisplayChannel != "Usb" && settings.MeasurementDisplayChannel != "Uart";
+            _autoScrollCheck.Checked = settings.MeasurementAutoScroll;
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
+        }
+
+        private void ShowUsb_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_showUsb.Checked && _settings != null)
+            {
+                _settings.MeasurementDisplayChannel = "Usb";
+            }
+        }
+
+        private void ShowUart_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_showUart.Checked && _settings != null)
+            {
+                _settings.MeasurementDisplayChannel = "Uart";
+            }
+        }
+
+        private void ShowBoth_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_showBoth.Checked && _settings != null)
+            {
+                _settings.MeasurementDisplayChannel = "Both";
+            }
+        }
+
+        private void AutoScrollCheck_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_settings != null)
+            {
+                _settings.MeasurementAutoScroll = _autoScrollCheck.Checked;
+            }
         }
 
         private bool IsChannelSelected(LinkChannel channel)
@@ -221,8 +190,12 @@ namespace Stm32WifiConfigTool.Panels
         {
             if (disposing)
             {
-                _conn.Usb.LineReceived -= OnLineReceived;
-                _conn.Uart.LineReceived -= OnLineReceived;
+                if (_conn != null)
+                {
+                    _conn.Usb.LineReceived -= OnLineReceived;
+                    _conn.Uart.LineReceived -= OnLineReceived;
+                }
+                components?.Dispose();
             }
             base.Dispose(disposing);
         }

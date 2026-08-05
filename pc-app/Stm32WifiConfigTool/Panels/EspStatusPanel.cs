@@ -10,83 +10,60 @@ namespace Stm32WifiConfigTool.Panels
     /// ESP32 상태("STATUS,&lt;번호&gt;" 프레임) 표시 패널. MCU는 측정값 전송 사이사이에
     /// 이 프레임을 주기적으로 브로드캐스트한다(docs/프로토콜_명세.md §1). 측정값 프레임과는
     /// 별도로 구분해서 여기 표시한다. USB/UART 채널을 선택해 어느 쪽(또는 둘 다)을 표시할지
-    /// 고를 수 있다. MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
+    /// 고를 수 있다. UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
+    /// 디자이너로 편집 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는
+    /// 생성 직후 <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을
+    /// 연결해야 한다. MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
     /// </summary>
-    public class EspStatusPanel : UserControl
+    public partial class EspStatusPanel : UserControl
     {
         private const int MaxLogLines = 2000;
 
-        private readonly RadioButton _showUsb;
-        private readonly RadioButton _showUart;
-        private readonly RadioButton _showBoth;
-        private readonly Label _currentStatusLabel;
-        private readonly Label _lastUpdateLabel;
-        private readonly TextBox _logBox;
-        private readonly ConnectionManager _conn;
-
+        private ConnectionManager _conn;
+        private AppSettings _settings;
         private int _logLineCount;
 
-        public EspStatusPanel(ConnectionManager conn, AppSettings settings)
+        public EspStatusPanel()
+        {
+            InitializeComponent();
+        }
+
+        /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.</summary>
+        public void Initialize(ConnectionManager conn, AppSettings settings)
         {
             _conn = conn;
+            _settings = settings;
 
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(6) };
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // 0: 채널 선택
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // 1: 현재 상태
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // 2: 지우기 버튼
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // 3: "수신 이력" 라벨
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // 4: 로그 박스
-
-            // 채널 선택
-            var channelGroup = new GroupBox { Text = "표시 채널", Dock = DockStyle.Top, Height = 50 };
-            _showUsb = new RadioButton { Text = "USB", Left = 10, Top = 20, AutoSize = true, Checked = settings.EspStatusDisplayChannel == "Usb" };
-            _showUart = new RadioButton { Text = "UART", Left = 70, Top = 20, AutoSize = true, Checked = settings.EspStatusDisplayChannel == "Uart" };
-            _showBoth = new RadioButton { Text = "둘 다", Left = 140, Top = 20, AutoSize = true, Checked = settings.EspStatusDisplayChannel != "Usb" && settings.EspStatusDisplayChannel != "Uart" };
-            _showUsb.CheckedChanged += (s, e) => { if (_showUsb.Checked) settings.EspStatusDisplayChannel = "Usb"; };
-            _showUart.CheckedChanged += (s, e) => { if (_showUart.Checked) settings.EspStatusDisplayChannel = "Uart"; };
-            _showBoth.CheckedChanged += (s, e) => { if (_showBoth.Checked) settings.EspStatusDisplayChannel = "Both"; };
-            channelGroup.Controls.Add(_showUsb);
-            channelGroup.Controls.Add(_showUart);
-            channelGroup.Controls.Add(_showBoth);
-            root.Controls.Add(channelGroup, 0, 0);
-
-            // 현재 상태 큰 표시
-            var currentGroup = new GroupBox { Text = "현재 ESP32 상태", Dock = DockStyle.Top, Height = 90 };
-            _currentStatusLabel = new Label
-            {
-                Text = "-",
-                Left = 10,
-                Top = 20,
-                AutoSize = true,
-                Font = new Font(Font.FontFamily, 16f, FontStyle.Bold),
-                ForeColor = Color.Gray
-            };
-            _lastUpdateLabel = new Label { Text = "수신 대기 중...", Left = 10, Top = 58, AutoSize = true, ForeColor = Color.DimGray };
-            currentGroup.Controls.Add(_currentStatusLabel);
-            currentGroup.Controls.Add(_lastUpdateLabel);
-            root.Controls.Add(currentGroup, 0, 1);
-
-            var clearButton = new Button { Text = "지우기", AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0, 4, 0, 4) };
-            clearButton.Click += ClearButton_Click;
-            root.Controls.Add(clearButton, 0, 2);
-
-            var logLabel = new Label { Text = "수신 이력", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 4, 0, 2) };
-            root.Controls.Add(logLabel, 0, 3);
-
-            _logBox = new TextBox
-            {
-                Dock = DockStyle.Fill,
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Font = new Font(FontFamily.GenericMonospace, 8.5f)
-            };
-            root.Controls.Add(_logBox, 0, 4);
-
-            Controls.Add(root);
+            _showUsb.Checked = settings.EspStatusDisplayChannel == "Usb";
+            _showUart.Checked = settings.EspStatusDisplayChannel == "Uart";
+            _showBoth.Checked = settings.EspStatusDisplayChannel != "Usb" && settings.EspStatusDisplayChannel != "Uart";
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
+        }
+
+        private void ShowUsb_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_showUsb.Checked && _settings != null)
+            {
+                _settings.EspStatusDisplayChannel = "Usb";
+            }
+        }
+
+        private void ShowUart_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_showUart.Checked && _settings != null)
+            {
+                _settings.EspStatusDisplayChannel = "Uart";
+            }
+        }
+
+        private void ShowBoth_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_showBoth.Checked && _settings != null)
+            {
+                _settings.EspStatusDisplayChannel = "Both";
+            }
         }
 
         private bool IsChannelSelected(LinkChannel channel)
@@ -186,8 +163,12 @@ namespace Stm32WifiConfigTool.Panels
         {
             if (disposing)
             {
-                _conn.Usb.LineReceived -= OnLineReceived;
-                _conn.Uart.LineReceived -= OnLineReceived;
+                if (_conn != null)
+                {
+                    _conn.Usb.LineReceived -= OnLineReceived;
+                    _conn.Uart.LineReceived -= OnLineReceived;
+                }
+                components?.Dispose();
             }
             base.Dispose(disposing);
         }

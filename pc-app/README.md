@@ -54,6 +54,34 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
      `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED` 등 MCU의 비동기 알림이 표시됩니다
      (ESP32 상태 번호 자체는 3번 패널에서 별도로 봅니다).
 
+## Visual Studio 디자이너로 폼/패널 편집하기
+
+4개 패널(`PortSettingsPanel`, `WifiConfigPanel`, `EspStatusPanel`, `MeasurementPanel`)과
+`SerialChannelPanel`(USB/UART 공용 하위 컨트롤), `MainForm`은 모두 **표준 WinForms 디자이너
+구조**(`<이름>.cs` + `<이름>.Designer.cs`)로 되어 있어 Visual Studio에서 더블클릭하면 디자이너
+화면이 뜨고 드래그 앤 드롭/속성 창으로 편집할 수 있습니다.
+
+- **`<이름>.Designer.cs`**: `InitializeComponent()`와 컨트롤 필드 선언만 있습니다. 디자이너가
+  자동으로 다시 쓰는 영역이므로 보통 직접 편집하지 않고 디자이너 화면에서 조작합니다.
+- **`<이름>.cs`**: 실제 동작(이벤트 핸들러, 비즈니스 로직)이 있습니다. 여기서
+  `public Xxx() { InitializeComponent(); }`(매개변수 없는 생성자, 디자이너 전용)와
+  `public void Initialize(ConnectionManager conn, AppSettings settings) { ... }`
+  (런타임 의존성 연결용, `MainForm`이 생성 직후 1회 호출)를 볼 수 있습니다.
+
+**왜 `Initialize()`가 따로 있나요?** WinForms 디자이너는 컨트롤을 화면에 그리기 위해 항상
+매개변수 없는 생성자로 인스턴스를 만듭니다. 그런데 이 패널들은 실제로는 `ConnectionManager`,
+`AppSettings` 같은 런타임 의존성이 필요합니다. 그래서 생성자는 `InitializeComponent()`만
+호출하고, 실제 의존성 연결/이벤트 구독은 `Initialize()`에서 따로 합니다 — 디자이너와
+런타임 동작을 분리하는 WinForms의 표준 패턴입니다. 새 패널을 추가할 때도 이 패턴을 따르세요.
+
+**편집 방법**:
+1. 솔루션 탐색기에서 `Panels/WifiConfigPanel.cs`(또는 원하는 패널) 더블클릭 → 디자이너 화면.
+2. 툴박스에서 컨트롤을 드래그하거나 기존 컨트롤을 선택해 속성 창에서 수정.
+3. 이벤트(예: 버튼 Click)는 속성 창의 번개 아이콘 탭에서 더블클릭하면 `<이름>.cs`에 핸들러가
+   자동 생성/연결됩니다.
+4. 컨트롤에 런타임 값(연결 상태, 설정값 등)을 반영해야 하면 `Initialize()` 메서드를 직접 수정하세요
+   (디자이너가 건드리지 않는 영역).
+
 ## 설정값 저장 (포트/보레이트/타임아웃 등)
 
 포트 설정(각 채널의 COM 포트/Baud Rate/읽기·쓰기 타임아웃), WiFi 설정 패널의 명령 전송
@@ -77,12 +105,13 @@ MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "현재값 읽기"(`GET 
 Stm32WifiConfigTool/
   Stm32WifiConfigTool.csproj
   Program.cs               - 진입점
-  MainForm.cs               - 단일 메인 창, 4개 패널을 도킹 배치 + ConnectionManager/설정 소유
-  Panels/                   - 예전에는 별도 팝업 Form이었던 것을 UserControl로 전환해 도킹
-    PortSettingsPanel.cs
-    WifiConfigPanel.cs
-    EspStatusPanel.cs       - ESP32 상태(STATUS,<번호>) 전용 패널 (신규)
-    MeasurementPanel.cs
+  MainForm.cs / .Designer.cs  - 단일 메인 창, 4개 패널을 도킹 배치 + ConnectionManager/설정 소유
+  Panels/                   - UserControl(디자이너 지원), MainForm에 모두 도킹되어 표시
+    SerialChannelPanel.cs / .Designer.cs  - USB 또는 UART 채널 1개의 연결 UI (PortSettingsPanel이 2개 사용)
+    PortSettingsPanel.cs / .Designer.cs
+    WifiConfigPanel.cs / .Designer.cs
+    EspStatusPanel.cs / .Designer.cs      - ESP32 상태(STATUS,<번호>) 전용 패널
+    MeasurementPanel.cs / .Designer.cs
   Services/
     LinkChannel.cs          - Usb/Uart 채널 구분
     SerialLinkService.cs    - 시리얼 연결 1개(연결/해제, 라인 단위 수신, 타임아웃)
