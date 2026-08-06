@@ -1,8 +1,18 @@
 # STM32CubeMX 설정 가이드 (STM32L562CETx + FreeRTOS)
 
+> **대상 버전: STM32CubeMX 6.18.1.** Pinout & Configuration / Clock Configuration / Project
+> Manager의 기본 3-탭 구조와 페리퍼럴별 설정 항목은 6.x 계열 전반에서 안정적으로 유지되어
+> 왔으므로 이 가이드는 다른 6.x 버전에서도 대체로 그대로 적용됩니다. 다만 좌측 IP 트리에서
+> FreeRTOS/USB_DEVICE 같은 항목은 **"Middleware and Software Packs"** 카테고리 아래(6.18.1
+> 기준 위치)에 있으니, 옛 버전 자료에서 흔히 보이는 "Middleware" 단독 표기와 다르면 이 경로를
+> 따르세요. 버튼/메뉴 문구가 여기 적힌 것과 미세하게 다르면(예: 아이콘 위치, 하위 탭 순서)
+> 기능은 동일하니 가장 가까운 항목을 선택하면 됩니다.
+
 ## 0. 프로젝트 생성
 
-- MCU 선택: `STM32L562CETx` (LQFP48/UFBGA 등 보유 패키지에 맞게)
+- MCU 선택: `STM32L562CETx` (LQFP48/UFBGA 등 보유 패키지에 맞게). MCU 선택 후 CubeMX가
+  **STM32CubeL5 펌웨어 패키지** 설치/업데이트를 요구하면 CubeMX가 제안하는 최신 호환 버전을
+  그대로 설치하세요(6.18.1은 특정 최소 펌웨어 패키지 버전을 요구할 수 있음).
 - Project Manager → Toolchain/IDE: **STM32CubeIDE**
 - Project Manager → Code Generator:
   - "Generate peripheral initialization as a pair of '.c/.h' files per peripheral" 체크 (관리 편의)
@@ -27,7 +37,7 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 | 기능 | 페리퍼럴 | 핀 | User Label | 비고 |
 |---|---|---|---|---|
 | PC 커맨드/데이터 | USART3 | PB10(TX)/PB11(RX) | - | 115200 8N1 |
-| PC 커맨드/데이터(백업) | USB OTG_FS (Device, CDC) | PA11(DM)/PA12(DP) | - | Virtual COM Port |
+| PC 커맨드/데이터(백업) | USB (Device, FS, CDC) | PA11(DM)/PA12(DP) | - | Virtual COM Port |
 | ESP32 AT 통신 | USART1 | PA9(TX)/PA10(RX) | - | 115200 8N1, **흐름제어(RTS/CTS) 사용 안 함** |
 | ESP32 하드웨어 리셋 | GPIO Output | PA8 | `ESP32_NRST` | Low active reset (ESP32 EN/RST 핀에 연결) |
 | FPGA 트리거 입력 | GPIO EXTI | PH1 | `FROM_FPGA` | Falling edge, Pull-up |
@@ -66,8 +76,10 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 
 ## 5. USB Device (PC 미러 채널)
 
-- Connectivity → USB (또는 USB_OTG_FS): Device (FS) 모드 Enable.
-- Middleware → USB_DEVICE: Class for FS IP = **Communication Device Class (Virtual Port Com)**.
+- Connectivity → **USB**: Device (FS) 모드 Enable. (STM32L562는 F4/F7/L4+ 계열에 있는
+  USB_OTG_FS IP가 아니라 별도의 단순 **USB(FS) Device-only** 페리퍼럴을 사용하므로, 좌측
+  트리에도 "USB_OTG_FS"가 아닌 "USB" 항목만 나타납니다.)
+- Middleware and Software Packs → USB_DEVICE: Class for FS IP = **Communication Device Class (Virtual Port Com)**.
 - USB_DEVICE Parameter Settings: Device Descriptor의 VID/PID/문자열은 임의 설정 가능(사내 테스트용 VID 사용 권장).
 - NVIC에서 USB 관련 인터럽트 자동 Enable 확인.
 
@@ -99,21 +111,27 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 - GPIO PH1(`FROM_FPGA`)을 GPIO_EXTI1로 설정, Pull-up, Trigger: **Falling edge**.
 - NVIC → EXTI1 interrupt Enable, Preemption Priority는 아래 "인터럽트 우선순위" 절 참고.
 
-## 9. FreeRTOS (Middleware → FREERTOS)
+## 9. FreeRTOS (Middleware and Software Packs → FREERTOS)
 
-- Interface: **CMSIS_V2**
-- Config Parameters 탭:
+좌측 IP 트리에서 **Middleware and Software Packs → FREERTOS**를 체크하면 우측에 설정 화면이
+열리고, 그 위쪽에 `Config parameters` / `Include parameters` / `Advanced settings` /
+`Tasks and Queues` / `Timers and Semaphores` 등 서브탭이 나타납니다(6.18.1 기준, 순서는
+버전에 따라 약간 다를 수 있음). 각 항목이 **어느 탭에 있는지**가 실수하기 쉬운 부분이라
+아래에 탭별로 정리합니다.
+
+- **드롭다운(Interface)**: FREERTOS 화면 최상단의 "Interface" 콤보에서 **CMSIS_V2** 선택
+  (CMSIS_V1은 레거시, 이 프로젝트는 osThreadNew 등 V2 API 사용).
+- **`Config parameters` 탭** (수치/드롭다운 값들):
   - `TOTAL_HEAP_SIZE`: 최소 **24576 (24KB)** 권장 (USB CDC + LWIP 미사용, AT 파서 버퍼 고려).
     메모리 여유가 있다면 32768(32KB)로 넉넉히.
   - `MINIMAL_STACK_SIZE`: 128 words (기본값) 유지.
+- **`Include parameters` 탭** (기능 On/Off 체크박스들 — Config parameters 탭과 헷갈리지 말 것):
   - `USE_MUTEXES`: Enable (SPI2 플래시 접근, UART TX 공유 보호용)
   - `USE_COUNTING_SEMAPHORES`: Enable
   - `USE_TIMERS`: Enable (WiFi 재접속 재시도 타이머 등에 사용 가능)
-  - `checkForStackOverflow` (Tasks and Queues 탭 하단 Config에는 없고 `USE_STACK_OVERFLOW_HOOK`은 없음 →
-    대신 FreeRTOSConfig에서 `configCHECK_FOR_STACK_OVERFLOW = 2`로 CubeMX Advanced Settings에서 설정)
-- Advanced Settings 탭:
+- **`Advanced settings` 탭**:
   - `USE_NEWLIB_REENTRANT`: Disabled (불필요시 메모리 절약)
-  - `configCHECK_FOR_STACK_OVERFLOW`: 2 (Method 2 권장, 개발 중)
+  - `configCHECK_FOR_STACK_OVERFLOW`: 2 (Method 2 권장, 개발 중 스택 오버플로우를 가장 확실히 잡음)
   - `configUSE_MALLOC_FAILED_HOOK`: Enable (Enabled)
   - `configASSERT`: Enable(개발 중)
 
@@ -155,13 +173,16 @@ FreeRTOS와 함께 쓸 때 `configLIBRARY_LOWEST_INTERRUPT_PRIORITY`(보통 15)�
 | USART2 (FPGA ADC 데이터) + DMA | 5 | 1 |
 | USART1 (ESP32) + DMA | 6 | 0 |
 | USART3 (PC) + DMA | 6 | 1 |
-| USB OTG_FS | 7 | 0 |
+| USB (FS Device) | 7 | 0 |
 | SPI2 (Flash, 폴링 사용시 불필요) | 6 | 2 |
 | SysTick | 15 (CubeMX 기본, FreeRTOS 커널 틱) | - |
 
-> CubeMX Project Manager → Advanced Settings 또는 NVIC 탭에서 각 인터럽트를 선택 후
-> Preemption Priority 값을 위 표대로 지정하세요. FreeRTOS 관련 설정에서
-> "Use dynamic memory allocation with hardware stack protection" 등은 기본값 유지.
+> Pinout & Configuration → **System Core → NVIC** 탭(전체 인터럽트를 한 표로 보여주는 곳)에서
+> 각 인터럽트를 선택 후 Preemption Priority/Sub Priority 값을 위 표대로 지정하세요. 이 값은
+> USART1/USART2/USART3/SPI2 등 각 페리퍼럴 설정 화면의 "NVIC Settings" 서브탭에서도 동일하게
+> 보이고 수정할 수 있습니다(어느 쪽에서 바꿔도 서로 동기화됩니다) — Project Manager →
+> Advanced Settings는 NVIC 우선순위가 아니라 HAL/LL 드라이버 생성 옵션을 다루는 별개의
+> 화면이므로 혼동하지 마세요.
 
 ## 10. Memory 설정 (Linker / 사용량 계획)
 
@@ -179,9 +200,12 @@ SRAM 256KB 대비 위 사용량은 여유가 충분하므로 별도 MPU 세밀 �
 ## 11. 코드 생성 후 콜백 연결 (USER CODE 영역)
 
 1. **`Core/Src/freertos.c`**
-   - `/* USER CODE BEGIN Application */` 영역에서 본 리포지토리의 `App_FreeRTOS_Init();` 1줄 호출
-     (`#include "app_freertos.h"` 추가). CubeMX가 만든 `defaultTaskBody`의 `MX_FREERTOS_Init()` 마지막
-     또는 `StartDefaultTask()` 시작부에서 호출하면 됩니다.
+   - CubeMX는 이 파일에 `MX_FREERTOS_Init(void)`(태스크/큐 등 RTOS 오브젝트 생성)와
+     `StartDefaultTask(void *argument)`(`defaultTask`의 본체, `osThreadNew`로 생성됨) 두 함수를
+     생성합니다. `MX_FREERTOS_Init()` 안의 `/* USER CODE BEGIN RTOS_THREADS */` 영역에서
+     본 리포지토리의 `App_FreeRTOS_Init();` 1줄을 호출하세요(`#include "app_freertos.h"` 추가).
+     이 함수가 `FPGA_Task`/`ESP32_Task`/`PCComm_Task`/`Config_Task`를 `osThreadNew()`로 직접
+     생성하므로, CubeMX Tasks and Queues 탭에서 별도로 태스크를 추가할 필요는 없습니다.
 
 2. **`Core/Src/stm32l5xx_it.c`**
    - `EXTI1_IRQHandler`, `USARTx_IRQHandler` 모두 CubeMX가 생성한 그대로 두면 됩니다
