@@ -162,37 +162,44 @@ ESP32가 이전 세션의 어중간한 상태(예: 이전 TCP 연결이 반쯤 �
 
 ### 인터럽트(NVIC) 우선순위 — Core → NVIC 탭
 
-**Sub Priority는 항상 0으로 고정되어 바꿀 수 없습니다 — 정상입니다, 오류 아닙니다.** FreeRTOS
-미들웨어를 Enable하면 CubeMX가 NVIC Priority Group을 자동으로 **"4 bits for pre-emption
-priority, 0 bits for subpriority"**로 강제 설정합니다(System Core → NVIC 탭 최상단의
-"Priority Group" 드롭다운에서 확인 가능하며, 여기서 항목이 회색으로 잠겨 있거나 다른 그룹으로
-바꿔도 다시 이 값으로 돌아옵니다). Cortex-M용 FreeRTOS 포트는 서브프라이오리티 개념 없이
-**Preemption Priority 숫자 하나만으로** "이 ISR이 FreeRTOS `...FromISR` API를 호출해도
-안전한가"를 판단하기 때문에, 서브프라이오리티를 쓰면 이 판단이 깨질 수 있어 ST가 의도적으로
-막아놓은 것입니다. **Priority Group을 억지로 바꾸지 말고, 아래처럼 인터럽트마다 서로 다른
-Preemption Priority 값을 주는 방식으로 우선순위를 구분하세요.**
+**정정: 원인은 FreeRTOS가 아니라 TrustZone(Security Extension)입니다.** STM32L562는
+Cortex-M33 + TrustZone 실리콘이라서, CubeMX의 System Core → NVIC 탭 상단 "Priority Group"
+드롭다운에는 **"3 bits for pre-emption priority, 1 bit for subpriority"(Group 3)가 최대치로
+고정**되어 있고 "4 bits / 0 bit"(Group 4, 16단계)는 이 MCU 라인에서는 아예 선택 목록에 없습니다
+(TrustZone 미사용/Non-secure 전용 프로젝트로 만들어도 동일 — CubeMX가 이 실리콘 계열 전체에
+대해 정적으로 이렇게 제한합니다). ARMv8-M 아키텍처에서 Security Extension이 구현된 칩은
+Non-secure 쪽에 노출되는 인터럽트 우선순위 비트 중 최상위 1비트를 예약해 "Secure 인터럽트가
+항상 Non-secure보다 우선"임을 하드웨어로 보장하는데(`AIRCR.PRIS`), 그 결과 실제 선택 가능한
+Preemption Priority 최대 비트수가 4비트가 아니라 3비트(0~7, 8단계)로 줄어듭니다. **즉 Group 4로
+바꿀 수 있는 CubeMX 메뉴 자체가 없으며, 이는 정상 동작이니 바꾸려 하지 말고 0~7 범위 안에서
+우선순위를 배정하세요.**
 
-FreeRTOS와 함께 쓸 때 `configLIBRARY_LOWEST_INTERRUPT_PRIORITY`(보통 15)와
-`configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY`(보통 5) 사이 규칙을 반드시 지켜야 합니다:
-**FreeRTOS API(`...FromISR`)를 호출하는 ISR의 Preemption Priority 숫자는 5 이상(즉, 우선순위는
-5보다 낮거나 같아야, 즉 "숫자가 커야")** 이어야 합니다 (숫자가 작을수록 하드웨어 우선순위가 높음).
+FreeRTOS와 함께 쓸 때 지켜야 하는 규칙(`configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY`, ST가
+CMSIS_V2 포트에 기본값 **5**로 박아두는 상수, 4비트 전체 폭(0~15) 기준의 "raw" 우선순위 값)는
+Group 설정과 무관하게 그대로입니다. Group 3에서는 CubeMX가 내부적으로
+`raw = (PreemptPriority × 2) + SubPriority` 로 8단계 Preemption Priority(0~7)와 1단계
+Sub Priority(0~1)를 4비트 raw 값(0~15)에 인코딩하므로, **FreeRTOS API(`...FromISR`)를 호출하는
+ISR은 raw ≥ 5를 만족해야 안전**합니다 — 실무적으로는 **Preemption Priority를 3 이상으로
+주면** (Sub Priority가 0이든 1이든) 항상 raw ≥ 6이 되어 안전 범위에 들어가므로, 아래 표처럼
+3~7 구간에서 배정하고 동순위가 필요할 때만 Sub Priority(0/1)로 미세 구분하면 됩니다.
 
 | 인터럽트 | Preemption Priority | Sub Priority |
 |---|---|---|
-| EXTI1 (FPGA 트리거, PH1) | 5 | 0 (고정) |
-| USART2 (FPGA ADC 데이터) + DMA | 6 | 0 (고정) |
-| USART1 (ESP32) + DMA | 7 | 0 (고정) |
-| USART3 (PC) + DMA | 8 | 0 (고정) |
-| USB (FS Device) | 9 | 0 (고정) |
-| SPI2 (Flash, 폴링 사용시 불필요) | 10 | 0 (고정) |
-| SysTick | 15 (CubeMX 기본, FreeRTOS 커널 틱) | - |
+| EXTI1 (FPGA 트리거, PH1) | 3 | 0 |
+| USART2 (FPGA ADC 데이터) + DMA | 3 | 1 |
+| USART1 (ESP32) + DMA | 4 | 0 |
+| USART3 (PC) + DMA | 5 | 0 |
+| USB (FS Device) | 6 | 0 |
+| SPI2 (Flash, 폴링 사용시 불필요) | 7 | 0 |
+| SysTick | CubeMX가 커널 틱으로 자동 관리(그룹 내 최저 우선순위) | - |
 
 > Pinout & Configuration → **System Core → NVIC** 탭(전체 인터럽트를 한 표로 보여주는 곳)에서
-> 각 인터럽트를 선택 후 Preemption Priority 값만 위 표대로 지정하세요(Sub Priority 칸은
-> 건드릴 수 없는 게 정상). 이 값은 USART1/USART2/USART3/SPI2 등 각 페리퍼럴 설정 화면의
-> "NVIC Settings" 서브탭에서도 동일하게 보이고 수정할 수 있습니다(어느 쪽에서 바꿔도 서로
-> 동기화됩니다) — Project Manager → Advanced Settings는 NVIC 우선순위가 아니라 HAL/LL
-> 드라이버 생성 옵션을 다루는 별개의 화면이므로 혼동하지 마세요.
+> 각 인터럽트를 선택 후 Preemption Priority/Sub Priority 값을 위 표대로 지정하세요. 이 값은
+> USART1/USART2/USART3/SPI2 등 각 페리퍼럴 설정 화면의 "NVIC Settings" 서브탭에서도 동일하게
+> 보이고 수정할 수 있습니다(어느 쪽에서 바꿔도 서로 동기화됩니다) — Project Manager →
+> Advanced Settings는 NVIC 우선순위가 아니라 HAL/LL 드라이버 생성 옵션을 다루는 별개의
+> 화면이므로 혼동하지 마세요. "Priority Group" 드롭다운 자체를 Group 4로 바꾸는 항목은
+> 이 MCU에서는 찾을 필요가 없습니다(제공되지 않음).
 
 ## 10. Memory 설정 (Linker / 사용량 계획)
 
