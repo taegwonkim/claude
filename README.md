@@ -29,10 +29,11 @@ HAL/CMSIS/USB 미들웨어/FreeRTOS 커널 소스 등 벤더 생성 코드는 �
 - **ESP32 연동 방식**: Espressif 표준 **ESP-AT** 펌웨어 사용 (MCU가 AT 커맨드로 제어). ESP32 측
   펌웨어 개발 불필요, ESP32에 [espressif/esp-at](https://github.com/espressif/esp-at) 펌웨어를
   플래싱한다고 가정.
-- **FPGA→MCU ADC 데이터 채널**: FPGA가 자체적으로 ADC를 읽어, GPIO EXTI(falling edge, PH1,
-  핀 라벨 `FROM_FPGA`)로 트리거 신호를 먼저 보낸 뒤, 측정값을 **USART2**(FPGA→MCU 전용 UART,
-  ASCII 라인 프로토콜)로 전송합니다 (SPI2는 플래시 전용). MCU는 트리거 인터럽트 후 USART2로
-  도착하는 한 줄(`ADC ...`)을 타임아웃 내에 수신해 파싱합니다.
+- **MCU↔FPGA 채널**: **USART2**는 양방향입니다. 부팅 후 MCU가 FPGA에 측정 개시 커맨드
+  (`STX(0x02) + "START" + CR(0x0D) + LF(0x0A)`, 1회)를 보내면, 그 이후 FPGA가 자체적으로
+  ADC를 읽어 GPIO EXTI(falling edge, PH1, 핀 라벨 `FROM_FPGA`)로 트리거 신호를 먼저 보낸 뒤,
+  측정값을 USART2(ASCII 라인 프로토콜)로 전송합니다 (SPI2는 플래시 전용). MCU는 트리거
+  인터럽트 후 USART2로 도착하는 한 줄(`ADC ...`)을 타임아웃 내에 수신해 파싱합니다.
 - **PC ↔ MCU 설정 프로토콜**: `STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A)` 프레임
   (필드는 콤마로 구분). ESP32 AT/FPGA 링크/TCP 서버 페이로드에는 적용하지 않고 USART3+USB CDC
   전용. 상세는 `docs/프로토콜_명세.md` §1 참고.
@@ -70,7 +71,7 @@ Core/Inc/
   esp32_at.h            - ESP32(USART1) AT 커맨드 드라이버
   pc_frame.h            - PC↔MCU STX+CSV+CRLF 프레임 빌드/파싱
   pc_comm.h             - PC 커맨드 파서 (USART3 + USB CDC 공용)
-  fpga_link.h           - FPGA 트리거(EXTI, PH1)/ADC(USART2) 수신
+  fpga_link.h           - MCU→FPGA START 커맨드 송신(1회) + FPGA 트리거(EXTI, PH1)/ADC(USART2) 수신
   status_led.h          - LED_RUN(PC13) 하트비트, LED_WIFI(PC14) 연결 표시
   app_freertos.h        - 태스크/큐 생성 진입점 (freertos.c에서 호출)
 Core/Src/

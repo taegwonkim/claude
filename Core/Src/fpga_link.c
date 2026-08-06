@@ -24,6 +24,10 @@ void FpgaLink_Init(void)
     UartLineRx_Start(&s_rx);
 
     s_trigSem = osSemaphoreNew(1U, 0U, NULL);
+
+    /* 부팅 후 1회, FPGA에 측정 개시 명령 전송 (USART2 TX, PA2) */
+    (void)HAL_UART_Transmit(&huart2, (uint8_t *)FPGA_START_CMD, (uint16_t)(sizeof(FPGA_START_CMD) - 1U),
+                             FPGA_START_CMD_TX_TIMEOUT_MS);
 }
 
 void FpgaLink_OnExti(uint16_t gpio_pin)

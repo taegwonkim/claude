@@ -41,7 +41,7 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 | ESP32 AT 통신 | USART1 | PA9(TX)/PA10(RX) | - | 115200 8N1, **흐름제어(RTS/CTS) 사용 안 함** |
 | ESP32 하드웨어 리셋 | GPIO Output | PA8 | `ESP32_NRST` | Low active reset (ESP32 EN/RST 핀에 연결) |
 | FPGA 트리거 입력 | GPIO EXTI | PH1 | `FROM_FPGA` | Falling edge, Pull-up |
-| FPGA ADC 데이터 | USART2 | PA2(TX, 미사용)/PA3(RX) | - | FPGA(자체 ADC 리드)→MCU 단방향, 115200 8N1 |
+| FPGA ADC 데이터 | USART2 | PA2(TX)/PA3(RX) | - | 부팅 시 MCU→FPGA START 커맨드 1회(PA2) + FPGA→MCU 트리거 후 ADC 라인(PA3), 115200 8N1 |
 | W25Q40 Flash | SPI2 (Master) | PB13(SCK)/PB14(MISO)/PB15(MOSI) | - | Flash 전용 |
 | W25Q40 Flash CS | GPIO Output | PB12 | `EEP_NSS` | SW 제어 |
 | 상태 LED(동작 확인) | GPIO Output | PC13 | `LED_RUN` | 1Hz 토글(heartbeat) |
@@ -83,16 +83,23 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 - USB_DEVICE Parameter Settings: Device Descriptor의 VID/PID/문자열은 임의 설정 가능(사내 테스트용 VID 사용 권장).
 - NVIC에서 USB 관련 인터럽트 자동 Enable 확인.
 
-## 6. USART2 (FPGA → MCU, ADC 측정값)
+## 6. USART2 (MCU ↔ FPGA)
 
-- Mode: Asynchronous, **RX만 사용**(TX 핀은 배선하지 않아도 무방, CubeMX에서는 페어로 핀이 잡히지만
-  실제 기판에서 TX는 미연결 가능). Baud Rate 115200, 8N1 (FPGA UART 코어 설정과 반드시 일치시킬 것).
+- Mode: Asynchronous, **TX/RX 모두 사용**(PA2=TX, PA3=RX 둘 다 배선 필요 — 부팅 시 MCU가
+  PA2로 FPGA에 측정 개시 커맨드를 1회 보내야 하므로, RX 전용으로 배선하면 안 됨).
+  Baud Rate 115200, 8N1 (FPGA UART 코어 설정과 반드시 일치시킬 것).
 - NVIC: USART2 global interrupt Enable.
 - DMA 탭: USART2_RX → DMA, Mode **Circular**, Data Width Byte (USART1/3와 동일하게
-  idle-line 검출 + 순환 DMA 수신 방식 사용, `HAL_UARTEx_ReceiveToIdle_DMA`).
+  idle-line 검출 + 순환 DMA 수신 방식 사용, `HAL_UARTEx_ReceiveToIdle_DMA`). TX는 부팅 시
+  1회만 짧게 보내는 용도라 DMA 없이 `HAL_UART_Transmit()`(폴링) 그대로 사용.
 - NVIC: EXTI line(트리거 핀, PH1 → `EXTI1_IRQn`) interrupt Enable.
 
-> 트리거(EXTI, PH1/`FROM_FPGA`)와 ADC 값(USART2)은 **별개의 신호**입니다. FPGA는 ADC를 직접 읽어(자체 ADC IP
+> **부팅 후 1회, MCU → FPGA 측정 개시 커맨드**: `FpgaLink_Init()`(`Core/Src/fpga_link.c`)에서
+> USART2 TX(PA2)로 `STX(0x02) + "START" + CR(0x0D) + LF(0x0A)`를 한 번 전송합니다(`FPGA_START_CMD`,
+> `app_config.h`). FPGA는 이 커맨드를 받은 뒤부터 주기적으로 트리거+ADC 값을 보내기 시작하는
+> 것으로 가정합니다.
+
+> 트리거(EXTI, PH1/`FROM_FPGA`)와 ADC 값(USART2 RX)은 **별개의 신호**입니다. FPGA는 ADC를 직접 읽어(자체 ADC IP
 > 또는 외부 ADC 칩을 FPGA가 제어) falling-edge 펄스로 "측정 완료/전송 시작"을 알린 뒤,
 > 곧이어 USART2로 측정값 라인을 전송합니다. MCU는 EXTI 인터럽트로 깨어난 뒤 USART2 수신을
 > 타임아웃(`APP_AT_RESP_TIMEOUT_MS`류 상수, `fpga_link.c`에서 별도 상수 사용)과 함께 대기합니다.
