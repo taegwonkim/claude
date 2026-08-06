@@ -162,6 +162,16 @@ ESP32가 이전 세션의 어중간한 상태(예: 이전 TCP 연결이 반쯤 �
 
 ### 인터럽트(NVIC) 우선순위 — Core → NVIC 탭
 
+**Sub Priority는 항상 0으로 고정되어 바꿀 수 없습니다 — 정상입니다, 오류 아닙니다.** FreeRTOS
+미들웨어를 Enable하면 CubeMX가 NVIC Priority Group을 자동으로 **"4 bits for pre-emption
+priority, 0 bits for subpriority"**로 강제 설정합니다(System Core → NVIC 탭 최상단의
+"Priority Group" 드롭다운에서 확인 가능하며, 여기서 항목이 회색으로 잠겨 있거나 다른 그룹으로
+바꿔도 다시 이 값으로 돌아옵니다). Cortex-M용 FreeRTOS 포트는 서브프라이오리티 개념 없이
+**Preemption Priority 숫자 하나만으로** "이 ISR이 FreeRTOS `...FromISR` API를 호출해도
+안전한가"를 판단하기 때문에, 서브프라이오리티를 쓰면 이 판단이 깨질 수 있어 ST가 의도적으로
+막아놓은 것입니다. **Priority Group을 억지로 바꾸지 말고, 아래처럼 인터럽트마다 서로 다른
+Preemption Priority 값을 주는 방식으로 우선순위를 구분하세요.**
+
 FreeRTOS와 함께 쓸 때 `configLIBRARY_LOWEST_INTERRUPT_PRIORITY`(보통 15)와
 `configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY`(보통 5) 사이 규칙을 반드시 지켜야 합니다:
 **FreeRTOS API(`...FromISR`)를 호출하는 ISR의 Preemption Priority 숫자는 5 이상(즉, 우선순위는
@@ -169,20 +179,20 @@ FreeRTOS와 함께 쓸 때 `configLIBRARY_LOWEST_INTERRUPT_PRIORITY`(보통 15)�
 
 | 인터럽트 | Preemption Priority | Sub Priority |
 |---|---|---|
-| EXTI1 (FPGA 트리거, PH1) | 5 | 0 |
-| USART2 (FPGA ADC 데이터) + DMA | 5 | 1 |
-| USART1 (ESP32) + DMA | 6 | 0 |
-| USART3 (PC) + DMA | 6 | 1 |
-| USB (FS Device) | 7 | 0 |
-| SPI2 (Flash, 폴링 사용시 불필요) | 6 | 2 |
+| EXTI1 (FPGA 트리거, PH1) | 5 | 0 (고정) |
+| USART2 (FPGA ADC 데이터) + DMA | 6 | 0 (고정) |
+| USART1 (ESP32) + DMA | 7 | 0 (고정) |
+| USART3 (PC) + DMA | 8 | 0 (고정) |
+| USB (FS Device) | 9 | 0 (고정) |
+| SPI2 (Flash, 폴링 사용시 불필요) | 10 | 0 (고정) |
 | SysTick | 15 (CubeMX 기본, FreeRTOS 커널 틱) | - |
 
 > Pinout & Configuration → **System Core → NVIC** 탭(전체 인터럽트를 한 표로 보여주는 곳)에서
-> 각 인터럽트를 선택 후 Preemption Priority/Sub Priority 값을 위 표대로 지정하세요. 이 값은
-> USART1/USART2/USART3/SPI2 등 각 페리퍼럴 설정 화면의 "NVIC Settings" 서브탭에서도 동일하게
-> 보이고 수정할 수 있습니다(어느 쪽에서 바꿔도 서로 동기화됩니다) — Project Manager →
-> Advanced Settings는 NVIC 우선순위가 아니라 HAL/LL 드라이버 생성 옵션을 다루는 별개의
-> 화면이므로 혼동하지 마세요.
+> 각 인터럽트를 선택 후 Preemption Priority 값만 위 표대로 지정하세요(Sub Priority 칸은
+> 건드릴 수 없는 게 정상). 이 값은 USART1/USART2/USART3/SPI2 등 각 페리퍼럴 설정 화면의
+> "NVIC Settings" 서브탭에서도 동일하게 보이고 수정할 수 있습니다(어느 쪽에서 바꿔도 서로
+> 동기화됩니다) — Project Manager → Advanced Settings는 NVIC 우선순위가 아니라 HAL/LL
+> 드라이버 생성 옵션을 다루는 별개의 화면이므로 혼동하지 마세요.
 
 ## 10. Memory 설정 (Linker / 사용량 계획)
 
