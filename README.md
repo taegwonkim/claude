@@ -1,98 +1,37 @@
-# STM32L562C + FreeRTOS — WiFi 계측 브릿지
+# STM32L562C WiFi 계측 브릿지
 
-STM32L562C(Cortex-M33) 위에서 FreeRTOS(CMSIS-RTOS2)를 사용해, PC ↔ MCU ↔ ESP32(WiFi) ↔ PC서버,
-그리고 FPGA → MCU(트리거+ADC값) 경로를 처리하는 펌웨어 애플리케이션 코드입니다.
+STM32L562C(MCU) 펌웨어와 이를 설정/모니터링하는 Windows PC용 C# 도구, 이렇게 **서로 독립된
+두 프로젝트**로 구성된 저장소입니다. 둘은 별도로 빌드/배포되며, 시리얼 링크(USART3 + USB CDC)로
+통신할 때만 서로를 알면 됩니다 — 그 통신 규격이 아래 공유 문서입니다.
 
-이 리포지토리는 **STM32CubeMX가 생성하는 프로젝트에 얹는 애플리케이션 레이어**입니다.
-HAL/CMSIS/USB 미들웨어/FreeRTOS 커널 소스 등 벤더 생성 코드는 포함하지 않습니다(그건 CubeMX가 직접
-만들어야 정확합니다). 대신 `docs/CubeMX_설정가이드.md`대로 .ioc를 구성해 코드를 생성한 뒤,
-`Core/Inc`, `Core/Src` 파일들을 CubeMX가 만든 프로젝트의 동일 폴더에 복사하고,
-`freertos.c`, `stm32l5xx_it.c`, `usbd_cdc_if.c`의 `USER CODE` 영역에 안내된 훅을 연결하면 됩니다.
-
-## 요구 기능 요약
-
-1. PC(USART3 + USB CDC, 같은 커맨드/데이터를 미러링)에서 시리얼로 접속해 다음을 설정
-   - ESP32가 접속할 AP의 SSID/Password
-   - 목적지 서버 IP, Port(기본 50001)
-   - DHCP 모드 on/off
-   - DHCP off일 때 ESP32 모듈의 정적 IP / Gateway / Netmask
-2. 설정값은 SPI2로 연결된 W25Q40CLSNIG(4Mbit NOR Flash)에 저장하고, 부팅 시 읽어와 WiFi 접속에 사용
-3. PC서버에 연결되면, FPGA(자체적으로 ADC를 읽음)가 일정 간격으로
-   - GPIO falling-edge 트리거 신호를 먼저 보내고
-   - 이어서 ADC 측정값을 UART(USART2)로 전송
-4. MCU는 수신한 측정값을
-   - ESP32(USART1, AT 커맨드)를 통해 PC서버로 전송
-   - 동시에 USART3 및 USB(CDC)로 PC에도 동일하게 전송
-
-## 설계상 가정 (요청 원문에 명시되지 않아 합리적 기본값으로 채택)
-
-- **ESP32 연동 방식**: Espressif 표준 **ESP-AT** 펌웨어 사용 (MCU가 AT 커맨드로 제어). ESP32 측
-  펌웨어 개발 불필요, ESP32에 [espressif/esp-at](https://github.com/espressif/esp-at) 펌웨어를
-  플래싱한다고 가정.
-- **MCU↔FPGA 채널**: **USART2**는 양방향입니다. 부팅 후 MCU가 FPGA에 측정 개시 커맨드
-  (`STX(0x02) + "START" + CR(0x0D) + LF(0x0A)`, 1회)를 보내면, 그 이후 FPGA가 자체적으로
-  ADC를 읽어 GPIO EXTI(falling edge, PH1, 핀 라벨 `FROM_FPGA`)로 트리거 신호를 먼저 보낸 뒤,
-  측정값을 USART2(ASCII 라인 프로토콜)로 전송합니다 (SPI2는 플래시 전용). MCU는 트리거
-  인터럽트 후 USART2로 도착하는 한 줄(`ADC ...`)을 타임아웃 내에 수신해 파싱합니다.
-- **PC ↔ MCU 설정 프로토콜**: `STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A)` 프레임
-  (필드는 콤마로 구분). ESP32 AT/FPGA 링크/TCP 서버 페이로드에는 적용하지 않고 USART3+USB CDC
-  전용. 상세는 `docs/프로토콜_명세.md` §1 참고.
-- ADC 측정값 포맷: FPGA가 트리거 후 `ADC <seq> <sample0> [sample1 ...]\r\n` 형식의 ASCII 라인을
-  USART2로 보낸다고 가정. 정확한 포맷은 `docs/프로토콜_명세.md` §3에서 조정 가능.
-
-위 가정과 다르게 구현하고 싶은 부분이 있으면 알려주시면 반영하겠습니다.
-
-## 하드웨어 핀 배정 (고정, 실제 보드 기준)
-
-| 신호 | 핀 | CubeMX User Label |
-|---|---|---|
-| ESP32 하드웨어 리셋 | PA8 | `ESP32_NRST` |
-| FPGA 트리거 입력 | PH1 | `FROM_FPGA` |
-| W25Q40 Flash CS | PB12 | `EEP_NSS` |
-| 상태 LED(하트비트) | PC13 | `LED_RUN` |
-| WiFi(서버 TCP) 상태 LED | PC14 | `LED_WIFI` |
-| ESP32 AT 통신(USART1) | PA9(TX)/PA10(RX) | - (흐름제어 사용 안 함) |
-
-전체 핀맵/주변장치 설정은 `docs/CubeMX_설정가이드.md` §2 참고.
-
-## 폴더 구조
+## 구성
 
 ```
+firmware/   - STM32L562C + FreeRTOS 펌웨어 (STM32CubeIDE, C). 자세한 내용은 firmware/README.md 참고.
+pc-app/     - PC용 C# 설정/모니터링 도구 (Visual Studio 2022, WinForms, .NET Framework 4.8).
+              자세한 내용은 pc-app/README.md 참고.
 docs/
-  CubeMX_설정가이드.md   - .ioc 설정 항목 (클럭/핀맵/USART/SPI/USB/FreeRTOS 태스크,우선순위,메모리)
-  프로토콜_명세.md        - PC↔MCU STX+CSV+CRLF 프레임 커맨드셋, 플래시 메모리 맵, ESP32 AT 시퀀스, FPGA 프레임 포맷
-Core/Inc/
-  app_config.h         - 태스크 우선순위/스택/큐 크기, 프로토콜 상수, 핀 매핑 정의
-  ring_buffer.h         - SPSC 바이트 링버퍼
-  uart_line_rx.h        - idle-line + Circular DMA UART 수신 공용 헬퍼
-  measurement_msg.h     - FPGA 측정값 메시지 구조체 + DATA 라인 빌더
-  w25q40.h              - SPI2 NOR 플래시(W25Q40CLSNIG) 드라이버
-  net_config_store.h    - 설정 구조체 + CRC32 + 플래시 로드/세이브
-  esp32_at.h            - ESP32(USART1) AT 커맨드 드라이버
-  pc_frame.h            - PC↔MCU STX+CSV+CRLF 프레임 빌드/파싱
-  pc_comm.h             - PC 커맨드 파서 (USART3 + USB CDC 공용)
-  fpga_link.h           - MCU→FPGA START 커맨드 송신(1회) + FPGA 트리거(EXTI, PH1)/ADC(USART2) 수신
-  status_led.h          - LED_RUN(PC13) 하트비트, LED_WIFI(PC14) 연결 표시
-  app_freertos.h        - 태스크/큐 생성 진입점 (freertos.c에서 호출)
-Core/Src/
-  (위 헤더들의 구현)
-  app_freertos.c        - App_FreeRTOS_Init(), ESP32_Task/Config_Task 본체
-  app_it_callbacks.c    - HAL_UARTEx_RxEventCallback/HAL_GPIO_EXTI_Callback 단일 정의 + dispatch
+  프로토콜_명세.md  - firmware ↔ pc-app 공용 통신 규격(PC↔MCU STX+CSV+CRLF 프레임, FPGA 프레임
+                    포맷, ESP32 AT 시퀀스, 플래시 메모리 맵). 한쪽만 수정하면 반드시 문서와
+                    상대편 구현을 함께 확인하세요.
 ```
 
-## 빌드 방법 (요약)
+## 시작하기
 
-1. STM32CubeMX에서 `docs/CubeMX_설정가이드.md`대로 새 프로젝트 생성 (MCU: STM32L562CETx),
-   Toolchain/IDE: STM32CubeIDE 선택 후 Generate Code.
-2. 생성된 프로젝트의 `Core/Inc`, `Core/Src`에 이 리포지토리의 동일 파일들을 복사(병합).
-3. `Core/Src/freertos.c`의 `USER CODE BEGIN Application` 영역에서 `App_FreeRTOS_Init()` 호출
-   (자세한 위치는 `app_freertos.c` 상단 주석 참고).
-4. `Core/Src/stm32l5xx_it.c`, `USB_DEVICE/App/usbd_cdc_if.c`, `StartDefaultTask()`(LED_RUN
-   하트비트)의 훅 연결은 `docs/CubeMX_설정가이드.md` §11 "콜백 연결" 절 참고.
-5. STM32CubeIDE에서 빌드 후 ST-LINK로 플래싱.
+- **펌웨어 개발/빌드**: [`firmware/README.md`](firmware/README.md)
+  (STM32CubeMX 설정은 [`firmware/docs/CubeMX_설정가이드.md`](firmware/docs/CubeMX_설정가이드.md))
+- **PC 도구 개발/빌드**: [`pc-app/README.md`](pc-app/README.md)
+- **두 프로젝트 사이의 통신 프로토콜**: [`docs/프로토콜_명세.md`](docs/프로토콜_명세.md)
 
-## 테스트 방법
+## 전체 시스템 개요
 
-- PC에서 터미널(예: TeraTerm, PuTTY, `screen`)로 USART3 또는 USB CDC 포트에 115200 8N1로 접속.
-- `HELP\r\n` 입력 시 지원 커맨드 목록 출력 (구현부는 `pc_comm.c` 참고).
-- 설정 후 `SAVE\r\n`으로 플래시에 저장, MCU가 자동으로 WiFi 재접속을 시도.
+1. PC(USART3 + USB CDC, 같은 커맨드/데이터를 미러링)에서 시리얼로 MCU에 접속해 ESP32가 접속할
+   AP의 SSID/Password, 목적지 서버(PC) IP/Port, DHCP 모드 등을 설정합니다.
+2. 설정값은 MCU가 SPI2로 연결된 W25Q40CLSNIG 플래시에 저장하고, 부팅 시 읽어와 WiFi 접속에
+   사용합니다.
+3. MCU가 부팅 후 FPGA에 측정 개시 커맨드를 1회 보내면, FPGA(자체적으로 ADC를 읽음)가 일정
+   간격으로 GPIO 트리거 신호 → ADC 측정값(UART)을 MCU에 전송합니다.
+4. MCU는 수신한 측정값을 ESP32(WiFi)를 통해 PC서버로 전송하는 동시에, USART3/USB로 PC 도구에도
+   동일하게 미러링합니다.
+
+각 항목의 상세 설계/구현은 `firmware/README.md`와 `docs/프로토콜_명세.md`를 참고하세요.

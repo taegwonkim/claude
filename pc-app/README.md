@@ -1,6 +1,6 @@
 # Stm32WifiConfigTool (PC용 C# 도구)
 
-STM32L562C + FreeRTOS 펌웨어(리포지토리 루트의 `Core/`, `docs/프로토콜_명세.md`)와 시리얼로
+STM32L562C + FreeRTOS 펌웨어(리포지토리의 `firmware/Core/`, `docs/프로토콜_명세.md`)와 시리얼로
 통신하는 Windows 데스크톱 도구입니다. **Visual Studio 2022**, WinForms, .NET Framework 4.8 기준으로
 작성되어 있으며 ".NET desktop development" 워크로드만 설치되어 있으면 별도 SDK 설치 없이 바로
 열고 빌드할 수 있습니다.
@@ -128,9 +128,9 @@ Stm32WifiConfigTool/
 ## 프로토콜 참고
 
 명령어 세트, 응답 포맷, 비동기 EVENT/STATUS/측정값 프레임 포맷은 리포지토리 루트의
-`docs/프로토콜_명세.md`를 그대로 따릅니다. MCU 쪽 커맨드 파서는 `Core/Src/pc_comm.c`,
-측정값 송신은 `Core/Src/fpga_link.c`, ESP32 상태 브로드캐스트/IP·MAC 조회는
-`Core/Src/app_freertos.c`/`Core/Src/esp32_at.c` 참고.
+`docs/프로토콜_명세.md`를 그대로 따릅니다. MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`,
+측정값 송신은 `firmware/Core/Src/fpga_link.c`, ESP32 상태 브로드캐스트/IP·MAC 조회는
+`firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c` 참고.
 
 ## 알려진 제한사항
 
