@@ -7,7 +7,8 @@ namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
     /// WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 설정 패널.
-    /// "현재값 읽기"로 MCU의 GET CONFIG 응답을 화면에 채우고, "저장"으로 SET+SAVE를 순차 전송한다.
+    /// "Read"로 MCU에 WIFI_R_ALL을 보내 현재값을 화면에 채우고, "Write"로 입력값 전체를
+    /// WIFI_W_ALL 한 프레임에 담아 MCU에 전달한다.
     /// UI 레이아웃은 <c>WifiConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
     /// 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -134,19 +135,19 @@ namespace Stm32WifiConfigTool.Panels
             }
             try
             {
-                Log("GET CONFIG 요청...");
-                NetConfig cfg = await Stm32Commands.GetConfigAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                Log("WIFI_R_ALL 요청...");
+                NetConfig cfg = await Stm32Commands.GetWifiAllAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
                 ApplyConfigToUi(cfg);
-                Log("GET CONFIG 완료");
+                Log("WIFI_R_ALL 완료");
             }
             catch (Exception ex)
             {
-                Log("GET CONFIG 실패: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "현재값 읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Log("WIFI_R_ALL 실패: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private async void SaveButton_Click(object sender, EventArgs e)
+        private async void WriteButton_Click(object sender, EventArgs e)
         {
             if (!EnsureConnected())
             {
@@ -167,35 +168,15 @@ namespace Stm32WifiConfigTool.Panels
 
             try
             {
-                Log("설정 저장 시작...");
-                await Stm32Commands.SetConfigAsync(SelectedLink, cfg, (int)_cmdTimeoutBox.Value, Log);
-                Log("설정 저장 완료 (MCU가 자동으로 WiFi 재접속을 시도합니다)");
-                MessageBox.Show(this, "저장되었습니다.", "WiFi 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Log("WIFI_W_ALL 전송...");
+                await Stm32Commands.SetWifiAllAsync(SelectedLink, cfg, (int)_cmdTimeoutBox.Value);
+                Log("WIFI_W_ALL 완료 (MCU가 자동으로 WiFi 재접속을 시도합니다)");
+                MessageBox.Show(this, "전달되었습니다.", "WiFi 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                Log("설정 저장 실패: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "저장 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private async void StatusButton_Click(object sender, EventArgs e)
-        {
-            if (!EnsureConnected())
-            {
-                return;
-            }
-            try
-            {
-                int statusNumber = await Stm32Commands.GetStatusAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
-                string text = "STATUS " + statusNumber + " (" + Stm32Protocol.DescribeStatus(statusNumber) + ")";
-                _statusValueLabel.Text = text;
-                Log(text);
-            }
-            catch (Exception ex)
-            {
-                Log("STATUS 조회 실패: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "상태 조회 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Log("WIFI_W_ALL 실패: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

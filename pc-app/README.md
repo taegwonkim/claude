@@ -10,14 +10,14 @@ STM32L562C + FreeRTOS 펌웨어(리포지토리의 `firmware/Core/`, `docs/프�
 1. Visual Studio 2022에서 `Stm32WifiConfigTool.sln` 열기
 2. F5(디버그 실행) 또는 Ctrl+Shift+B(빌드)
 
-## 구성 (창 1개, 패널 4개 동시 표시)
+## 구성 (창 1개, 패널 5개 동시 표시)
 
 MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기 경유)** 두 채널에 항상
 동일한 데이터를 미러링합니다. 두 채널 모두 `STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A)`
 프레임 포맷을 사용합니다(필드는 콤마로 구분, `docs/프로토콜_명세.md` §1). 이 도구는 두 채널을
-완전히 독립적으로 연결·해제할 수 있고, 별도 팝업 창을 띄우지 않고 **메인 창 하나 안에서 네 패널을
-항상 동시에** 볼 수 있게 도킹 배치했습니다: 좌상단 포트 설정, 중앙상단 WiFi 설정, 우상단 ESP32 상태,
-하단 전체 폭 측정값 보기.
+완전히 독립적으로 연결·해제할 수 있고, 별도 팝업 창을 띄우지 않고 **메인 창 하나 안에서 다섯
+패널을 항상 동시에** 볼 수 있게 도킹 배치했습니다: 좌상단 포트 설정, 중앙상단 WiFi 설정,
+그 오른쪽 Measurement 설정, 우상단 ESP32 상태, 하단 전체 폭 측정값/상태 보기.
 
 MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 프레임을 구분해서 각각 다른 패널에
 표시**합니다(둘 다 첫 필드로 구분되며, 응답 대기 로직도 이 둘을 명령 응답과 혼동하지 않도록
@@ -26,38 +26,53 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
 1. **포트 설정** (좌상단, `Panels/PortSettingsPanel.cs`)
    USB/UART 각각 COM 포트, Baud Rate, 읽기/쓰기 타임아웃(ms)을 설정하고 연결/해제합니다.
    다른 패널에서 명령을 보내거나 데이터를 받으려면 먼저 여기서 연결해야 합니다.
+   - "새로고침": OS에 연결된 COM 포트 목록을 다시 읽어옵니다.
+   - "지우기": 선택된 COM 포트를 비웁니다(연결 중에는 비활성화).
+   - "연결"/"연결 해제": 포트를 열고 닫습니다.
 
 2. **WiFi 설정** (중앙상단, `Panels/WifiConfigPanel.cs`)
    SSID/비밀번호, 서버 IP·Port, DHCP on/off, DHCP off일 때의 정적 IP/Gateway/Netmask를 설정합니다.
-   - "현재값 읽기": `GET,CONFIG` 프레임을 보내 MCU에 저장된 값을 화면에 채웁니다(비밀번호는 MCU가
-     마스킹해서 돌려주므로 표시되지 않습니다 — 바꾸려면 "비밀번호 변경" 체크 후 새로 입력).
-   - "저장(SET+SAVE)": 변경된 값을 `SET,...` 프레임들로 순차 전송 후 `SAVE`까지 수행합니다.
-     저장되면 MCU가 자동으로 WiFi/서버 재접속을 시도합니다.
-   - "상태 조회": `STATUS` 프레임을 보내 ESP32 상태 번호를 즉시 확인합니다(0=DOWN/1=WIFI_UP/2=TCP_UP).
+   - "Read": `WIFI_R_ALL` 프레임을 보내 MCU에 저장된 값을 한 번에 읽어와 화면에 채웁니다
+     (비밀번호는 MCU가 `****`로 마스킹해서 돌려주므로 표시되지 않습니다 — 바꾸려면
+     "비밀번호 변경" 체크 후 새로 입력).
+   - "Write": 화면의 입력값 전체(SSID/Password/서버 IP·Port/DHCP/IP/Gateway/Mask)를
+     `WIFI_W_ALL` 한 프레임에 담아 MCU에 전달합니다. "비밀번호 변경"을 체크하지 않았으면
+     빈 문자열로 전송되며, 이 경우 MCU는 기존 저장된 비밀번호를 유지해야 합니다
+     (`Models/NetConfig.cs`의 `Password` 필드 설명 참고). 저장되면 MCU가 자동으로
+     WiFi/서버 재접속을 시도합니다.
    - 상단 "명령 전송 채널"에서 USB/UART 중 커맨드를 보낼 채널을 고릅니다.
 
-3. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`, 신규)
+3. **Measurement 설정** (WiFi 설정 오른쪽, `Panels/MeasurementConfigPanel.cs`, 신규)
+   측정 모듈의 Reference(mV, 측정 상한치) / Offset(mV, 상한치 초과 시 노이즈 여유값) /
+   Resistance(mOhm, 선간 저항 측정값) / Interval Time(sec, 측정 간격)을 설정합니다.
+   - "Read": `MEAS_R_ALL` 프레임으로 현재값을 읽어와 화면에 채웁니다.
+   - "Write": 입력값 전체를 `MEAS_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
+   - WiFi 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖습니다.
+
+4. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 `STATUS,<번호>` 프레임을 표시합니다. 측정값 프레임
    전송 사이사이에 도착하며, 측정값 패널과는 별도로 여기서만 다룹니다.
    - 현재 상태를 큰 글씨로(색상: DOWN=빨강, WIFI_UP=주황, TCP_UP=초록) 표시.
    - "표시 채널": USB / UART / 둘 다.
    - 하단에 수신 이력(시각/채널/번호/텍스트)을 로그로 쌓고, "지우기"로 초기화합니다.
 
-4. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
+5. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
    FPGA 트리거 결과로 MCU가 보내는 `<DC IP>,<MAC>,data1,...,data6` 프레임("DATA" 같은 태그
    없음, `docs/프로토콜_명세.md` §2)을 표로 보여줍니다. `DC IP`/`MAC`은 이 장치(ESP32)의
    station IP/MAC 주소로, 측정값을 보낸 장치를 구분하는 용도입니다.
    - "표시 채널": USB / UART / 둘 다 — 어느 채널에서 온 데이터를 그릴지 선택.
+   - "자동 스크롤": 새 측정값이 들어올 때마다 그리드를 자동으로 맨 아래로 스크롤합니다.
    - "지우기": 그리드와 이벤트 로그를 모두 비웁니다.
    - "CSV로 저장": 현재까지 쌓인 측정값을 CSV 파일로 내보냅니다.
    - 하단 "이벤트 로그"에는 `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` /
      `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED` 등 MCU의 비동기 알림이 표시됩니다
-     (ESP32 상태 번호 자체는 3번 패널에서 별도로 봅니다).
+     (ESP32 상태 번호 자체는 4번 패널에서 별도로 봅니다).
 
 ## Visual Studio 디자이너로 폼/패널 편집하기
 
-4개 패널(`PortSettingsPanel`, `WifiConfigPanel`, `EspStatusPanel`, `MeasurementPanel`)과
-`SerialChannelPanel`(USB/UART 공용 하위 컨트롤), `MainForm`은 모두 **표준 WinForms 디자이너
+5개 패널(`PortSettingsPanel`, `WifiConfigPanel`, `MeasurementConfigPanel`, `EspStatusPanel`,
+`MeasurementPanel`)과 `SerialChannelPanel`(USB/UART 공용 하위 컨트롤), `MainForm`은 모두
+**표준 WinForms 디자이너
 구조**(`<이름>.cs` + `<이름>.Designer.cs`)로 되어 있어 Visual Studio에서 더블클릭하면 디자이너
 화면이 뜨고 드래그 앤 드롭/속성 창으로 편집할 수 있습니다.
 
@@ -84,9 +99,10 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
 
 ## 설정값 저장 (포트/보레이트/타임아웃 등)
 
-포트 설정(각 채널의 COM 포트/Baud Rate/읽기·쓰기 타임아웃), WiFi 설정 패널의 명령 전송
-채널·커맨드 타임아웃, 측정값 보기 패널의 표시 채널·자동 스크롤 여부, ESP32 상태 보기 패널의
-표시 채널은 프로그램을 닫을 때 자동으로 다음 위치에 저장되고, 다음 실행 시 그대로 복원됩니다:
+포트 설정(각 채널의 COM 포트/Baud Rate/읽기·쓰기 타임아웃), WiFi 설정·Measurement 설정 패널의
+명령 전송 채널·커맨드 타임아웃, 측정값 보기 패널의 표시 채널·자동 스크롤 여부, ESP32 상태 보기
+패널의 표시 채널은 프로그램을 닫을 때 자동으로 다음 위치에 저장되고, 다음 실행 시 그대로
+복원됩니다:
 
 ```
 %AppData%\Stm32WifiConfigTool\settings.ini
@@ -96,8 +112,8 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
 필요하면 직접 열어 수정해도 됩니다. 파일이 없거나 손상된 경우 기본값으로 안전하게 대체합니다.
 
 **SSID/비밀번호/서버 IP 등 WiFi 접속 정보는 이 파일에 저장하지 않습니다** — 그 값들의 원본은
-MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "현재값 읽기"(`GET CONFIG`)로 항상 MCU에서
-다시 조회합니다. 특히 비밀번호를 PC에 평문으로 남기지 않기 위한 의도적인 설계입니다.
+MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "Read"(`WIFI_R_ALL`)로 항상 MCU에서 다시 조회합니다.
+특히 비밀번호를 PC에 평문으로 남기지 않기 위한 의도적인 설계입니다.
 
 ## 프로젝트 구조
 
@@ -105,11 +121,12 @@ MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "현재값 읽기"(`GET 
 Stm32WifiConfigTool/
   Stm32WifiConfigTool.csproj
   Program.cs               - 진입점
-  MainForm.cs / .Designer.cs  - 단일 메인 창, 4개 패널을 도킹 배치 + ConnectionManager/설정 소유
+  MainForm.cs / .Designer.cs  - 단일 메인 창, 5개 패널을 도킹 배치 + ConnectionManager/설정 소유
   Panels/                   - UserControl(디자이너 지원), MainForm에 모두 도킹되어 표시
     SerialChannelPanel.cs / .Designer.cs  - USB 또는 UART 채널 1개의 연결 UI (PortSettingsPanel이 2개 사용)
     PortSettingsPanel.cs / .Designer.cs
     WifiConfigPanel.cs / .Designer.cs
+    MeasurementConfigPanel.cs / .Designer.cs  - Reference/Offset/Resistance/Interval Time 설정
     EspStatusPanel.cs / .Designer.cs      - ESP32 상태(STATUS,<번호>) 전용 패널
     MeasurementPanel.cs / .Designer.cs
   Services/
@@ -117,20 +134,26 @@ Stm32WifiConfigTool/
     SerialLinkService.cs    - 시리얼 연결 1개(연결/해제, 라인 단위 수신, 타임아웃)
     ConnectionManager.cs    - Usb/Uart SerialLinkService 2개를 앱 전체에서 공유
     Stm32Protocol.cs        - STX+CSV+CRLF 프레임 빌더/파서, 메시지 종류 분류(화이트리스트)
-    Stm32Commands.cs        - SET/SAVE/GET CONFIG/STATUS async 요청-응답 헬퍼
+    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL async 요청-응답 헬퍼
     AppSettingsStore.cs     - PC측 UI 설정 로드/저장 (%AppData%\Stm32WifiConfigTool\settings.ini)
   Models/
     NetConfig.cs
+    MeasurementConfig.cs    - Reference/Offset/Resistance/Interval Time
     MeasurementRecord.cs    - DC IP/MAC + data1..6
     AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
 
 ## 프로토콜 참고
 
-명령어 세트, 응답 포맷, 비동기 EVENT/STATUS/측정값 프레임 포맷은 리포지토리 루트의
-`docs/프로토콜_명세.md`를 그대로 따릅니다. MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`,
-측정값 송신은 `firmware/Core/Src/fpga_link.c`, ESP32 상태 브로드캐스트/IP·MAC 조회는
-`firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c` 참고.
+`docs/프로토콜_명세.md` §1의 STX+CSV+CRLF 프레이밍, §2 측정값 포맷, ESP32 상태(STATUS,<번호>)
+프레임은 리포지토리 공용 규격을 그대로 따릅니다. **WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL은
+이 PC 도구에서 새로 도입한 커맨드로, 이 시점 기준 `firmware/`·`firmware-no-rtos/`(MCU 쪽)에는
+아직 구현되어 있지 않습니다** — 프레임 형태(필드 순서/개수, 응답 형식)는 `Services/Stm32Protocol.cs`의
+`BuildWifiWriteAll`/`BuildMeasWriteAll` 및 `Stm32Commands.cs`의 `GetWifiAllAsync` 등의 XML 주석에
+정의되어 있으니, MCU 측 `pc_comm.c`를 이 형식에 맞춰 구현해야 실제 통신이 됩니다(기존 SET/SAVE/
+GET,CONFIG/STATUS 커맨드 방식은 이 도구에서 제거되었습니다). MCU 쪽 커맨드 파서는
+`firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`, ESP32 상태
+브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c` 참고.
 
 ## 알려진 제한사항
 

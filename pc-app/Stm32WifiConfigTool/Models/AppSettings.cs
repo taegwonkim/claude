@@ -23,6 +23,10 @@ namespace Stm32WifiConfigTool.Models
         public string WifiCommandChannel { get; set; } = "Usb";
         public int WifiCommandTimeoutMs { get; set; } = 3000;
 
+        /// <summary>Measurement 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
+        public string MeasConfigCommandChannel { get; set; } = "Usb";
+        public int MeasConfigCommandTimeoutMs { get; set; } = 3000;
+
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
         public string MeasurementDisplayChannel { get; set; } = "Both";
         public bool MeasurementAutoScroll { get; set; } = true;

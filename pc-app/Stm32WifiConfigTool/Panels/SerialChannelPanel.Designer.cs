@@ -11,6 +11,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.FlowLayoutPanel _portRow;
         private System.Windows.Forms.ComboBox _portCombo;
         private System.Windows.Forms.Button _refreshButton;
+        private System.Windows.Forms.Button _clearButton;
         private System.Windows.Forms.Label _baudLabel;
         private System.Windows.Forms.ComboBox _baudCombo;
         private System.Windows.Forms.Label _readTimeoutLabel;
@@ -35,6 +36,7 @@ namespace Stm32WifiConfigTool.Panels
             this._portRow = new System.Windows.Forms.FlowLayoutPanel();
             this._portCombo = new System.Windows.Forms.ComboBox();
             this._refreshButton = new System.Windows.Forms.Button();
+            this._clearButton = new System.Windows.Forms.Button();
             this._baudLabel = new System.Windows.Forms.Label();
             this._baudCombo = new System.Windows.Forms.ComboBox();
             this._readTimeoutLabel = new System.Windows.Forms.Label();
@@ -58,7 +60,7 @@ namespace Stm32WifiConfigTool.Panels
             this._groupBox.Location = new System.Drawing.Point(0, 0);
             this._groupBox.Name = "_groupBox";
             this._groupBox.Padding = new System.Windows.Forms.Padding(8);
-            this._groupBox.Size = new System.Drawing.Size(400, 220);
+            this._groupBox.Size = new System.Drawing.Size(440, 220);
             this._groupBox.TabIndex = 0;
             this._groupBox.TabStop = false;
             this._groupBox.Text = "채널";
@@ -89,7 +91,7 @@ namespace Stm32WifiConfigTool.Panels
             this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.Size = new System.Drawing.Size(384, 191);
+            this._layout.Size = new System.Drawing.Size(424, 191);
             this._layout.TabIndex = 0;
             //
             // _portLabel
@@ -106,10 +108,11 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._portRow.Controls.Add(this._portCombo);
             this._portRow.Controls.Add(this._refreshButton);
+            this._portRow.Controls.Add(this._clearButton);
             this._portRow.Dock = System.Windows.Forms.DockStyle.Fill;
             this._portRow.Location = new System.Drawing.Point(123, 0);
             this._portRow.Name = "_portRow";
-            this._portRow.Size = new System.Drawing.Size(258, 30);
+            this._portRow.Size = new System.Drawing.Size(298, 30);
             this._portRow.TabIndex = 1;
             this._portRow.WrapContents = false;
             //
@@ -118,19 +121,30 @@ namespace Stm32WifiConfigTool.Panels
             this._portCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this._portCombo.Location = new System.Drawing.Point(3, 3);
             this._portCombo.Name = "_portCombo";
-            this._portCombo.Size = new System.Drawing.Size(150, 23);
+            this._portCombo.Size = new System.Drawing.Size(130, 23);
             this._portCombo.TabIndex = 0;
             //
             // _refreshButton
             //
             this._refreshButton.AutoSize = true;
-            this._refreshButton.Location = new System.Drawing.Point(159, 3);
+            this._refreshButton.Location = new System.Drawing.Point(139, 3);
             this._refreshButton.Name = "_refreshButton";
             this._refreshButton.Size = new System.Drawing.Size(75, 25);
             this._refreshButton.TabIndex = 1;
             this._refreshButton.Text = "새로고침";
             this._refreshButton.UseVisualStyleBackColor = true;
             this._refreshButton.Click += new System.EventHandler(this.RefreshButton_Click);
+            //
+            // _clearButton
+            //
+            this._clearButton.AutoSize = true;
+            this._clearButton.Location = new System.Drawing.Point(220, 3);
+            this._clearButton.Name = "_clearButton";
+            this._clearButton.Size = new System.Drawing.Size(70, 25);
+            this._clearButton.TabIndex = 2;
+            this._clearButton.Text = "지우기";
+            this._clearButton.UseVisualStyleBackColor = true;
+            this._clearButton.Click += new System.EventHandler(this.ClearButton_Click);
             //
             // _baudLabel
             //
@@ -231,7 +245,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             this.Controls.Add(this._groupBox);
             this.Name = "SerialChannelPanel";
-            this.Size = new System.Drawing.Size(400, 220);
+            this.Size = new System.Drawing.Size(440, 220);
             this._groupBox.ResumeLayout(false);
             this._layout.ResumeLayout(false);
             this._portRow.ResumeLayout(false);

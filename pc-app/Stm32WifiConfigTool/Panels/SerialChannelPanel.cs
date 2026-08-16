@@ -86,6 +86,12 @@ namespace Stm32WifiConfigTool.Panels
             RefreshPorts();
         }
 
+        /// <summary>선택된 COM 포트를 비워 다시 고를 수 있게 한다(연결 중에는 비활성화됨).</summary>
+        private void ClearButton_Click(object sender, EventArgs e)
+        {
+            _portCombo.SelectedIndex = -1;
+        }
+
         private void RefreshPorts()
         {
             string current = _portCombo.SelectedItem as string ?? _settings?.PortName;
@@ -146,6 +152,7 @@ namespace Stm32WifiConfigTool.Panels
                     _baudCombo.Enabled = false;
                     _readTimeout.Enabled = false;
                     _writeTimeout.Enabled = false;
+                    _clearButton.Enabled = false;
                 }
                 else
                 {
@@ -156,6 +163,7 @@ namespace Stm32WifiConfigTool.Panels
                     _baudCombo.Enabled = true;
                     _readTimeout.Enabled = true;
                     _writeTimeout.Enabled = true;
+                    _clearButton.Enabled = true;
                 }
             }));
         }

@@ -15,7 +15,7 @@ namespace Stm32WifiConfigTool.Services
     ///
     /// 메시지 분류(첫 필드 기준, 화이트리스트 방식 - 새 프레임 종류가 추가돼도 명령 응답
     /// 매칭 로직이 오작동하지 않도록):
-    /// - 커맨드 응답: OK / ERR,... / SAVED / CONFIG,... / HELP,...
+    /// - 커맨드 응답: WIFI_R_ALL,... / WIFI_W_ALL,OK|ERR,... / MEAS_R_ALL,... / MEAS_W_ALL,OK|ERR,... / ERR,... / HELP,...
     /// - ESP32 상태(주기적 브로드캐스트 겸 STATUS 커맨드 응답): STATUS,&lt;번호&gt;
     /// - 측정값(그 외 전부, 정확히 8개 필드): &lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6 ("DATA" 태그 없음)
     /// - 비동기 이벤트: EVENT,&lt;name&gt;
@@ -24,21 +24,39 @@ namespace Stm32WifiConfigTool.Services
     {
         public const char Stx = '\x02';
 
-        private static readonly HashSet<string> ReplyTags = new HashSet<string> { "OK", "ERR", "SAVED", "CONFIG", "HELP" };
+        private static readonly HashSet<string> ReplyTags = new HashSet<string>
+        {
+            "WIFI_R_ALL", "WIFI_W_ALL", "MEAS_R_ALL", "MEAS_W_ALL", "ERR", "HELP"
+        };
 
-        public static string BuildSetSsid(string ssid) => Stx + "SET,SSID," + ssid;
-        public static string BuildSetPass(string pass) => Stx + "SET,PASS," + pass;
-        public static string BuildSetServerIp(string ip) => Stx + "SET,SERVER_IP," + ip;
-        public static string BuildSetServerPort(int port) => Stx + "SET,SERVER_PORT," + port.ToString(CultureInfo.InvariantCulture);
-        public static string BuildSetDhcp(bool on) => Stx + "SET,DHCP," + (on ? "ON" : "OFF");
-        public static string BuildSetIp(string ip) => Stx + "SET,IP," + ip;
-        public static string BuildSetGateway(string gateway) => Stx + "SET,GATEWAY," + gateway;
-        public static string BuildSetMask(string mask) => Stx + "SET,MASK," + mask;
+        /// <summary>WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 전체를 한 번에 조회한다.
+        /// 응답: WIFI_R_ALL,ssid,pass_masked,server_ip,server_port,ON|OFF,ip,gateway,mask</summary>
+        public static readonly string CmdWifiReadAll = Stx + "WIFI_R_ALL";
 
-        public static readonly string CmdSave = Stx + "SAVE";
-        public static readonly string CmdGetConfig = Stx + "GET,CONFIG";
-        public static readonly string CmdStatus = Stx + "STATUS";
-        public static readonly string CmdHelp = Stx + "HELP";
+        /// <summary>WiFi 설정 전체를 한 프레임으로 MCU에 전달한다. 응답: WIFI_W_ALL,OK 또는 WIFI_W_ALL,ERR,&lt;reason&gt;
+        /// pass가 빈 문자열이면(사용자가 "비밀번호 변경"을 체크하지 않은 경우) 필드 자체는 빈 채로
+        /// 전송된다 - MCU는 이 경우 기존 저장된 비밀번호를 유지해야 한다(<see cref="Models.NetConfig.Password"/> 참고).</summary>
+        public static string BuildWifiWriteAll(string ssid, string pass, string serverIp, int serverPort,
+            bool dhcpOn, string ip, string gateway, string mask)
+        {
+            return Stx + "WIFI_W_ALL," + ssid + "," + pass + "," + serverIp + "," +
+                   serverPort.ToString(CultureInfo.InvariantCulture) + "," + (dhcpOn ? "ON" : "OFF") + "," +
+                   ip + "," + gateway + "," + mask;
+        }
+
+        /// <summary>측정 모듈 설정(Reference/Offset/Resistance/Interval) 전체를 한 번에 조회한다.
+        /// 응답: MEAS_R_ALL,reference_mv,offset_mv,resistance_mohm,interval_sec</summary>
+        public static readonly string CmdMeasReadAll = Stx + "MEAS_R_ALL";
+
+        /// <summary>측정 모듈 설정 전체를 한 프레임으로 MCU에 전달한다. 응답: MEAS_W_ALL,OK 또는 MEAS_W_ALL,ERR,&lt;reason&gt;</summary>
+        public static string BuildMeasWriteAll(double referenceMv, double offsetMv, double resistanceMOhm, double intervalSec)
+        {
+            return Stx + "MEAS_W_ALL," +
+                   referenceMv.ToString(CultureInfo.InvariantCulture) + "," +
+                   offsetMv.ToString(CultureInfo.InvariantCulture) + "," +
+                   resistanceMOhm.ToString(CultureInfo.InvariantCulture) + "," +
+                   intervalSec.ToString(CultureInfo.InvariantCulture);
+        }
 
         /// <summary>SerialLinkService.LineReceived로 전달된 한 줄을 파싱한다. 맨 앞이 STX가 아니면
         /// false(잡음/깨진 프레임 - 호출자는 무시해야 한다).</summary>

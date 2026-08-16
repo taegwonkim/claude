@@ -46,7 +46,7 @@ namespace Stm32WifiConfigTool.Panels
             this._layout.RowCount = 2;
             this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this._layout.Size = new System.Drawing.Size(420, 520);
+            this._layout.Size = new System.Drawing.Size(460, 520);
             this._layout.TabIndex = 0;
             //
             // _usbPanel
@@ -54,7 +54,7 @@ namespace Stm32WifiConfigTool.Panels
             this._usbPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this._usbPanel.Location = new System.Drawing.Point(9, 9);
             this._usbPanel.Name = "_usbPanel";
-            this._usbPanel.Size = new System.Drawing.Size(402, 244);
+            this._usbPanel.Size = new System.Drawing.Size(442, 244);
             this._usbPanel.TabIndex = 0;
             //
             // _uartPanel
@@ -62,14 +62,14 @@ namespace Stm32WifiConfigTool.Panels
             this._uartPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this._uartPanel.Location = new System.Drawing.Point(9, 259);
             this._uartPanel.Name = "_uartPanel";
-            this._uartPanel.Size = new System.Drawing.Size(402, 244);
+            this._uartPanel.Size = new System.Drawing.Size(442, 244);
             this._uartPanel.TabIndex = 1;
             //
             // PortSettingsPanel
             //
             this.Controls.Add(this._layout);
             this.Name = "PortSettingsPanel";
-            this.Size = new System.Drawing.Size(420, 520);
+            this.Size = new System.Drawing.Size(460, 520);
             this._layout.ResumeLayout(false);
             this.ResumeLayout(false);
         }
