@@ -16,22 +16,68 @@ STM32L562CET6이 UART로 연결된 ESP32-C3-WROOM(ESP-AT 펌웨어)을 AT 명령
   로직을 담은 상태 머신. `WiFi_Manager_Process()`를 메인 루프에서 주기적으로
   호출하면 됩니다.
 
-- `Src/main_example.c`
-  CubeMX로 생성한 프로젝트에 통합하는 예시.
+- `Src/main_usercode_reference.c`, `Src/usart_usercode_reference.c`
+  STM32CubeIDE/CubeMX가 생성한 `Core/Src/main.c`, `Core/Src/usart.c`의
+  어느 "USER CODE" 구역에 무엇을 넣어야 하는지 보여주는 참고용 파일.
+  전체가 `#if 0`으로 감싸져 있어 프로젝트에 그대로 추가해도 컴파일
+  대상에서 빠지며, 내용만 복사해서 실제 `main.c`/`usart.c`에 옮겨
+  넣으면 된다.
 
-## 하드웨어 연결
+## 하드웨어 연결 (USART1 기준)
+
+이 문서는 ESP32-C3-WROOM과의 통신에 **USART1**을 사용하는 것을
+전제로 합니다.
 
 | STM32L562CET6 | ESP32-C3-WROOM |
 |---|---|
-| USARTx_TX | RX |
-| USARTx_RX | TX |
+| USART1_TX | RX |
+| USART1_RX | TX |
 | GND | GND |
-| 3.3V (충분한 전류 공급) | 3V3 |
+| 3.3V (충분한 전류 공급, ESP32는 순간 전류가 큼) | 3V3 |
 
-- CubeMX에서 사용할 USART(예: USART1)를 Asynchronous 모드로 생성하고,
-  ESP-AT 펌웨어의 기본 보레이트(보통 115200bps)와 맞춥니다.
-- 해당 USART의 전역 인터럽트(NVIC)를 활성화해야 합니다(1바이트 인터럽트
-  수신 방식이므로 `HAL_UART_Receive_IT`가 계속 재무장됩니다).
+### STM32CubeMX 설정 (.ioc)
+
+1. **Connectivity → USART1**
+   - Mode: `Asynchronous`
+   - Parameter Settings: Baud Rate `115200`(ESP-AT 펌웨어 기본값에 맞춤),
+     Word Length `8 Bits`, Parity `None`, Stop Bits `1`
+2. **NVIC Settings 탭**
+   - `USART1 global interrupt` 체크 (인터럽트 활성화). 이 라이브러리는
+     `HAL_UART_Receive_IT()`로 1바이트씩 계속 재무장하는 방식이므로 이
+     인터럽트가 꺼져 있으면 전혀 동작하지 않습니다.
+3. Generate Code 실행 시 CubeMX가 `Core/Src/usart.c`에
+   `UART_HandleTypeDef huart1;`과 `MX_USART1_UART_Init()`을 생성하고,
+   `Core/Inc/usart.h`에 `extern UART_HandleTypeDef huart1;`을 선언해
+   줍니다. 이 라이브러리는 이 `huart1`을 그대로 사용합니다.
+
+### 이 라이브러리 파일 추가하기
+
+`Inc/esp32_at.h`, `Inc/wifi_manager.h`, `Src/esp32_at.c`, `Src/wifi_manager.c`
+4개 파일을 프로젝트의 `Core/Inc`, `Core/Src`에 복사하면 STM32CubeIDE가
+자동으로 include 경로와 빌드에 포함시킵니다(별도 폴더에 두는 경우 프로젝트
+속성의 Include Paths에 해당 폴더를 추가해야 합니다).
+
+### main.c / usart.c에 코드 삽입하기
+
+CubeMX는 "Generate Code"를 다시 실행해도 `/* USER CODE BEGIN ... */`와
+`/* USER CODE END ... */` 사이의 내용은 보존합니다. 따라서 이 라이브러리를
+호출하는 코드는 반드시 그 구역 안에 넣어야 합니다.
+
+- `Core/Src/usart.c`
+  - 파일 상단 `USER CODE BEGIN 0` 구역에 `#include "esp32_at.h"` 추가
+  - 파일 하단 `USER CODE BEGIN 1` 구역(맨 마지막)에
+    `HAL_UART_RxCpltCallback()`를 오버라이드해 넣고, 내부에서
+    `ESP32_AT_UART_RxCpltCallback(huart)`를 호출
+  - 정확한 위치와 코드는 `Src/usart_usercode_reference.c` 참고
+
+- `Core/Src/main.c`
+  - `USER CODE BEGIN Includes`: `#include "wifi_manager.h"`
+  - `USER CODE BEGIN PV`: AP/IP/서버 설정 구조체 선언
+  - `USER CODE BEGIN 2` (주변장치 초기화 이후, while(1) 진입 전):
+    `WiFi_Manager_Init(&huart1, ...)` 호출
+  - `USER CODE BEGIN 3` (while(1) 루프 안): 매 반복마다
+    `WiFi_Manager_Process()` 호출
+  - 정확한 위치와 코드는 `Src/main_usercode_reference.c` 참고
 
 ## 연결 절차 (상태 머신 흐름)
 
@@ -62,38 +108,38 @@ STM32L562CET6이 UART로 연결된 ESP32-C3-WROOM(ESP-AT 펌웨어)을 AT 명령
 
 ## 사용 예시
 
+`Src/main_usercode_reference.c`에 있는 내용을 실제 `Core/Src/main.c`의
+동일한 이름의 USER CODE 구역에 옮기면 다음과 같은 흐름이 됩니다.
+
 ```c
-wifi_ap_config_t ap_cfg = {
-    .ssid = "MyHomeAP",
-    .password = "MyAPPassword123",
-};
+/* USER CODE BEGIN PV */
+static wifi_ap_config_t     s_ap_cfg = { .ssid = "MyHomeAP", .password = "MyAPPassword123" };
+static wifi_ip_config_t     s_ip_cfg = { .dhcp_enable = false, .ip = "192.168.0.50",
+                                          .gateway = "192.168.0.1", .netmask = "255.255.255.0" };
+static wifi_server_config_t s_server_cfg = { .ip = "192.168.0.100", .port = 8080 };
+/* USER CODE END PV */
 
-wifi_ip_config_t ip_cfg = {
-    .dhcp_enable = false,
-    .ip = "192.168.0.50",
-    .gateway = "192.168.0.1",
-    .netmask = "255.255.255.0",
-};
+/* ... MX_USART1_UART_Init() 등 CubeMX 초기화 코드 ... */
 
-wifi_server_config_t server_cfg = {
-    .ip = "192.168.0.100",
-    .port = 8080,
-};
+/* USER CODE BEGIN 2 */
+WiFi_Manager_Init(&huart1, &s_ap_cfg, &s_ip_cfg, &s_server_cfg);
+/* USER CODE END 2 */
 
-WiFi_Manager_Init(&huart1, &ap_cfg, &ip_cfg, &server_cfg);
+while (1)
+{
+  /* USER CODE BEGIN 3 */
+  WiFi_Manager_Process();
 
-while (1) {
-    WiFi_Manager_Process();
+  if (WiFi_Manager_IsConnected()) {
+      WiFi_Manager_Send((uint8_t *)"hello\r\n", 7);
+  }
 
-    if (WiFi_Manager_IsConnected()) {
-        WiFi_Manager_Send((uint8_t *)"hello\r\n", 7);
-    }
-
-    HAL_Delay(10);
+  HAL_Delay(10);
 }
+/* USER CODE END 3 */
 ```
 
-DHCP를 사용하려면 `ip_cfg.dhcp_enable = true`로 두면 되고, 이때
+DHCP를 사용하려면 `s_ip_cfg.dhcp_enable = true`로 두면 되고, 이때
 `ip`/`gateway`/`netmask` 필드는 사용되지 않습니다. 서버 접속이 필요 없다면
 `WiFi_Manager_Init()`의 `server_cfg` 인자에 `NULL`을 넘기면 AP 접속까지만
 수행합니다.
