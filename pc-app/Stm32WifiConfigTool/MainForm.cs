@@ -9,7 +9,9 @@ namespace Stm32WifiConfigTool
     /// STM32L562C WiFi 계측 브릿지 PC 도구의 메인(유일한) 창.
     /// 포트 설정(좌상단) / WiFi 설정(중앙상단) / Measurement 설정(중앙상단 우측) / ESP32 상태(우상단) /
     /// 측정값·상태 보기(하단, 전체 폭)를 별도 창을 띄우지 않고 한 창 안에서 동시에 볼 수 있도록
-    /// 도킹 배치한다.
+    /// 도킹 배치한다. 상단 4개 패널은 <see cref="SplitContainer"/> 3개를 중첩해 구성했으므로
+    /// 사용자가 패널 사이 경계선을 마우스로 드래그해 각 패널의 폭을 자유롭게 조절할 수 있다
+    /// (드래그 중 실시간으로 <see cref="AppSettings"/>에 반영되고, 앱 재시작 후에도 유지된다).
     /// UI 레이아웃은 <c>MainForm.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// USB/UART 연결(ConnectionManager)은 이 창이 소유하며, 5개 패널이 모두 공유한다.
     /// 포트/보레이트/타임아웃 등 UI 설정은 시작 시 AppSettingsStore.Load()로 복원하고,
@@ -30,7 +32,45 @@ namespace Stm32WifiConfigTool
             _espStatusPanel.Initialize(_conn, _settings);
             _measurementPanel.Initialize(_conn, _settings);
 
+            ApplySavedSplitterDistances();
+
             FormClosed += MainForm_FormClosed;
+        }
+
+        /// <summary>저장된 패널 폭(px)을 각 스플리터에 복원한다. 창이 저장 당시보다 좁아졌거나
+        /// 설정값이 손상된 경우에도 Panel1MinSize/Panel2MinSize 범위 밖 값은 SplitterDistance
+        /// setter가 예외를 던지므로, 유효 범위로 clamp한 뒤 적용한다.</summary>
+        private void ApplySavedSplitterDistances()
+        {
+            SetSplitterDistanceClamped(_splitPortWifi, _settings.PortPanelWidth);
+            SetSplitterDistanceClamped(_splitWifiMeas, _settings.WifiPanelWidth);
+            SetSplitterDistanceClamped(_splitMeasStatus, _settings.MeasConfigPanelWidth);
+        }
+
+        private static void SetSplitterDistanceClamped(SplitContainer split, int distance)
+        {
+            int min = split.Panel1MinSize;
+            int max = split.Width - split.Panel2MinSize - split.SplitterWidth;
+            if (max < min)
+            {
+                return; /* 창이 너무 좁아 아직 유효 범위를 계산할 수 없음 - 디자이너 기본값 유지 */
+            }
+            split.SplitterDistance = Math.Max(min, Math.Min(max, distance));
+        }
+
+        private void SplitPortWifi_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            _settings.PortPanelWidth = _splitPortWifi.SplitterDistance;
+        }
+
+        private void SplitWifiMeas_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            _settings.WifiPanelWidth = _splitWifiMeas.SplitterDistance;
+        }
+
+        private void SplitMeasStatus_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            _settings.MeasConfigPanelWidth = _splitMeasStatus.SplitterDistance;
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)

@@ -20,7 +20,9 @@ namespace Stm32WifiConfigTool
         }
 
         private System.Windows.Forms.TableLayoutPanel _root;
-        private System.Windows.Forms.TableLayoutPanel _topRow;
+        private System.Windows.Forms.SplitContainer _splitPortWifi;
+        private System.Windows.Forms.SplitContainer _splitWifiMeas;
+        private System.Windows.Forms.SplitContainer _splitMeasStatus;
         private Stm32WifiConfigTool.Panels.PortSettingsPanel _portPanel;
         private Stm32WifiConfigTool.Panels.WifiConfigPanel _wifiPanel;
         private Stm32WifiConfigTool.Panels.MeasurementConfigPanel _measConfigPanel;
@@ -36,21 +38,34 @@ namespace Stm32WifiConfigTool
         private void InitializeComponent()
         {
             this._root = new System.Windows.Forms.TableLayoutPanel();
-            this._topRow = new System.Windows.Forms.TableLayoutPanel();
+            this._splitPortWifi = new System.Windows.Forms.SplitContainer();
+            this._splitWifiMeas = new System.Windows.Forms.SplitContainer();
+            this._splitMeasStatus = new System.Windows.Forms.SplitContainer();
             this._portPanel = new Stm32WifiConfigTool.Panels.PortSettingsPanel();
             this._wifiPanel = new Stm32WifiConfigTool.Panels.WifiConfigPanel();
             this._measConfigPanel = new Stm32WifiConfigTool.Panels.MeasurementConfigPanel();
             this._espStatusPanel = new Stm32WifiConfigTool.Panels.EspStatusPanel();
             this._measurementPanel = new Stm32WifiConfigTool.Panels.MeasurementPanel();
             this._root.SuspendLayout();
-            this._topRow.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._splitPortWifi)).BeginInit();
+            this._splitPortWifi.Panel1.SuspendLayout();
+            this._splitPortWifi.Panel2.SuspendLayout();
+            this._splitPortWifi.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._splitWifiMeas)).BeginInit();
+            this._splitWifiMeas.Panel1.SuspendLayout();
+            this._splitWifiMeas.Panel2.SuspendLayout();
+            this._splitWifiMeas.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._splitMeasStatus)).BeginInit();
+            this._splitMeasStatus.Panel1.SuspendLayout();
+            this._splitMeasStatus.Panel2.SuspendLayout();
+            this._splitMeasStatus.SuspendLayout();
             this.SuspendLayout();
             //
             // _root
             //
             this._root.ColumnCount = 1;
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._root.Controls.Add(this._topRow, 0, 0);
+            this._root.Controls.Add(this._splitPortWifi, 0, 0);
             this._root.Controls.Add(this._measurementPanel, 0, 1);
             this._root.Dock = System.Windows.Forms.DockStyle.Fill;
             this._root.Location = new System.Drawing.Point(0, 0);
@@ -61,24 +76,53 @@ namespace Stm32WifiConfigTool
             this._root.Size = new System.Drawing.Size(1900, 940);
             this._root.TabIndex = 0;
             //
-            // _topRow
+            // _splitPortWifi (좌: 포트 설정 | 우: 나머지 전부 - 사용자가 스플리터를 드래그해 폭 조절 가능)
             //
-            this._topRow.ColumnCount = 4;
-            this._topRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 460F));
-            this._topRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._topRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 300F));
-            this._topRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 300F));
-            this._topRow.Controls.Add(this._portPanel, 0, 0);
-            this._topRow.Controls.Add(this._wifiPanel, 1, 0);
-            this._topRow.Controls.Add(this._measConfigPanel, 2, 0);
-            this._topRow.Controls.Add(this._espStatusPanel, 3, 0);
-            this._topRow.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._topRow.Location = new System.Drawing.Point(0, 0);
-            this._topRow.Name = "_topRow";
-            this._topRow.RowCount = 1;
-            this._topRow.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._topRow.Size = new System.Drawing.Size(1900, 520);
-            this._topRow.TabIndex = 0;
+            this._splitPortWifi.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._splitPortWifi.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
+            this._splitPortWifi.Location = new System.Drawing.Point(0, 0);
+            this._splitPortWifi.Name = "_splitPortWifi";
+            this._splitPortWifi.Panel1.Controls.Add(this._portPanel);
+            this._splitPortWifi.Panel1MinSize = 340;
+            this._splitPortWifi.Panel2.Controls.Add(this._splitWifiMeas);
+            this._splitPortWifi.Panel2MinSize = 500;
+            this._splitPortWifi.Size = new System.Drawing.Size(1900, 520);
+            this._splitPortWifi.SplitterDistance = 460;
+            this._splitPortWifi.SplitterWidth = 6;
+            this._splitPortWifi.TabIndex = 0;
+            this._splitPortWifi.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitPortWifi_SplitterMoved);
+            //
+            // _splitWifiMeas (좌: WiFi 설정 | 우: Measurement 설정 + ESP32 상태)
+            //
+            this._splitWifiMeas.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._splitWifiMeas.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            this._splitWifiMeas.Location = new System.Drawing.Point(0, 0);
+            this._splitWifiMeas.Name = "_splitWifiMeas";
+            this._splitWifiMeas.Panel1.Controls.Add(this._wifiPanel);
+            this._splitWifiMeas.Panel1MinSize = 480;
+            this._splitWifiMeas.Panel2.Controls.Add(this._splitMeasStatus);
+            this._splitWifiMeas.Panel2MinSize = 460;
+            this._splitWifiMeas.Size = new System.Drawing.Size(1434, 520);
+            this._splitWifiMeas.SplitterDistance = 840;
+            this._splitWifiMeas.SplitterWidth = 6;
+            this._splitWifiMeas.TabIndex = 0;
+            this._splitWifiMeas.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitWifiMeas_SplitterMoved);
+            //
+            // _splitMeasStatus (좌: Measurement 설정 | 우: ESP32 상태)
+            //
+            this._splitMeasStatus.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._splitMeasStatus.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
+            this._splitMeasStatus.Location = new System.Drawing.Point(0, 0);
+            this._splitMeasStatus.Name = "_splitMeasStatus";
+            this._splitMeasStatus.Panel1.Controls.Add(this._measConfigPanel);
+            this._splitMeasStatus.Panel1MinSize = 220;
+            this._splitMeasStatus.Panel2.Controls.Add(this._espStatusPanel);
+            this._splitMeasStatus.Panel2MinSize = 220;
+            this._splitMeasStatus.Size = new System.Drawing.Size(588, 520);
+            this._splitMeasStatus.SplitterDistance = 300;
+            this._splitMeasStatus.SplitterWidth = 6;
+            this._splitMeasStatus.TabIndex = 0;
+            this._splitMeasStatus.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitMeasStatus_SplitterMoved);
             //
             // _portPanel
             //
@@ -91,26 +135,26 @@ namespace Stm32WifiConfigTool
             // _wifiPanel
             //
             this._wifiPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._wifiPanel.Location = new System.Drawing.Point(460, 0);
+            this._wifiPanel.Location = new System.Drawing.Point(0, 0);
             this._wifiPanel.Name = "_wifiPanel";
             this._wifiPanel.Size = new System.Drawing.Size(840, 520);
-            this._wifiPanel.TabIndex = 1;
+            this._wifiPanel.TabIndex = 0;
             //
             // _measConfigPanel
             //
             this._measConfigPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._measConfigPanel.Location = new System.Drawing.Point(1300, 0);
+            this._measConfigPanel.Location = new System.Drawing.Point(0, 0);
             this._measConfigPanel.Name = "_measConfigPanel";
             this._measConfigPanel.Size = new System.Drawing.Size(300, 520);
-            this._measConfigPanel.TabIndex = 2;
+            this._measConfigPanel.TabIndex = 0;
             //
             // _espStatusPanel
             //
             this._espStatusPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._espStatusPanel.Location = new System.Drawing.Point(1600, 0);
+            this._espStatusPanel.Location = new System.Drawing.Point(0, 0);
             this._espStatusPanel.Name = "_espStatusPanel";
-            this._espStatusPanel.Size = new System.Drawing.Size(300, 520);
-            this._espStatusPanel.TabIndex = 3;
+            this._espStatusPanel.Size = new System.Drawing.Size(282, 520);
+            this._espStatusPanel.TabIndex = 0;
             //
             // _measurementPanel
             //
@@ -129,7 +173,18 @@ namespace Stm32WifiConfigTool
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "STM32L562C WiFi 계측 브릿지 도구";
             this._root.ResumeLayout(false);
-            this._topRow.ResumeLayout(false);
+            this._splitPortWifi.Panel1.ResumeLayout(false);
+            this._splitPortWifi.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this._splitPortWifi)).EndInit();
+            this._splitPortWifi.ResumeLayout(false);
+            this._splitWifiMeas.Panel1.ResumeLayout(false);
+            this._splitWifiMeas.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this._splitWifiMeas)).EndInit();
+            this._splitWifiMeas.ResumeLayout(false);
+            this._splitMeasStatus.Panel1.ResumeLayout(false);
+            this._splitMeasStatus.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this._splitMeasStatus)).EndInit();
+            this._splitMeasStatus.ResumeLayout(false);
             this.ResumeLayout(false);
         }
 
