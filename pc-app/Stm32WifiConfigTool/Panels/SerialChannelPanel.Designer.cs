@@ -6,7 +6,6 @@ namespace Stm32WifiConfigTool.Panels
         private System.ComponentModel.IContainer components = null;
 
         private System.Windows.Forms.GroupBox _groupBox;
-        private System.Windows.Forms.TableLayoutPanel _layout;
         private System.Windows.Forms.Label _portLabel;
         private System.Windows.Forms.FlowLayoutPanel _portRow;
         private System.Windows.Forms.ComboBox _portCombo;
@@ -31,7 +30,6 @@ namespace Stm32WifiConfigTool.Panels
         private void InitializeComponent()
         {
             this._groupBox = new System.Windows.Forms.GroupBox();
-            this._layout = new System.Windows.Forms.TableLayoutPanel();
             this._portLabel = new System.Windows.Forms.Label();
             this._portRow = new System.Windows.Forms.FlowLayoutPanel();
             this._portCombo = new System.Windows.Forms.ComboBox();
@@ -47,59 +45,40 @@ namespace Stm32WifiConfigTool.Panels
             this._statusCaptionLabel = new System.Windows.Forms.Label();
             this._statusLabel = new System.Windows.Forms.Label();
             this._groupBox.SuspendLayout();
-            this._layout.SuspendLayout();
             this._portRow.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this._writeTimeout)).BeginInit();
             this.SuspendLayout();
             //
-            // _groupBox
+            // _groupBox (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
+            // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
+            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다.)
             //
-            this._groupBox.Controls.Add(this._layout);
+            this._groupBox.Controls.Add(this._portLabel);
+            this._groupBox.Controls.Add(this._portRow);
+            this._groupBox.Controls.Add(this._baudLabel);
+            this._groupBox.Controls.Add(this._baudCombo);
+            this._groupBox.Controls.Add(this._readTimeoutLabel);
+            this._groupBox.Controls.Add(this._readTimeout);
+            this._groupBox.Controls.Add(this._writeTimeoutLabel);
+            this._groupBox.Controls.Add(this._writeTimeout);
+            this._groupBox.Controls.Add(this._connectButton);
+            this._groupBox.Controls.Add(this._statusCaptionLabel);
+            this._groupBox.Controls.Add(this._statusLabel);
             this._groupBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._groupBox.Location = new System.Drawing.Point(0, 0);
             this._groupBox.Name = "_groupBox";
             this._groupBox.Padding = new System.Windows.Forms.Padding(8);
-            this._groupBox.Size = new System.Drawing.Size(440, 220);
+            this._groupBox.Size = new System.Drawing.Size(440, 250);
             this._groupBox.TabIndex = 0;
             this._groupBox.TabStop = false;
             this._groupBox.Text = "채널";
             //
-            // _layout
-            //
-            this._layout.ColumnCount = 2;
-            this._layout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 120F));
-            this._layout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._layout.Controls.Add(this._portLabel, 0, 0);
-            this._layout.Controls.Add(this._portRow, 1, 0);
-            this._layout.Controls.Add(this._baudLabel, 0, 1);
-            this._layout.Controls.Add(this._baudCombo, 1, 1);
-            this._layout.Controls.Add(this._readTimeoutLabel, 0, 2);
-            this._layout.Controls.Add(this._readTimeout, 1, 2);
-            this._layout.Controls.Add(this._writeTimeoutLabel, 0, 3);
-            this._layout.Controls.Add(this._writeTimeout, 1, 3);
-            this._layout.Controls.Add(this._connectButton, 1, 4);
-            this._layout.Controls.Add(this._statusCaptionLabel, 0, 5);
-            this._layout.Controls.Add(this._statusLabel, 1, 5);
-            this._layout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._layout.Location = new System.Drawing.Point(8, 21);
-            this._layout.Name = "_layout";
-            this._layout.RowCount = 6;
-            this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
-            this._layout.Size = new System.Drawing.Size(424, 191);
-            this._layout.TabIndex = 0;
-            //
             // _portLabel
             //
-            this._portLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._portLabel.Location = new System.Drawing.Point(3, 0);
+            this._portLabel.Location = new System.Drawing.Point(15, 25);
             this._portLabel.Name = "_portLabel";
-            this._portLabel.Size = new System.Drawing.Size(114, 30);
+            this._portLabel.Size = new System.Drawing.Size(100, 23);
             this._portLabel.TabIndex = 0;
             this._portLabel.Text = "포트";
             this._portLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -109,10 +88,9 @@ namespace Stm32WifiConfigTool.Panels
             this._portRow.Controls.Add(this._portCombo);
             this._portRow.Controls.Add(this._refreshButton);
             this._portRow.Controls.Add(this._clearButton);
-            this._portRow.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._portRow.Location = new System.Drawing.Point(123, 0);
+            this._portRow.Location = new System.Drawing.Point(125, 22);
             this._portRow.Name = "_portRow";
-            this._portRow.Size = new System.Drawing.Size(298, 30);
+            this._portRow.Size = new System.Drawing.Size(300, 30);
             this._portRow.TabIndex = 1;
             this._portRow.WrapContents = false;
             //
@@ -148,73 +126,66 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _baudLabel
             //
-            this._baudLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._baudLabel.Location = new System.Drawing.Point(3, 30);
+            this._baudLabel.Location = new System.Drawing.Point(15, 59);
             this._baudLabel.Name = "_baudLabel";
-            this._baudLabel.Size = new System.Drawing.Size(114, 30);
+            this._baudLabel.Size = new System.Drawing.Size(100, 23);
             this._baudLabel.TabIndex = 2;
             this._baudLabel.Text = "Baud Rate";
             this._baudLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _baudCombo
             //
-            this._baudCombo.Dock = System.Windows.Forms.DockStyle.Fill;
             this._baudCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._baudCombo.Location = new System.Drawing.Point(123, 33);
+            this._baudCombo.Location = new System.Drawing.Point(125, 56);
             this._baudCombo.Name = "_baudCombo";
-            this._baudCombo.Size = new System.Drawing.Size(258, 23);
+            this._baudCombo.Size = new System.Drawing.Size(300, 23);
             this._baudCombo.TabIndex = 3;
             //
             // _readTimeoutLabel
             //
-            this._readTimeoutLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._readTimeoutLabel.Location = new System.Drawing.Point(3, 60);
+            this._readTimeoutLabel.Location = new System.Drawing.Point(15, 93);
             this._readTimeoutLabel.Name = "_readTimeoutLabel";
-            this._readTimeoutLabel.Size = new System.Drawing.Size(114, 30);
+            this._readTimeoutLabel.Size = new System.Drawing.Size(100, 23);
             this._readTimeoutLabel.TabIndex = 4;
             this._readTimeoutLabel.Text = "읽기 타임아웃(ms)";
             this._readTimeoutLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _readTimeout
             //
-            this._readTimeout.Dock = System.Windows.Forms.DockStyle.Fill;
             this._readTimeout.Increment = new decimal(new int[] { 100, 0, 0, 0 });
-            this._readTimeout.Location = new System.Drawing.Point(123, 63);
+            this._readTimeout.Location = new System.Drawing.Point(125, 90);
             this._readTimeout.Maximum = new decimal(new int[] { 60000, 0, 0, 0 });
             this._readTimeout.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
             this._readTimeout.Name = "_readTimeout";
-            this._readTimeout.Size = new System.Drawing.Size(258, 23);
+            this._readTimeout.Size = new System.Drawing.Size(300, 23);
             this._readTimeout.TabIndex = 5;
             this._readTimeout.Value = new decimal(new int[] { 3000, 0, 0, 0 });
             //
             // _writeTimeoutLabel
             //
-            this._writeTimeoutLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._writeTimeoutLabel.Location = new System.Drawing.Point(3, 90);
+            this._writeTimeoutLabel.Location = new System.Drawing.Point(15, 127);
             this._writeTimeoutLabel.Name = "_writeTimeoutLabel";
-            this._writeTimeoutLabel.Size = new System.Drawing.Size(114, 30);
+            this._writeTimeoutLabel.Size = new System.Drawing.Size(100, 23);
             this._writeTimeoutLabel.TabIndex = 6;
             this._writeTimeoutLabel.Text = "쓰기 타임아웃(ms)";
             this._writeTimeoutLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _writeTimeout
             //
-            this._writeTimeout.Dock = System.Windows.Forms.DockStyle.Fill;
             this._writeTimeout.Increment = new decimal(new int[] { 100, 0, 0, 0 });
-            this._writeTimeout.Location = new System.Drawing.Point(123, 93);
+            this._writeTimeout.Location = new System.Drawing.Point(125, 124);
             this._writeTimeout.Maximum = new decimal(new int[] { 60000, 0, 0, 0 });
             this._writeTimeout.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
             this._writeTimeout.Name = "_writeTimeout";
-            this._writeTimeout.Size = new System.Drawing.Size(258, 23);
+            this._writeTimeout.Size = new System.Drawing.Size(300, 23);
             this._writeTimeout.TabIndex = 7;
             this._writeTimeout.Value = new decimal(new int[] { 2000, 0, 0, 0 });
             //
             // _connectButton
             //
-            this._connectButton.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._connectButton.Location = new System.Drawing.Point(123, 123);
+            this._connectButton.Location = new System.Drawing.Point(125, 161);
             this._connectButton.Name = "_connectButton";
-            this._connectButton.Size = new System.Drawing.Size(258, 30);
+            this._connectButton.Size = new System.Drawing.Size(300, 30);
             this._connectButton.TabIndex = 8;
             this._connectButton.Text = "연결";
             this._connectButton.UseVisualStyleBackColor = true;
@@ -222,21 +193,19 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _statusCaptionLabel
             //
-            this._statusCaptionLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._statusCaptionLabel.Location = new System.Drawing.Point(3, 153);
+            this._statusCaptionLabel.Location = new System.Drawing.Point(15, 199);
             this._statusCaptionLabel.Name = "_statusCaptionLabel";
-            this._statusCaptionLabel.Size = new System.Drawing.Size(114, 38);
+            this._statusCaptionLabel.Size = new System.Drawing.Size(100, 30);
             this._statusCaptionLabel.TabIndex = 9;
             this._statusCaptionLabel.Text = "상태";
             this._statusCaptionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _statusLabel
             //
-            this._statusLabel.Dock = System.Windows.Forms.DockStyle.Fill;
             this._statusLabel.ForeColor = System.Drawing.Color.Firebrick;
-            this._statusLabel.Location = new System.Drawing.Point(123, 153);
+            this._statusLabel.Location = new System.Drawing.Point(125, 199);
             this._statusLabel.Name = "_statusLabel";
-            this._statusLabel.Size = new System.Drawing.Size(258, 38);
+            this._statusLabel.Size = new System.Drawing.Size(300, 30);
             this._statusLabel.TabIndex = 10;
             this._statusLabel.Text = "연결 안됨";
             this._statusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -245,9 +214,8 @@ namespace Stm32WifiConfigTool.Panels
             //
             this.Controls.Add(this._groupBox);
             this.Name = "SerialChannelPanel";
-            this.Size = new System.Drawing.Size(440, 220);
+            this.Size = new System.Drawing.Size(440, 250);
             this._groupBox.ResumeLayout(false);
-            this._layout.ResumeLayout(false);
             this._portRow.ResumeLayout(false);
             this._portRow.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).EndInit();

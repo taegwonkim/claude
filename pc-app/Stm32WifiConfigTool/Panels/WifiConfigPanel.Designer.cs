@@ -20,11 +20,9 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.RadioButton _channelUsb;
         private System.Windows.Forms.RadioButton _channelUart;
         private System.Windows.Forms.GroupBox _fieldsGroup;
-        private System.Windows.Forms.TableLayoutPanel _fieldsLayout;
         private System.Windows.Forms.Label _ssidLabel;
         private System.Windows.Forms.TextBox _ssidBox;
         private System.Windows.Forms.Label _passwordLabel;
-        private System.Windows.Forms.TableLayoutPanel _passwordRow;
         private System.Windows.Forms.TextBox _passwordBox;
         private System.Windows.Forms.CheckBox _changePasswordCheck;
         private System.Windows.Forms.Label _serverIpLabel;
@@ -59,11 +57,9 @@ namespace Stm32WifiConfigTool.Panels
             this._channelUsb = new System.Windows.Forms.RadioButton();
             this._channelUart = new System.Windows.Forms.RadioButton();
             this._fieldsGroup = new System.Windows.Forms.GroupBox();
-            this._fieldsLayout = new System.Windows.Forms.TableLayoutPanel();
             this._ssidLabel = new System.Windows.Forms.Label();
             this._ssidBox = new System.Windows.Forms.TextBox();
             this._passwordLabel = new System.Windows.Forms.Label();
-            this._passwordRow = new System.Windows.Forms.TableLayoutPanel();
             this._passwordBox = new System.Windows.Forms.TextBox();
             this._changePasswordCheck = new System.Windows.Forms.CheckBox();
             this._serverIpLabel = new System.Windows.Forms.Label();
@@ -87,8 +83,6 @@ namespace Stm32WifiConfigTool.Panels
             this._root.SuspendLayout();
             this._channelGroup.SuspendLayout();
             this._fieldsGroup.SuspendLayout();
-            this._fieldsLayout.SuspendLayout();
-            this._passwordRow.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._serverPortBox)).BeginInit();
             this._bottomLayout.SuspendLayout();
             this._buttonRow.SuspendLayout();
@@ -145,9 +139,26 @@ namespace Stm32WifiConfigTool.Panels
             this._channelUart.Text = "UART";
             this._channelUart.CheckedChanged += new System.EventHandler(this.ChannelUart_CheckedChanged);
             //
-            // _fieldsGroup
+            // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
+            // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
+            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다.)
             //
-            this._fieldsGroup.Controls.Add(this._fieldsLayout);
+            this._fieldsGroup.Controls.Add(this._ssidLabel);
+            this._fieldsGroup.Controls.Add(this._ssidBox);
+            this._fieldsGroup.Controls.Add(this._passwordLabel);
+            this._fieldsGroup.Controls.Add(this._passwordBox);
+            this._fieldsGroup.Controls.Add(this._changePasswordCheck);
+            this._fieldsGroup.Controls.Add(this._serverIpLabel);
+            this._fieldsGroup.Controls.Add(this._serverIpBox);
+            this._fieldsGroup.Controls.Add(this._serverPortLabel);
+            this._fieldsGroup.Controls.Add(this._serverPortBox);
+            this._fieldsGroup.Controls.Add(this._dhcpCheck);
+            this._fieldsGroup.Controls.Add(this._staticIpLabel);
+            this._fieldsGroup.Controls.Add(this._staticIpBox);
+            this._fieldsGroup.Controls.Add(this._gatewayLabel);
+            this._fieldsGroup.Controls.Add(this._gatewayBox);
+            this._fieldsGroup.Controls.Add(this._maskLabel);
+            this._fieldsGroup.Controls.Add(this._maskBox);
             this._fieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
             this._fieldsGroup.Location = new System.Drawing.Point(9, 64);
             this._fieldsGroup.Name = "_fieldsGroup";
@@ -156,56 +167,18 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup.TabStop = false;
             this._fieldsGroup.Text = "설정값";
             //
-            // _fieldsLayout
-            //
-            this._fieldsLayout.ColumnCount = 2;
-            this._fieldsLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 130F));
-            this._fieldsLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._fieldsLayout.Controls.Add(this._ssidLabel, 0, 0);
-            this._fieldsLayout.Controls.Add(this._ssidBox, 1, 0);
-            this._fieldsLayout.Controls.Add(this._passwordLabel, 0, 1);
-            this._fieldsLayout.Controls.Add(this._passwordRow, 1, 1);
-            this._fieldsLayout.Controls.Add(this._serverIpLabel, 0, 2);
-            this._fieldsLayout.Controls.Add(this._serverIpBox, 1, 2);
-            this._fieldsLayout.Controls.Add(this._serverPortLabel, 0, 3);
-            this._fieldsLayout.Controls.Add(this._serverPortBox, 1, 3);
-            this._fieldsLayout.Controls.Add(this._dhcpCheck, 1, 4);
-            this._fieldsLayout.Controls.Add(this._staticIpLabel, 0, 5);
-            this._fieldsLayout.Controls.Add(this._staticIpBox, 1, 5);
-            this._fieldsLayout.Controls.Add(this._gatewayLabel, 0, 6);
-            this._fieldsLayout.Controls.Add(this._gatewayBox, 1, 6);
-            this._fieldsLayout.Controls.Add(this._maskLabel, 0, 7);
-            this._fieldsLayout.Controls.Add(this._maskBox, 1, 7);
-            this._fieldsLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._fieldsLayout.Location = new System.Drawing.Point(8, 21);
-            this._fieldsLayout.Name = "_fieldsLayout";
-            this._fieldsLayout.Padding = new System.Windows.Forms.Padding(8);
-            this._fieldsLayout.RowCount = 8;
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 32F));
-            this._fieldsLayout.Size = new System.Drawing.Size(606, 301);
-            this._fieldsLayout.TabIndex = 0;
-            //
             // _ssidLabel
             //
-            this._ssidLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._ssidLabel.Location = new System.Drawing.Point(11, 11);
+            this._ssidLabel.Location = new System.Drawing.Point(15, 25);
             this._ssidLabel.Name = "_ssidLabel";
-            this._ssidLabel.Size = new System.Drawing.Size(124, 32);
+            this._ssidLabel.Size = new System.Drawing.Size(124, 23);
             this._ssidLabel.TabIndex = 0;
             this._ssidLabel.Text = "SSID";
             this._ssidLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _ssidBox
             //
-            this._ssidBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._ssidBox.Location = new System.Drawing.Point(141, 14);
+            this._ssidBox.Location = new System.Drawing.Point(150, 22);
             this._ssidBox.MaxLength = 31;
             this._ssidBox.Name = "_ssidBox";
             this._ssidBox.Size = new System.Drawing.Size(454, 23);
@@ -213,86 +186,65 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _passwordLabel
             //
-            this._passwordLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._passwordLabel.Location = new System.Drawing.Point(11, 43);
+            this._passwordLabel.Location = new System.Drawing.Point(15, 59);
             this._passwordLabel.Name = "_passwordLabel";
-            this._passwordLabel.Size = new System.Drawing.Size(124, 32);
+            this._passwordLabel.Size = new System.Drawing.Size(124, 23);
             this._passwordLabel.TabIndex = 2;
             this._passwordLabel.Text = "비밀번호";
             this._passwordLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _passwordRow
-            //
-            this._passwordRow.ColumnCount = 2;
-            this._passwordRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._passwordRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this._passwordRow.Controls.Add(this._passwordBox, 0, 0);
-            this._passwordRow.Controls.Add(this._changePasswordCheck, 1, 0);
-            this._passwordRow.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._passwordRow.Location = new System.Drawing.Point(141, 46);
-            this._passwordRow.Name = "_passwordRow";
-            this._passwordRow.RowCount = 1;
-            this._passwordRow.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this._passwordRow.Size = new System.Drawing.Size(454, 26);
-            this._passwordRow.TabIndex = 3;
-            //
             // _passwordBox
             //
-            this._passwordBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._passwordBox.Enabled = false;
-            this._passwordBox.Location = new System.Drawing.Point(3, 3);
+            this._passwordBox.Location = new System.Drawing.Point(150, 56);
             this._passwordBox.MaxLength = 63;
             this._passwordBox.Name = "_passwordBox";
-            this._passwordBox.Size = new System.Drawing.Size(334, 23);
-            this._passwordBox.TabIndex = 0;
+            this._passwordBox.Size = new System.Drawing.Size(330, 23);
+            this._passwordBox.TabIndex = 3;
             this._passwordBox.UseSystemPasswordChar = true;
             //
             // _changePasswordCheck
             //
             this._changePasswordCheck.AutoSize = true;
-            this._changePasswordCheck.Location = new System.Drawing.Point(343, 3);
+            this._changePasswordCheck.Location = new System.Drawing.Point(490, 58);
             this._changePasswordCheck.Name = "_changePasswordCheck";
             this._changePasswordCheck.Size = new System.Drawing.Size(108, 19);
-            this._changePasswordCheck.TabIndex = 1;
+            this._changePasswordCheck.TabIndex = 4;
             this._changePasswordCheck.Text = "비밀번호 변경";
             this._changePasswordCheck.CheckedChanged += new System.EventHandler(this.ChangePasswordCheck_CheckedChanged);
             //
             // _serverIpLabel
             //
-            this._serverIpLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._serverIpLabel.Location = new System.Drawing.Point(11, 75);
+            this._serverIpLabel.Location = new System.Drawing.Point(15, 93);
             this._serverIpLabel.Name = "_serverIpLabel";
-            this._serverIpLabel.Size = new System.Drawing.Size(124, 32);
-            this._serverIpLabel.TabIndex = 4;
+            this._serverIpLabel.Size = new System.Drawing.Size(124, 23);
+            this._serverIpLabel.TabIndex = 5;
             this._serverIpLabel.Text = "서버 IP";
             this._serverIpLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _serverIpBox
             //
-            this._serverIpBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._serverIpBox.Location = new System.Drawing.Point(141, 78);
+            this._serverIpBox.Location = new System.Drawing.Point(150, 90);
             this._serverIpBox.Name = "_serverIpBox";
             this._serverIpBox.Size = new System.Drawing.Size(454, 23);
-            this._serverIpBox.TabIndex = 5;
+            this._serverIpBox.TabIndex = 6;
             //
             // _serverPortLabel
             //
-            this._serverPortLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._serverPortLabel.Location = new System.Drawing.Point(11, 107);
+            this._serverPortLabel.Location = new System.Drawing.Point(15, 127);
             this._serverPortLabel.Name = "_serverPortLabel";
-            this._serverPortLabel.Size = new System.Drawing.Size(124, 32);
-            this._serverPortLabel.TabIndex = 6;
+            this._serverPortLabel.Size = new System.Drawing.Size(124, 23);
+            this._serverPortLabel.TabIndex = 7;
             this._serverPortLabel.Text = "서버 Port";
             this._serverPortLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _serverPortBox
             //
-            this._serverPortBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._serverPortBox.Location = new System.Drawing.Point(141, 110);
+            this._serverPortBox.Location = new System.Drawing.Point(150, 124);
             this._serverPortBox.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
             this._serverPortBox.Name = "_serverPortBox";
             this._serverPortBox.Size = new System.Drawing.Size(454, 23);
-            this._serverPortBox.TabIndex = 7;
+            this._serverPortBox.TabIndex = 8;
             this._serverPortBox.Value = new decimal(new int[] { 50001, 0, 0, 0 });
             //
             // _dhcpCheck
@@ -300,69 +252,63 @@ namespace Stm32WifiConfigTool.Panels
             this._dhcpCheck.AutoSize = true;
             this._dhcpCheck.Checked = true;
             this._dhcpCheck.CheckState = System.Windows.Forms.CheckState.Checked;
-            this._dhcpCheck.Location = new System.Drawing.Point(141, 143);
+            this._dhcpCheck.Location = new System.Drawing.Point(150, 161);
             this._dhcpCheck.Name = "_dhcpCheck";
             this._dhcpCheck.Size = new System.Drawing.Size(87, 19);
-            this._dhcpCheck.TabIndex = 8;
+            this._dhcpCheck.TabIndex = 9;
             this._dhcpCheck.Text = "DHCP 사용";
             this._dhcpCheck.CheckedChanged += new System.EventHandler(this.DhcpCheck_CheckedChanged);
             //
             // _staticIpLabel
             //
-            this._staticIpLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._staticIpLabel.Location = new System.Drawing.Point(11, 171);
+            this._staticIpLabel.Location = new System.Drawing.Point(15, 195);
             this._staticIpLabel.Name = "_staticIpLabel";
-            this._staticIpLabel.Size = new System.Drawing.Size(124, 32);
-            this._staticIpLabel.TabIndex = 9;
+            this._staticIpLabel.Size = new System.Drawing.Size(124, 23);
+            this._staticIpLabel.TabIndex = 10;
             this._staticIpLabel.Text = "정적 IP";
             this._staticIpLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _staticIpBox
             //
-            this._staticIpBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._staticIpBox.Enabled = false;
-            this._staticIpBox.Location = new System.Drawing.Point(141, 174);
+            this._staticIpBox.Location = new System.Drawing.Point(150, 192);
             this._staticIpBox.Name = "_staticIpBox";
             this._staticIpBox.Size = new System.Drawing.Size(454, 23);
-            this._staticIpBox.TabIndex = 10;
+            this._staticIpBox.TabIndex = 11;
             //
             // _gatewayLabel
             //
-            this._gatewayLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._gatewayLabel.Location = new System.Drawing.Point(11, 203);
+            this._gatewayLabel.Location = new System.Drawing.Point(15, 229);
             this._gatewayLabel.Name = "_gatewayLabel";
-            this._gatewayLabel.Size = new System.Drawing.Size(124, 32);
-            this._gatewayLabel.TabIndex = 11;
+            this._gatewayLabel.Size = new System.Drawing.Size(124, 23);
+            this._gatewayLabel.TabIndex = 12;
             this._gatewayLabel.Text = "Gateway";
             this._gatewayLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _gatewayBox
             //
-            this._gatewayBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._gatewayBox.Enabled = false;
-            this._gatewayBox.Location = new System.Drawing.Point(141, 206);
+            this._gatewayBox.Location = new System.Drawing.Point(150, 226);
             this._gatewayBox.Name = "_gatewayBox";
             this._gatewayBox.Size = new System.Drawing.Size(454, 23);
-            this._gatewayBox.TabIndex = 12;
+            this._gatewayBox.TabIndex = 13;
             //
             // _maskLabel
             //
-            this._maskLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._maskLabel.Location = new System.Drawing.Point(11, 235);
+            this._maskLabel.Location = new System.Drawing.Point(15, 263);
             this._maskLabel.Name = "_maskLabel";
-            this._maskLabel.Size = new System.Drawing.Size(124, 32);
-            this._maskLabel.TabIndex = 13;
+            this._maskLabel.Size = new System.Drawing.Size(124, 23);
+            this._maskLabel.TabIndex = 14;
             this._maskLabel.Text = "Netmask";
             this._maskLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _maskBox
             //
-            this._maskBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._maskBox.Enabled = false;
-            this._maskBox.Location = new System.Drawing.Point(141, 238);
+            this._maskBox.Location = new System.Drawing.Point(150, 260);
             this._maskBox.Name = "_maskBox";
             this._maskBox.Size = new System.Drawing.Size(454, 23);
-            this._maskBox.TabIndex = 14;
+            this._maskBox.TabIndex = 15;
             //
             // _bottomLayout
             //
@@ -459,10 +405,7 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.ResumeLayout(false);
             this._channelGroup.PerformLayout();
             this._fieldsGroup.ResumeLayout(false);
-            this._fieldsLayout.ResumeLayout(false);
-            this._fieldsLayout.PerformLayout();
-            this._passwordRow.ResumeLayout(false);
-            this._passwordRow.PerformLayout();
+            this._fieldsGroup.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._serverPortBox)).EndInit();
             this._bottomLayout.ResumeLayout(false);
             this._bottomLayout.PerformLayout();

@@ -20,7 +20,6 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.RadioButton _channelUsb;
         private System.Windows.Forms.RadioButton _channelUart;
         private System.Windows.Forms.GroupBox _fieldsGroup;
-        private System.Windows.Forms.TableLayoutPanel _fieldsLayout;
         private System.Windows.Forms.Label _referenceLabel;
         private System.Windows.Forms.NumericUpDown _referenceBox;
         private System.Windows.Forms.Label _offsetLabel;
@@ -50,7 +49,6 @@ namespace Stm32WifiConfigTool.Panels
             this._channelUsb = new System.Windows.Forms.RadioButton();
             this._channelUart = new System.Windows.Forms.RadioButton();
             this._fieldsGroup = new System.Windows.Forms.GroupBox();
-            this._fieldsLayout = new System.Windows.Forms.TableLayoutPanel();
             this._referenceLabel = new System.Windows.Forms.Label();
             this._referenceBox = new System.Windows.Forms.NumericUpDown();
             this._offsetLabel = new System.Windows.Forms.Label();
@@ -69,7 +67,6 @@ namespace Stm32WifiConfigTool.Panels
             this._root.SuspendLayout();
             this._channelGroup.SuspendLayout();
             this._fieldsGroup.SuspendLayout();
-            this._fieldsLayout.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._referenceBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this._offsetBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this._resistanceBox)).BeginInit();
@@ -129,9 +126,18 @@ namespace Stm32WifiConfigTool.Panels
             this._channelUart.Text = "UART";
             this._channelUart.CheckedChanged += new System.EventHandler(this.ChannelUart_CheckedChanged);
             //
-            // _fieldsGroup
+            // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
+            // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
+            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다.)
             //
-            this._fieldsGroup.Controls.Add(this._fieldsLayout);
+            this._fieldsGroup.Controls.Add(this._referenceLabel);
+            this._fieldsGroup.Controls.Add(this._referenceBox);
+            this._fieldsGroup.Controls.Add(this._offsetLabel);
+            this._fieldsGroup.Controls.Add(this._offsetBox);
+            this._fieldsGroup.Controls.Add(this._resistanceLabel);
+            this._fieldsGroup.Controls.Add(this._resistanceBox);
+            this._fieldsGroup.Controls.Add(this._intervalLabel);
+            this._fieldsGroup.Controls.Add(this._intervalBox);
             this._fieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
             this._fieldsGroup.Location = new System.Drawing.Point(9, 64);
             this._fieldsGroup.Name = "_fieldsGroup";
@@ -140,37 +146,11 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup.TabStop = false;
             this._fieldsGroup.Text = "측정 설정값";
             //
-            // _fieldsLayout
-            //
-            this._fieldsLayout.ColumnCount = 2;
-            this._fieldsLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 130F));
-            this._fieldsLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._fieldsLayout.Controls.Add(this._referenceLabel, 0, 0);
-            this._fieldsLayout.Controls.Add(this._referenceBox, 1, 0);
-            this._fieldsLayout.Controls.Add(this._offsetLabel, 0, 1);
-            this._fieldsLayout.Controls.Add(this._offsetBox, 1, 1);
-            this._fieldsLayout.Controls.Add(this._resistanceLabel, 0, 2);
-            this._fieldsLayout.Controls.Add(this._resistanceBox, 1, 2);
-            this._fieldsLayout.Controls.Add(this._intervalLabel, 0, 3);
-            this._fieldsLayout.Controls.Add(this._intervalBox, 1, 3);
-            this._fieldsLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._fieldsLayout.Location = new System.Drawing.Point(8, 21);
-            this._fieldsLayout.Name = "_fieldsLayout";
-            this._fieldsLayout.Padding = new System.Windows.Forms.Padding(8);
-            this._fieldsLayout.RowCount = 4;
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 34F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 34F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 34F));
-            this._fieldsLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 34F));
-            this._fieldsLayout.Size = new System.Drawing.Size(266, 141);
-            this._fieldsLayout.TabIndex = 0;
-            //
             // _referenceLabel
             //
-            this._referenceLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._referenceLabel.Location = new System.Drawing.Point(11, 11);
+            this._referenceLabel.Location = new System.Drawing.Point(15, 25);
             this._referenceLabel.Name = "_referenceLabel";
-            this._referenceLabel.Size = new System.Drawing.Size(124, 34);
+            this._referenceLabel.Size = new System.Drawing.Size(124, 23);
             this._referenceLabel.TabIndex = 0;
             this._referenceLabel.Text = "Reference (mV)";
             this._referenceLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -178,8 +158,7 @@ namespace Stm32WifiConfigTool.Panels
             // _referenceBox
             //
             this._referenceBox.DecimalPlaces = 2;
-            this._referenceBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._referenceBox.Location = new System.Drawing.Point(141, 14);
+            this._referenceBox.Location = new System.Drawing.Point(150, 22);
             this._referenceBox.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             this._referenceBox.Name = "_referenceBox";
             this._referenceBox.Size = new System.Drawing.Size(114, 23);
@@ -187,10 +166,9 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _offsetLabel
             //
-            this._offsetLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._offsetLabel.Location = new System.Drawing.Point(11, 45);
+            this._offsetLabel.Location = new System.Drawing.Point(15, 63);
             this._offsetLabel.Name = "_offsetLabel";
-            this._offsetLabel.Size = new System.Drawing.Size(124, 34);
+            this._offsetLabel.Size = new System.Drawing.Size(124, 23);
             this._offsetLabel.TabIndex = 2;
             this._offsetLabel.Text = "Offset (mV)";
             this._offsetLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -198,8 +176,7 @@ namespace Stm32WifiConfigTool.Panels
             // _offsetBox
             //
             this._offsetBox.DecimalPlaces = 2;
-            this._offsetBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._offsetBox.Location = new System.Drawing.Point(141, 48);
+            this._offsetBox.Location = new System.Drawing.Point(150, 60);
             this._offsetBox.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             this._offsetBox.Name = "_offsetBox";
             this._offsetBox.Size = new System.Drawing.Size(114, 23);
@@ -207,10 +184,9 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _resistanceLabel
             //
-            this._resistanceLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._resistanceLabel.Location = new System.Drawing.Point(11, 79);
+            this._resistanceLabel.Location = new System.Drawing.Point(15, 101);
             this._resistanceLabel.Name = "_resistanceLabel";
-            this._resistanceLabel.Size = new System.Drawing.Size(124, 34);
+            this._resistanceLabel.Size = new System.Drawing.Size(124, 23);
             this._resistanceLabel.TabIndex = 4;
             this._resistanceLabel.Text = "Resistance (mOhm)";
             this._resistanceLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -218,8 +194,7 @@ namespace Stm32WifiConfigTool.Panels
             // _resistanceBox
             //
             this._resistanceBox.DecimalPlaces = 2;
-            this._resistanceBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._resistanceBox.Location = new System.Drawing.Point(141, 82);
+            this._resistanceBox.Location = new System.Drawing.Point(150, 98);
             this._resistanceBox.Maximum = new decimal(new int[] { 10000000, 0, 0, 0 });
             this._resistanceBox.Name = "_resistanceBox";
             this._resistanceBox.Size = new System.Drawing.Size(114, 23);
@@ -227,10 +202,9 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _intervalLabel
             //
-            this._intervalLabel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._intervalLabel.Location = new System.Drawing.Point(11, 113);
+            this._intervalLabel.Location = new System.Drawing.Point(15, 139);
             this._intervalLabel.Name = "_intervalLabel";
-            this._intervalLabel.Size = new System.Drawing.Size(124, 34);
+            this._intervalLabel.Size = new System.Drawing.Size(124, 23);
             this._intervalLabel.TabIndex = 6;
             this._intervalLabel.Text = "Interval Time (sec)";
             this._intervalLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -238,9 +212,8 @@ namespace Stm32WifiConfigTool.Panels
             // _intervalBox
             //
             this._intervalBox.DecimalPlaces = 1;
-            this._intervalBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._intervalBox.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
-            this._intervalBox.Location = new System.Drawing.Point(141, 116);
+            this._intervalBox.Location = new System.Drawing.Point(150, 136);
             this._intervalBox.Maximum = new decimal(new int[] { 3600, 0, 0, 0 });
             this._intervalBox.Minimum = new decimal(new int[] { 1, 0, 0, 65536 });
             this._intervalBox.Name = "_intervalBox";
@@ -342,8 +315,7 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.ResumeLayout(false);
             this._channelGroup.PerformLayout();
             this._fieldsGroup.ResumeLayout(false);
-            this._fieldsLayout.ResumeLayout(false);
-            this._fieldsLayout.PerformLayout();
+            this._fieldsGroup.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._referenceBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this._offsetBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this._resistanceBox)).EndInit();
