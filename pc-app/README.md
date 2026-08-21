@@ -22,9 +22,19 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
 **패널 폭 조절**: 상단 4개 패널(포트/WiFi/Measurement 설정/ESP32 상태) 사이 경계선에 마우스를
 올리면 커서가 ↔ 모양으로 바뀝니다 — 그 상태로 드래그하면 각 패널의 폭을 원하는 대로 조절할 수
 있습니다(`SplitContainer` 3개를 중첩해 구현, 너무 좁아져 내부 컨트롤이 잘리지 않도록 각 패널에
-최소 폭이 걸려 있습니다). 조절한 폭은 드래그하는 즉시 반영되고, 프로그램을 닫을 때 다른 UI
-설정과 함께 저장되어 다음 실행 시 그대로 복원됩니다(`AppSettings.PortPanelWidth` /
-`WifiPanelWidth` / `MeasConfigPanelWidth`, `MainForm.cs`).
+최소 폭이 걸려 있습니다). 조절한 폭은 **드래그를 놓는 즉시 설정 파일(`settings.ini`)에 바로
+저장**되어(`MainForm.SaveSettingsSafe()`), 프로그램을 닫을 때까지 기다리지 않고도 다음 실행
+시 그대로 복원됩니다 — 창의 X 버튼이 아니라 디버거 중지/작업 관리자 등으로 프로세스를 강제
+종료해도 마지막으로 드래그를 놓은 시점의 폭은 이미 파일에 기록되어 있습니다
+(`AppSettings.PortPanelWidth` / `WifiPanelWidth` / `MeasConfigPanelWidth`).
+
+**폭이 복원되지 않을 때 확인할 것**: 폭을 조절한 뒤 `%AppData%\Stm32WifiConfigTool\settings.ini`
+파일을 열어 `PortPanelWidth`/`WifiPanelWidth`/`MeasConfigPanelWidth` 값이 실제로 조절한 값으로
+바뀌었는지 확인하세요. 바뀌어 있는데도 다음 실행 시 반영되지 않는다면 복원 로직(`MainForm.
+MainForm_Load` → `ApplySavedSplitterDistances()`) 쪽 문제이고, 값 자체가 바뀌지 않는다면
+저장이 안 되는 것이므로 원인이 다릅니다. 또한 Visual Studio에서 코드만 바꾸고 **다시 빌드하지
+않은 채** 이전 실행 파일을 그대로 실행 중인 경우에도 같은 증상으로 보일 수 있으니, 솔루션을
+완전히 다시 빌드한 뒤 테스트하세요.
 
 MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 프레임을 구분해서 각각 다른 패널에
 표시**합니다(둘 다 첫 필드로 구분되며, 응답 대기 로직도 이 둘을 명령 응답과 혼동하지 않도록

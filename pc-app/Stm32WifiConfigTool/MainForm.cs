@@ -71,19 +71,26 @@ namespace Stm32WifiConfigTool
         private void SplitPortWifi_SplitterMoved(object sender, SplitterEventArgs e)
         {
             _settings.PortPanelWidth = _splitPortWifi.SplitterDistance;
+            SaveSettingsSafe();
         }
 
         private void SplitWifiMeas_SplitterMoved(object sender, SplitterEventArgs e)
         {
             _settings.WifiPanelWidth = _splitWifiMeas.SplitterDistance;
+            SaveSettingsSafe();
         }
 
         private void SplitMeasStatus_SplitterMoved(object sender, SplitterEventArgs e)
         {
             _settings.MeasConfigPanelWidth = _splitMeasStatus.SplitterDistance;
+            SaveSettingsSafe();
         }
 
-        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
+        /// <summary>스플리터를 놓는 즉시(드래그 완료 시점) 설정 파일에 바로 기록한다. 프로그램
+        /// 종료 시(FormClosed)에만 저장하면, 창의 X 버튼이 아니라 디버거 중지 버튼/작업 관리자
+        /// 등으로 프로세스를 강제 종료했을 때 FormClosed 자체가 전혀 발생하지 않아 조절한 폭이
+        /// 통째로 저장되지 않는 문제가 있었다 — 폭 조절은 특히 즉시 반영해 이 문제를 없앤다.</summary>
+        private void SaveSettingsSafe()
         {
             try
             {
@@ -91,8 +98,13 @@ namespace Stm32WifiConfigTool
             }
             catch (Exception)
             {
-                /* 설정 저장 실패(권한/디스크 문제 등)로 종료 자체가 막히면 안 되므로 무시 */
+                /* 설정 저장 실패(권한/디스크 문제 등)로 UI 동작 자체가 막히면 안 되므로 무시 */
             }
+        }
+
+        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            SaveSettingsSafe();
         }
     }
 }
