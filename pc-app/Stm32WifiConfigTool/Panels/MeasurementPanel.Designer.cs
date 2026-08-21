@@ -90,9 +90,13 @@ namespace Stm32WifiConfigTool.Panels
             this._topRow.TabIndex = 0;
             this._topRow.WrapContents = false;
             //
+            // 아래 컨트롤들은 AutoSize를 껐고(Dock도 없음) Location+Size를 직접 가지므로,
+            // Visual Studio 디자이너에서 하나씩 선택해 크기 조절 핸들을 드래그해 폭/높이를
+            // 자유롭게 바꿀 수 있다. (FlowLayoutPanel인 _topRow 안에서도 각 컨트롤의 위치는
+            // 자동 배치되지만 크기는 자유롭게 바꿀 수 있다.)
+            //
             // _channelGroup
             //
-            this._channelGroup.AutoSize = true;
             this._channelGroup.Controls.Add(this._showUsb);
             this._channelGroup.Controls.Add(this._showUart);
             this._channelGroup.Controls.Add(this._showBoth);
@@ -105,31 +109,28 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _showUsb
             //
-            this._showUsb.AutoSize = true;
             this._showUsb.Location = new System.Drawing.Point(10, 20);
             this._showUsb.Name = "_showUsb";
-            this._showUsb.Size = new System.Drawing.Size(48, 19);
+            this._showUsb.Size = new System.Drawing.Size(55, 22);
             this._showUsb.TabIndex = 0;
             this._showUsb.Text = "USB";
             this._showUsb.CheckedChanged += new System.EventHandler(this.ShowUsb_CheckedChanged);
             //
             // _showUart
             //
-            this._showUart.AutoSize = true;
             this._showUart.Location = new System.Drawing.Point(70, 20);
             this._showUart.Name = "_showUart";
-            this._showUart.Size = new System.Drawing.Size(52, 19);
+            this._showUart.Size = new System.Drawing.Size(60, 22);
             this._showUart.TabIndex = 1;
             this._showUart.Text = "UART";
             this._showUart.CheckedChanged += new System.EventHandler(this.ShowUart_CheckedChanged);
             //
             // _showBoth
             //
-            this._showBoth.AutoSize = true;
             this._showBoth.Checked = true;
             this._showBoth.Location = new System.Drawing.Point(140, 20);
             this._showBoth.Name = "_showBoth";
-            this._showBoth.Size = new System.Drawing.Size(53, 19);
+            this._showBoth.Size = new System.Drawing.Size(60, 22);
             this._showBoth.TabIndex = 2;
             this._showBoth.TabStop = true;
             this._showBoth.Text = "둘 다";
@@ -137,7 +138,6 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _clearButton
             //
-            this._clearButton.AutoSize = true;
             this._clearButton.Location = new System.Drawing.Point(229, 15);
             this._clearButton.Margin = new System.Windows.Forms.Padding(10, 15, 3, 3);
             this._clearButton.Name = "_clearButton";
@@ -149,7 +149,6 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _exportButton
             //
-            this._exportButton.AutoSize = true;
             this._exportButton.Location = new System.Drawing.Point(310, 15);
             this._exportButton.Margin = new System.Windows.Forms.Padding(3, 15, 3, 3);
             this._exportButton.Name = "_exportButton";
@@ -161,13 +160,12 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _autoScrollCheck
             //
-            this._autoScrollCheck.AutoSize = true;
             this._autoScrollCheck.Checked = true;
             this._autoScrollCheck.CheckState = System.Windows.Forms.CheckState.Checked;
             this._autoScrollCheck.Location = new System.Drawing.Point(413, 20);
             this._autoScrollCheck.Margin = new System.Windows.Forms.Padding(10, 20, 3, 3);
             this._autoScrollCheck.Name = "_autoScrollCheck";
-            this._autoScrollCheck.Size = new System.Drawing.Size(84, 19);
+            this._autoScrollCheck.Size = new System.Drawing.Size(100, 22);
             this._autoScrollCheck.TabIndex = 3;
             this._autoScrollCheck.Text = "자동 스크롤";
             this._autoScrollCheck.CheckedChanged += new System.EventHandler(this.AutoScrollCheck_CheckedChanged);
@@ -236,12 +234,10 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _eventLabel
             //
-            this._eventLabel.AutoSize = true;
-            this._eventLabel.Dock = System.Windows.Forms.DockStyle.Top;
             this._eventLabel.Location = new System.Drawing.Point(9, 278);
             this._eventLabel.Name = "_eventLabel";
             this._eventLabel.Padding = new System.Windows.Forms.Padding(0, 6, 0, 2);
-            this._eventLabel.Size = new System.Drawing.Size(163, 23);
+            this._eventLabel.Size = new System.Drawing.Size(220, 23);
             this._eventLabel.TabIndex = 2;
             this._eventLabel.Text = "이벤트 로그 (WIFI/TCP 상태 등)";
             //
@@ -259,7 +255,6 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _countLabel
             //
-            this._countLabel.Dock = System.Windows.Forms.DockStyle.Bottom;
             this._countLabel.Location = new System.Drawing.Point(0, 380);
             this._countLabel.Name = "_countLabel";
             this._countLabel.Size = new System.Drawing.Size(900, 20);
