@@ -32,9 +32,19 @@ namespace Stm32WifiConfigTool
             _espStatusPanel.Initialize(_conn, _settings);
             _measurementPanel.Initialize(_conn, _settings);
 
-            ApplySavedSplitterDistances();
+            /* NOTE: 저장된 스플리터 폭 복원은 생성자가 아니라 Load 이벤트에서 한다. 생성자
+             * 시점(InitializeComponent() 직후)에는 폼이 아직 실제로 화면에 배치되기 전이라,
+             * 중첩된 SplitContainer들의 Width가 디자이너가 기록해둔 설계 시점 값(예: 항상
+             * 1900/1434/588)으로 남아있을 수 있어 폭 조절 범위 계산이 부정확해질 수 있다.
+             * Load 시점에는 실제 최종 레이아웃이 적용된 뒤라 Width를 신뢰할 수 있다. */
+            Load += MainForm_Load;
 
             FormClosed += MainForm_FormClosed;
+        }
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+            ApplySavedSplitterDistances();
         }
 
         /// <summary>저장된 패널 폭(px)을 각 스플리터에 복원한다. 창이 저장 당시보다 좁아졌거나
