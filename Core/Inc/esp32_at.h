@@ -15,7 +15,7 @@
 #ifndef INC_ESP32_AT_H_
 #define INC_ESP32_AT_H_
 
-#include "stm32f1xx_hal.h"   /* 사용 중인 MCU 시리즈에 맞게 수정 (stm32f4xx_hal.h 등) */
+#include "stm32l5xx_hal.h"   /* STM32L562RCT6(STM32L5 시리즈) 기준. 다른 시리즈면 stm32f1xx_hal.h 등으로 수정 */
 #include <stdint.h>
 #include <stdbool.h>
 

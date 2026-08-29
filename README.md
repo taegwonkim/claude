@@ -2,8 +2,15 @@
 
 STM32 MCU가 UART로 ESP32-C3(AT 펌웨어)를 제어해서 ① Wi-Fi에 접속하고,
 ② 서버 PC와 TCP 소켓을 맺고, ③ 데이터를 주고받고, ④ 연결이 끊기면 자동으로
-재접속하는 예제입니다. 보드는 **NUCLEO-F103RB** 기준으로 작성했지만, UART
-핸들 이름만 바꾸면 다른 STM32 보드에도 그대로 적용됩니다.
+재접속하는 예제입니다. MCU는 **STM32L562RCT6**(STM32L5 시리즈, Cortex-M33)
+기준으로 작성했으며, UART 핸들 이름만 바꾸면 다른 STM32 보드에도 그대로
+적용됩니다.
+
+> **TrustZone 관련 주의**: STM32L562RCT6은 TrustZone(TZEN)을 지원합니다.
+> 이 예제는 CubeMX에서 TrustZone을 **비활성화**한 단일(Non-secure only)
+> 프로젝트를 기준으로 합니다. TrustZone을 활성화하면 Secure/Non-secure
+> 프로젝트가 분리되고 GTZC로 주변장치(UART 포함)의 보안 속성을 지정해야
+> 하므로 이 예제 범위를 벗어납니다.
 
 ## 1. 전체 구조
 
@@ -25,12 +32,17 @@ STM32 MCU가 UART로 ESP32-C3(AT 펌웨어)를 제어해서 ① Wi-Fi에 접속�
 
 ## 2. 하드웨어 연결
 
-| ESP32-C3 | STM32 (NUCLEO-F103RB) |
+| ESP32-C3 | STM32L562RCT6 |
 |---|---|
 | TX | PA10 (USART1_RX) |
 | RX | PA9  (USART1_TX) |
 | GND | GND (공통) |
-| 3V3 | 3.3V (ESP32-C3는 3.3V 전용, 5V 금지) |
+| 3V3 | 3.3V (ESP32-C3, STM32L5 모두 3.3V 전용, 5V 금지) |
+
+디버그 로그 출력용 UART는 PA2(USART2_TX)/PA3(USART2_RX)를 예시로 사용했습니다.
+실제 사용 중인 보드(자체 제작 보드 등)에 ST-Link VCP나 별도 USB-UART가
+다른 핀/USART에 물려 있다면 `main.c`의 `MX_USART2_UART_Init()`,
+`MX_GPIO_Init()`을 해당 핀 번호로 수정하세요.
 
 > ESP32-C3 모듈에 이미 AT 펌웨어가 플래시되어 있어야 합니다(대부분의
 > ESP32-C3-DevKitM 류는 공장 출고 시 AT 펌웨어가 들어있거나, Espressif의
@@ -38,19 +50,22 @@ STM32 MCU가 UART로 ESP32-C3(AT 펌웨어)를 제어해서 ① Wi-Fi에 접속�
 
 ## 3. STM32CubeMX 설정
 
-1. **New Project** → 사용 보드(NUCLEO-F103RB) 선택 → *Initialize all peripherals
-   with their default Mode* 선택 (USART2/ST-Link VCP가 자동으로 잡힙니다).
-2. `Pinout & Configuration` → `Connectivity` → **USART1** 선택 →
-   Mode: `Asynchronous`.
+1. **New Project** → MCU Selector에서 `STM32L562RCT6` 검색 후 선택
+   (보드가 아닌 개별 MCU로 시작 — 자체 제작 보드 기준).
+2. `Pinout & Configuration` → `System Core` → **RCC**에서 아래 사항 확인:
+   - TrustZone은 **비활성화** 상태로 둡니다(기본값).
+3. `Connectivity` → **USART1** 선택 → Mode: `Asynchronous`.
    - Parameter Settings: Baud Rate `115200`, Word Length `8 Bits`,
      Parity `None`, Stop Bits `1` (ESP-AT 기본값과 동일하게 맞춤).
    - NVIC Settings 탭에서 **USART1 global interrupt** 체크 (인터럽트 수신용).
-3. **USART2**는 보드를 선택할 때 이미 ST-Link 가상 COM포트로 자동 설정되어
-   있습니다(디버그 로그 출력용). 그대로 두면 됩니다.
-4. `Clock Configuration` 탭에서 SYSCLK가 72MHz(HSE 8MHz × PLL 9)로 잡히는지
-   확인합니다(보드 기본값 그대로 두면 됩니다).
-5. `Project Manager` → Toolchain/IDE를 **STM32CubeIDE**로 선택 → `GENERATE CODE`.
-6. 생성된 프로젝트에 이 저장소의 다음 파일들을 복사합니다.
+4. **USART2** (디버그 로그용) 도 동일하게 `Asynchronous`, 115200bps로 설정.
+   PA2/PA3 대신 다른 핀을 쓰려면 Pinout view에서 원하는 핀을 클릭해
+   `USART2_TX`/`USART2_RX`로 지정합니다.
+5. `Clock Configuration` 탭에서 SYSCLK를 원하는 값으로 설정합니다
+   (이 예제는 MSI 4MHz → PLL → 110MHz 기준, STM32L5 최대 클럭). MSI 대신
+   보드에 HSE 크리스탈이 있다면 그에 맞게 Oscillator를 바꿔도 됩니다.
+6. `Project Manager` → Toolchain/IDE를 **STM32CubeIDE**로 선택 → `GENERATE CODE`.
+7. 생성된 프로젝트에 이 저장소의 다음 파일들을 복사합니다.
    - `Core/Inc/esp32_at.h` → 프로젝트의 `Core/Inc/`
    - `Core/Src/esp32_at.c` → 프로젝트의 `Core/Src/`
    - `main.c`의 `USER CODE BEGIN/END` 블록 안 내용(초기화, while 루프,
@@ -60,6 +75,10 @@ STM32 MCU가 UART로 ESP32-C3(AT 펌웨어)를 제어해서 ① Wi-Fi에 접속�
      `MX_GPIO_Init` 등과 병합해서 써야 합니다.)
    - `HAL_UART_RxCpltCallback()` 함수 안에서 `ESP32_UART_RxCpltCallback(huart);`
      를 호출하도록 추가합니다(이미 있다면 그 안에 한 줄만 추가).
+
+> STM32L5는 F1 계열과 달리 AFIO 리매핑이 없고, `GPIO_InitTypeDef.Alternate`
+> 필드로 핀마다 AF 번호(USART1/2 모두 `AF7`)를 직접 지정합니다. CubeMX가
+> 이 부분을 자동 생성해주므로 직접 신경 쓸 필요는 없습니다.
 
 ## 4. AT 명령 시퀀스 (드라이버가 자동으로 순서대로 실행)
 
