@@ -4,8 +4,9 @@
  * esp32_at.h 구현부.
  *
  * 전체 흐름(상태 머신):
- *   INIT -> MODULE_CHECK(AT, ATE0, CWMODE) -> WIFI_CONNECTING(CWJAP)
- *        -> WIFI_CONNECTED -> TCP_CONNECTING(CIPMUX, CIPMODE, CIPSTART)
+ *   INIT -> MODULE_CHECK(AT, ATE0, CWMODE) -> GET_MAC(CIPSTAMAC?)
+ *        -> WIFI_CONNECTING(CWJAP) -> WIFI_CONNECTED
+ *        -> TCP_CONNECTING(CIPMUX, CIPMODE, CIPSTART)
  *        -> TCP_CONNECTED (정상 통신)
  *   통신 중 "WIFI DISCONNECT" / "CLOSED" 같은 비동기 메시지나 SEND 실패를 감지하면
  *   LINK_DOWN -> RECONNECT_WAIT(지수 백오프 대기) -> 다시 MODULE_CHECK 부터 재시도.
@@ -28,6 +29,8 @@ static char     s_ssid[ESP32_SSID_MAX];
 static char     s_pass[ESP32_PASS_MAX];
 static char     s_server_ip[ESP32_SERVER_IP_MAX];
 static uint16_t s_server_port;
+
+static char     s_mac[ESP32_MAC_STR_LEN] = {0}; /* "aa:bb:cc:dd:ee:ff" */
 
 static ESP32_DataCallback_t  s_data_cb;
 static ESP32_StateCallback_t s_state_cb;
@@ -93,9 +96,10 @@ void ESP32_Init(UART_HandleTypeDef *huart)
     s_ipd_chunk_len = 0;
 
     s_got_ok = s_got_error = s_got_send_ok = s_got_wifi_gotip = false;
+    s_mac[0] = '\0';
     s_link_down_evt = false;
 
-    /* 1바이트 수신 인터럽트를 계속 재무장하는 방식(F1 계열에 DMA 없이도 동작) */
+    /* 1바이트 수신 인터럽트를 계속 재무장하는 방식(DMA 없이도 동작) */
     HAL_UART_Receive_IT(s_huart, &s_rx_byte, 1);
 }
 
@@ -117,6 +121,7 @@ void ESP32_SetServer(const char *ip, uint16_t port)
 void ESP32_SetDataCallback(ESP32_DataCallback_t cb)  { s_data_cb = cb; }
 void ESP32_SetStateCallback(ESP32_StateCallback_t cb) { s_state_cb = cb; }
 ESP32_State_t ESP32_GetState(void) { return s_state; }
+const char *ESP32_GetMacAddress(void) { return s_mac; }
 
 HAL_StatusTypeDef ESP32_Send(const uint8_t *data, uint16_t len)
 {
@@ -216,9 +221,27 @@ void ESP32_Process(void)
         case 3:
             if (s_got_ok) {
                 s_step = 0;
-                SetState(ESP32_STATE_WIFI_CONNECTING);
+                SetState(ESP32_STATE_GET_MAC);
             } else if (s_got_error || now > s_deadline) {
                 RetryOrFatal();
+            }
+            break;
+        }
+        break;
+
+    case ESP32_STATE_GET_MAC:
+        switch (s_step) {
+        case 0:
+            SendCmd("AT+CIPSTAMAC?");
+            s_deadline = now + ESP32_CMD_TIMEOUT_MS;
+            s_step = 1;
+            break;
+        case 1:
+            /* MAC 조회는 부가 정보일 뿐이므로 실패해도 재접속 절차를 밟지 않고
+             * 그냥 다음 단계(Wi-Fi 접속)로 넘어간다. */
+            if (s_got_ok || s_got_error || now > s_deadline) {
+                s_step = 0;
+                SetState(ESP32_STATE_WIFI_CONNECTING);
             }
             break;
         }
@@ -402,6 +425,14 @@ static void HandleLine(const char *line)
         s_got_error = true;
     } else if (strstr(line, "WIFI GOT IP") != NULL) {
         s_got_wifi_gotip = true;
+    } else if (strncmp(line, "+CIPSTAMAC:", 11) == 0) {
+        const char *q1 = strchr(line, '"');
+        const char *q2 = (q1 != NULL) ? strchr(q1 + 1, '"') : NULL;
+        if (q1 != NULL && q2 != NULL && (size_t)(q2 - q1 - 1) < sizeof(s_mac)) {
+            size_t mac_len = (size_t)(q2 - q1 - 1);
+            memcpy(s_mac, q1 + 1, mac_len);
+            s_mac[mac_len] = '\0';
+        }
     } else if (strstr(line, "WIFI DISCONNECT") != NULL) {
         s_link_down_evt = true; /* AP 접속 자체가 끊어짐 */
     } else if (strcmp(line, "CLOSED") == 0) {

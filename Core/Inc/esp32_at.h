@@ -31,6 +31,7 @@ extern "C" {
 #define ESP32_SSID_MAX            32
 #define ESP32_PASS_MAX            64
 #define ESP32_SERVER_IP_MAX       16
+#define ESP32_MAC_STR_LEN         18    /* "xx:xx:xx:xx:xx:xx" + '\0' */
 
 #define ESP32_CMD_TIMEOUT_MS      3000  /* 일반 AT 명령 응답 대기 시간 */
 #define ESP32_WIFI_TIMEOUT_MS     20000 /* AT+CWJAP 응답 대기 시간(AP 접속은 느림) */
@@ -44,7 +45,8 @@ extern "C" {
 /* ------------------------------------------------------------------ */
 typedef enum {
     ESP32_STATE_INIT = 0,     /* 드라이버 초기화 직후 */
-    ESP32_STATE_MODULE_CHECK, /* AT, ATE0 등 모듈 응답 확인 */
+    ESP32_STATE_MODULE_CHECK, /* AT, ATE0, CWMODE 등 모듈 응답 확인 */
+    ESP32_STATE_GET_MAC,      /* AT+CIPSTAMAC? 로 Station MAC 주소 조회 */
     ESP32_STATE_WIFI_CONNECTING,
     ESP32_STATE_WIFI_CONNECTED,
     ESP32_STATE_TCP_CONNECTING,
@@ -81,6 +83,11 @@ void ESP32_Process(void);
 HAL_StatusTypeDef ESP32_Send(const uint8_t *data, uint16_t len);
 
 ESP32_State_t ESP32_GetState(void);
+
+/* Station MAC 주소 문자열("aa:bb:cc:dd:ee:ff"). GET_MAC 단계를 거치기 전에는
+ * 빈 문자열("")이 반환된다. 상태 콜백에서 ESP32_STATE_WIFI_CONNECTING 이후
+ * 확인하면 값이 채워져 있음이 보장된다. */
+const char *ESP32_GetMacAddress(void);
 
 /* HAL_UART_RxCpltCallback() 안에서, huart가 ESP32용 핸들일 때 호출해줘야 함 */
 void ESP32_UART_RxCpltCallback(UART_HandleTypeDef *huart);

@@ -94,7 +94,12 @@ static void OnEsp32Data(const uint8_t *data, uint16_t len)
 static void OnEsp32State(ESP32_State_t state)
 {
     switch (state) {
-    case ESP32_STATE_WIFI_CONNECTING:  DebugLog("[STATE] Wi-Fi 접속 시도\r\n"); break;
+    case ESP32_STATE_WIFI_CONNECTING: {
+        char msg[48];
+        snprintf(msg, sizeof(msg), "[STATE] MAC=%s, Wi-Fi 접속 시도\r\n", ESP32_GetMacAddress());
+        DebugLog(msg);
+        break;
+    }
     case ESP32_STATE_WIFI_CONNECTED:   DebugLog("[STATE] Wi-Fi 접속 완료\r\n"); break;
     case ESP32_STATE_TCP_CONNECTING:   DebugLog("[STATE] 서버 접속 시도\r\n"); break;
     case ESP32_STATE_TCP_CONNECTED:    DebugLog("[STATE] 서버 접속 완료, 통신 가능\r\n"); break;

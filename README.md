@@ -87,12 +87,19 @@ STM32 MCU가 UART로 ESP32-C3(AT 펌웨어)를 제어해서 ① Wi-Fi에 접속�
 | 1 | `AT` | 모듈이 살아있는지 확인 |
 | 2 | `ATE0` | 에코 끄기(응답 파싱을 단순하게) |
 | 3 | `AT+CWMODE=1` | Station 모드로 설정 |
-| 4 | `AT+CWJAP="SSID","PASSWORD"` | 공유기(AP)에 접속 → 성공 시 `WIFI CONNECTED`, `WIFI GOT IP`, `OK` 순서로 응답 |
-| 5 | `AT+CIPMUX=0` | 단일 TCP 연결 모드 |
-| 6 | `AT+CIPMODE=0` | 일반(비-투명) 모드: `AT+CIPSEND=<len>` 으로 프레임 단위 송신 |
-| 7 | `AT+CIPSTART="TCP","<서버IP>",<포트>` | 서버 PC로 TCP 연결 |
-| 8 | (통신 중) `AT+CIPSEND=<len>` + 데이터 | 데이터 전송, 성공 시 `SEND OK` |
+| 4 | `AT+CIPSTAMAC?` | Station MAC 주소 조회 → `+CIPSTAMAC:"aa:bb:cc:dd:ee:ff"` 응답 |
+| 5 | `AT+CWJAP="SSID","PASSWORD"` | 공유기(AP)에 접속 → 성공 시 `WIFI CONNECTED`, `WIFI GOT IP`, `OK` 순서로 응답 |
+| 6 | `AT+CIPMUX=0` | 단일 TCP 연결 모드 |
+| 7 | `AT+CIPMODE=0` | 일반(비-투명) 모드: `AT+CIPSEND=<len>` 으로 프레임 단위 송신 |
+| 8 | `AT+CIPSTART="TCP","<서버IP>",<포트>` | 서버 PC로 TCP 연결 |
+| 9 | (통신 중) `AT+CIPSEND=<len>` + 데이터 | 데이터 전송, 성공 시 `SEND OK` |
 | - | `+IPD,<len>:<data>` | 서버가 보낸 데이터가 비동기로 도착(모듈이 자체적으로 push) |
+
+`ESP32_STATE_GET_MAC` 단계에서 조회한 MAC 주소는 `ESP32_GetMacAddress()`로
+언제든 읽을 수 있으며(`"aa:bb:cc:dd:ee:ff"` 형식 문자열), 조회에 실패해도
+치명적 오류로 취급하지 않고 바로 다음 단계(Wi-Fi 접속)로 넘어갑니다. 이
+값은 재접속 시(`RECONNECT_WAIT` → `MODULE_CHECK` → `GET_MAC`)마다 다시
+조회됩니다.
 
 ## 5. 재접속(재시도) 로직
 
@@ -130,6 +137,9 @@ while (1) {
     }
 }
 ```
+
+`ESP32_GetMacAddress()`는 모듈이 초기화(`GET_MAC` 단계)를 마친 뒤부터
+`"aa:bb:cc:dd:ee:ff"` 형식의 문자열을 반환합니다(그 전에는 빈 문자열).
 
 자세한 전체 예시는 `Core/Src/main.c` 참고.
 
