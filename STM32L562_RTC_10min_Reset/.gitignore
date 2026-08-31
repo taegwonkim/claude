@@ -1,0 +1,14 @@
+# Build output
+Debug/
+Release/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# CubeIDE
+.metadata/
+.settings/
