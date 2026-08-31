@@ -62,6 +62,10 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void CaptureResetCause(void);
 static void PrintBanner(void);
+static void SetInitialDateTime(void);
+#if (RESET_SOURCE == RESET_SRC_ALARM_A)
+static void RTC_SetResetAlarm(void);
+#endif
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -75,6 +79,100 @@ int __io_putchar(int ch)
   return ch;
 }
 #endif
+
+#if (RTC_INIT_FROM_BUILD_TIME == 1U)
+/**
+  * @brief  Sakamoto 알고리즘으로 요일을 계산한다.
+  * @param  year : 4자리 연도, month : 1~12, day : 1~31
+  * @retval RTC_WEEKDAY_MONDAY(1) ~ RTC_WEEKDAY_SUNDAY(7)
+  */
+static uint8_t CalcWeekDay(uint16_t year, uint8_t month, uint8_t day)
+{
+  static const uint8_t t[12] = {0U, 3U, 2U, 5U, 0U, 3U, 5U, 1U, 4U, 6U, 2U, 4U};
+  uint32_t y = year;
+  uint32_t w;
+
+  if (month < 3U)
+  {
+    y--;
+  }
+  w = (y + (y / 4U) - (y / 100U) + (y / 400U) + t[month - 1U] + day) % 7U;
+
+  /* Sakamoto : 0=일요일 ... 6=토요일 / RTC : 1=월요일 ... 7=일요일 */
+  return (w == 0U) ? (uint8_t)RTC_WEEKDAY_SUNDAY : (uint8_t)w;
+}
+#endif /* RTC_INIT_FROM_BUILD_TIME */
+
+/**
+  * @brief  콜드 부트 시 RTC 달력의 초기 시각을 설정한다.
+  * @note   RTC_INIT_FROM_BUILD_TIME 이 1 이면 컴파일 시각(__DATE__/__TIME__)을
+  *         사용한다. Alarm 방식은 "벽시계 시각" 기준이므로 실제 시각과 맞춰야
+  *         의미가 있는데, 빌드 시각을 넣어두면 별도 동기화 없이도 대략 맞는다.
+  *         (플래싱까지 걸린 시간만큼 오차가 생기므로, 정확도가 필요하면
+  *          GPS/NTP/호스트 통신 등으로 받은 시각을 넣을 것)
+  */
+static void SetInitialDateTime(void)
+{
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+
+#if (RTC_INIT_FROM_BUILD_TIME == 1U)
+  /* __DATE__ = "Mmm dd yyyy" (dd 는 공백 패딩 가능), __TIME__ = "hh:mm:ss" */
+  static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  const char *bd = __DATE__;
+  const char *bt = __TIME__;
+  uint8_t  month = 1U;
+  uint8_t  day;
+  uint16_t year;
+  uint8_t  i;
+
+  for (i = 0U; i < 12U; i++)
+  {
+    if ((months[i * 3U] == bd[0]) &&
+        (months[(i * 3U) + 1U] == bd[1]) &&
+        (months[(i * 3U) + 2U] == bd[2]))
+    {
+      month = (uint8_t)(i + 1U);
+      break;
+    }
+  }
+  day  = (uint8_t)(((bd[4] == ' ') ? 0U : (uint8_t)(bd[4] - '0') * 10U)
+                   + (uint8_t)(bd[5] - '0'));
+  year = (uint16_t)(((bd[7] - '0') * 1000) + ((bd[8] - '0') * 100)
+                    + ((bd[9] - '0') * 10) + (bd[10] - '0'));
+
+  sTime.Hours   = (uint8_t)(((bt[0] - '0') * 10) + (bt[1] - '0'));
+  sTime.Minutes = (uint8_t)(((bt[3] - '0') * 10) + (bt[4] - '0'));
+  sTime.Seconds = (uint8_t)(((bt[6] - '0') * 10) + (bt[7] - '0'));
+
+  sDate.Month   = month;
+  sDate.Date    = day;
+  sDate.Year    = (uint8_t)(year % 100U);          /* RTC 는 2자리 연도 */
+  sDate.WeekDay = CalcWeekDay(year, month, day);
+#else
+  /* 2000-01-01 (토요일) 00:00:00 */
+  sTime.Hours   = 0U;
+  sTime.Minutes = 0U;
+  sTime.Seconds = 0U;
+  sDate.Month   = RTC_MONTH_JANUARY;
+  sDate.Date    = 1U;
+  sDate.Year    = 0U;
+  sDate.WeekDay = RTC_WEEKDAY_SATURDAY;
+#endif
+
+  sTime.SubSeconds     = 0U;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 
 /**
   * @brief  RCC 리셋 플래그를 읽어 저장하고 클리어한다.
@@ -111,10 +209,25 @@ static void PrintBanner(void)
   printf(" RTC time    : 20%02d-%02d-%02d %02d:%02d:%02d\r\n",
          sDate.Year, sDate.Month, sDate.Date,
          sTime.Hours, sTime.Minutes, sTime.Seconds);
+#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
+  printf(" Trigger     : RTC WakeUp Timer\r\n");
   printf(" Next reset in %lu s (%luh %02lum)\r\n",
          (unsigned long)RESET_PERIOD_SEC,
          (unsigned long)(RESET_PERIOD_SEC / 3600U),
          (unsigned long)((RESET_PERIOD_SEC % 3600U) / 60U));
+#elif (ALARM_MODE == ALARM_MODE_DAILY_FIXED)
+  printf(" Trigger     : RTC Alarm A (daily fixed)\r\n");
+  printf(" Next reset at %02u:%02u:%02u every day\r\n",
+         (unsigned int)ALARM_RESET_HOUR,
+         (unsigned int)ALARM_RESET_MINUTE,
+         (unsigned int)ALARM_RESET_SECOND);
+#else
+  printf(" Trigger     : RTC Alarm A (relative)\r\n");
+  printf(" Next reset in %lu s (%luh %02lum)\r\n",
+         (unsigned long)RESET_PERIOD_SEC,
+         (unsigned long)(RESET_PERIOD_SEC / 3600U),
+         (unsigned long)((RESET_PERIOD_SEC % 3600U) / 60U));
+#endif
   printf("------------------------------------------\r\n");
 #endif
 }
@@ -185,14 +298,22 @@ int main(void)
       g_reset_request = 0U;
 
 #if (USE_DEBUG_UART == 1U)
+#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
       printf("\r\n[RTC] %lu s elapsed -> Software reset now!\r\n",
              (unsigned long)RESET_PERIOD_SEC);
+#else
+      printf("\r\n[RTC] Alarm A fired -> Software reset now!\r\n");
+#endif
       /* UART 송신 완료 대기 (마지막 문자가 잘리지 않도록) */
       while (__HAL_UART_GET_FLAG(&huart_dbg, UART_FLAG_TC) == RESET) { }
 #endif
 
       /* 재시작 후 다시 설정하므로 여기서는 정리만 한다 */
+#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
       HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+#else
+      HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_A);
+#endif
 
       /* ===== 소프트웨어 리셋 ===== */
       HAL_NVIC_SystemReset();
@@ -296,9 +417,6 @@ void SystemClock_Config(void)
   */
 static void MX_RTC_Init(void)
 {
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
-
   /** Initialize RTC Only */
   hrtc.Instance = RTC;
   hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
@@ -332,29 +450,14 @@ static void MX_RTC_Init(void)
     /* USER CODE END Check_RTC_BKUP */
 
     /** Initialize RTC and set the Time and Date */
-    sTime.Hours = 0x0;
-    sTime.Minutes = 0x0;
-    sTime.Seconds = 0x0;
-    sTime.SubSeconds = 0x0;
-    sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-    sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-    if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
-    {
-      Error_Handler();
-    }
-    sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-    sDate.Month = RTC_MONTH_JANUARY;
-    sDate.Date = 0x1;
-    sDate.Year = 0x0;
-    if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
-    {
-      Error_Handler();
-    }
+    SetInitialDateTime();
 
     /* USER CODE BEGIN Check_RTC_Calendar */
   }
   /* USER CODE END Check_RTC_Calendar */
 
+  /* USER CODE BEGIN RTC_Init 2 */
+#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
   /** Enable the WakeUp
     * 주기 파라미터(WUT_CLOCK_SEL / WUT_COUNTER)는 main.h 에서
     * RESET_PERIOD_SEC 값으로부터 자동 계산된다.
@@ -368,6 +471,11 @@ static void MX_RTC_Init(void)
   {
     Error_Handler();
   }
+#else
+  /* Alarm A 방식 : 벽시계 시각 기준으로 알람을 건다 */
+  RTC_SetResetAlarm();
+#endif
+  /* USER CODE END RTC_Init 2 */
 }
 
 #if (USE_DEBUG_UART == 1U)
@@ -435,6 +543,8 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
+
 /**
   * @brief  RTC Wakeup Timer 인터럽트 콜백 (RESET_PERIOD_SEC 마다 호출, 기본 24시간)
   * @note   ISR 컨텍스트이므로 여기서 바로 리셋하지 않고 플래그만 세운다.
@@ -445,6 +555,83 @@ void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc_handle)
   UNUSED(hrtc_handle);
   g_reset_request = 1U;
 }
+
+#else /* RESET_SRC_ALARM_A */
+
+/**
+  * @brief  리셋용 Alarm A 를 설정한다.
+  * @note   AlarmMask 에 RTC_ALARMMASK_DATEWEEKDAY 를 주면 "날짜"를 비교에서
+  *         제외하므로, 지정한 시:분:초가 될 때마다(= 하루에 한 번) 알람이
+  *         발생한다. 즉 마스크만으로 24시간 주기가 만들어진다.
+  */
+static void RTC_SetResetAlarm(void)
+{
+  RTC_AlarmTypeDef sAlarm = {0};
+
+#if (ALARM_MODE == ALARM_MODE_DAILY_FIXED)
+  /* 매일 고정된 시각에 리셋 (기본 03:00:00) */
+  sAlarm.AlarmTime.Hours   = ALARM_RESET_HOUR;
+  sAlarm.AlarmTime.Minutes = ALARM_RESET_MINUTE;
+  sAlarm.AlarmTime.Seconds = ALARM_RESET_SECOND;
+#else
+  /* 현재 시각 + RESET_PERIOD_SEC 에 리셋 (콜백에서 재장전) */
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+  uint32_t now_sec;
+  uint32_t target_sec;
+
+  /* GetTime -> GetDate 순서로 호출해야 shadow register 가 정상 해제된다 */
+  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+  now_sec = ((uint32_t)sTime.Hours * 3600U)
+            + ((uint32_t)sTime.Minutes * 60U)
+            + (uint32_t)sTime.Seconds;
+  /* 날짜를 마스킹하므로 하루(86400초) 안에서 순환시킨다.
+     RESET_PERIOD_SEC 가 정확히 86400 이면 target == now 가 되는데,
+     알람 비교는 매 초 갱신 시점에 일어나므로 이번 초에는 매치되지 않고
+     정확히 24시간 뒤에 발생한다. */
+  target_sec = (now_sec + RESET_PERIOD_SEC) % 86400U;
+
+  sAlarm.AlarmTime.Hours   = (uint8_t)(target_sec / 3600U);
+  sAlarm.AlarmTime.Minutes = (uint8_t)((target_sec % 3600U) / 60U);
+  sAlarm.AlarmTime.Seconds = (uint8_t)(target_sec % 60U);
+#endif
+
+  sAlarm.AlarmTime.SubSeconds     = 0U;
+  sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
+
+  sAlarm.AlarmMask          = RTC_ALARMMASK_DATEWEEKDAY;   /* 날짜 무시 = 매일 */
+  sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;  /* 서브초 무시 */
+  sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
+  sAlarm.AlarmDateWeekDay    = 1U;                         /* 마스킹되어 무의미 */
+  sAlarm.Alarm               = RTC_ALARM_A;
+
+  /* 재장전 시 기존 알람을 먼저 해제해야 안전하다 */
+  if (HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_A) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief  RTC Alarm A 인터럽트 콜백
+  * @note   DAILY_FIXED 모드는 알람이 매일 자동 반복되므로 재장전이 필요 없다.
+  *         RELATIVE 모드는 다음 알람을 여기서 다시 걸어야 하지만, 어차피
+  *         곧바로 리셋되므로 재부팅 후 MX_RTC_Init() 에서 다시 설정된다.
+  */
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc_handle)
+{
+  UNUSED(hrtc_handle);
+  g_reset_request = 1U;
+}
+
+#endif /* RESET_SOURCE */
 
 /* USER CODE END 4 */
 

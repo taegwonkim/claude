@@ -71,6 +71,44 @@ void Error_Handler(void);
  * ===================================================================== */
 #define RESET_PERIOD_SEC      (24U * 3600U)   /* 86400초 = 24시간 */
 
+/* ===== 리셋 트리거 방식 선택 ============================================
+ *  RESET_SRC_WAKEUP_TIMER : RTC Wakeup Timer.
+ *                           "부팅 시점 기준" RESET_PERIOD_SEC 마다 리셋.
+ *                           설정 한 줄이면 끝나고 자동 재장전된다.
+ *  RESET_SRC_ALARM_A      : RTC Alarm A.
+ *                           "벽시계 시각" 기준으로 리셋. 매일 03:00 처럼
+ *                           고정된 시각에 리셋해야 할 때 사용한다.
+ * ===================================================================== */
+#define RESET_SRC_WAKEUP_TIMER   0U
+#define RESET_SRC_ALARM_A        1U
+
+#define RESET_SOURCE          RESET_SRC_WAKEUP_TIMER   /* <-- 여기만 바꾸면 방식 전환 */
+
+/* ----- Alarm A 방식 세부 설정 (RESET_SOURCE == RESET_SRC_ALARM_A 일 때만 사용) --
+ *  ALARM_MODE_DAILY_FIXED : 매일 정해진 시각(ALARM_RESET_HH:MM:SS)에 리셋.
+ *                           알람이 자동 반복되므로 재장전이 필요 없다.
+ *                           -> 주기는 항상 24시간 고정.
+ *  ALARM_MODE_RELATIVE    : (현재 시각 + RESET_PERIOD_SEC) 에 알람을 걸고
+ *                           콜백에서 다음 알람을 다시 건다.
+ *                           -> RESET_PERIOD_SEC 는 86400초(24h) 이하만 가능.
+ * ---------------------------------------------------------------------- */
+#define ALARM_MODE_DAILY_FIXED   0U
+#define ALARM_MODE_RELATIVE      1U
+
+#define ALARM_MODE            ALARM_MODE_DAILY_FIXED
+
+/* ALARM_MODE_DAILY_FIXED 에서 리셋할 시각 (24시간 표기) */
+#define ALARM_RESET_HOUR      3U
+#define ALARM_RESET_MINUTE    0U
+#define ALARM_RESET_SECOND    0U
+
+/* 콜드 부트 시 RTC 달력에 넣을 초기 시각.
+ *   1U : 빌드 시각(__DATE__/__TIME__)을 사용 -> 별도 시각 동기화 없이도
+ *        Alarm 의 "벽시계 시각" 이 대충 맞는다(플래싱 시점과의 오차는 존재).
+ *   0U : 2000-01-01 00:00:00 으로 시작.
+ * 실제 제품에서는 GPS/NTP/호스트 등에서 받은 시각으로 설정할 것. */
+#define RTC_INIT_FROM_BUILD_TIME  1U
+
 /* --- Wakeup Timer 파라미터 자동 계산 (수정 불필요) -----------------------
  * RTC WUT 카운터는 16bit 이므로 ck_spre(1Hz) 기준 최대 65536초(약 18.2h).
  * 그보다 긴 주기는 WUCKSEL=11x (CK_SPRE_17BITS) 로 2^16(65536)을 더해
@@ -88,6 +126,12 @@ void Error_Handler(void);
   #define WUT_COUNTER         (RESET_PERIOD_SEC - 65536U - 1U)
 #else
   #error "RESET_PERIOD_SEC 가 너무 큽니다(최대 131072초). 더 긴 주기는 RTC Alarm 방식을 사용하세요."
+#endif
+
+/* Alarm A + RELATIVE 모드는 날짜를 마스킹하므로 24시간을 넘길 수 없다. */
+#if (RESET_SOURCE == RESET_SRC_ALARM_A) && (ALARM_MODE == ALARM_MODE_RELATIVE) \
+    && (RESET_PERIOD_SEC > 86400U)
+  #error "Alarm RELATIVE 모드에서 RESET_PERIOD_SEC 는 86400초(24h)를 넘을 수 없습니다."
 #endif
 
 /* LSI 는 오차가 ±5% 수준이라 장주기에서는 편차가 커진다(24h -> 최대 ±72분).

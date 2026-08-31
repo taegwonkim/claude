@@ -91,7 +91,11 @@ void RTC_IRQHandler(void)
   /* USER CODE BEGIN RTC_IRQn 0 */
   /* USER CODE END RTC_IRQn 0 */
 
+#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
   HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
+#else
+  HAL_RTC_AlarmIRQHandler(&hrtc);
+#endif
 
   /* USER CODE BEGIN RTC_IRQn 1 */
   /* USER CODE END RTC_IRQn 1 */
