@@ -1,7 +1,8 @@
-# STM32L562 — RTC로 10분마다 Software Reset
+# STM32L562 — RTC로 24시간마다 Software Reset
 
 STM32CubeMX / STM32CubeIDE 기반, **STM32L562** 에서 RTC Wakeup Timer 를 사용해
-**정확히 10분(600초)마다 소프트웨어 리셋**을 거는 예제 프로젝트입니다.
+**정확히 24시간(86400초)마다 소프트웨어 리셋**을 거는 예제 프로젝트입니다.
+주기는 `Core/Inc/main.h` 의 `RESET_PERIOD_SEC` 하나로 바꿀 수 있습니다.
 
 ---
 
@@ -11,12 +12,21 @@ STM32CubeMX / STM32CubeIDE 기반, **STM32L562** 에서 RTC Wakeup Timer 를 사
 |------|------|
 | 타이머 | RTC Wakeup Timer (WUT) |
 | 클럭 소스 | `ck_spre` = 1 Hz (RTC 프리스케일러 출력) |
-| 카운터 값 | `599` → 주기 = (599 + 1) × 1 s = **600 s = 10분** |
+| WUCKSEL | `RTC_WAKEUPCLOCK_CK_SPRE_17BITS` (2¹⁶ 가산 모드) |
+| 카운터 값 | `20863` → 주기 = (20863 + 1 + 65536) × 1 s = **86400 s = 24시간** |
 | 인터럽트 | `RTC_IRQn` → `HAL_RTCEx_WakeUpTimerEventCallback()` |
 | 리셋 방법 | `HAL_NVIC_SystemReset()` (Cortex-M33 `AIRCR.SYSRESETREQ`) |
 
-Wakeup Timer 는 **자동 재장전(auto-reload)** 방식이라 한 번만 설정하면 계속 반복되고,
-`ck_spre` 모드에서 최대 65536 초(약 18시간)까지 설정할 수 있어 10분은 여유롭게 커버됩니다.
+Wakeup Timer 는 **자동 재장전(auto-reload)** 방식이라 한 번만 설정하면 계속 반복됩니다.
+
+> ### ⚠ 24시간은 16비트 카운터만으로는 불가능합니다
+> WUT 카운터는 16비트라서 `ck_spre`(1 Hz) 기준 **최대 65536초 ≈ 18.2시간**입니다.
+> 86400초는 이 범위를 넘으므로, `WUCKSEL[2:1] = 11` (**CK_SPRE_17BITS**) 모드를 써서
+> 카운터에 **2¹⁶(65536)을 더하는** 방식으로 설정해야 합니다.
+> 이 모드의 주기는 `(WUT + 1 + 65536)초` 이고, 최대 **131072초 ≈ 36.4시간** 까지 가능합니다.
+>
+> 본 프로젝트는 `main.h` 에서 `RESET_PERIOD_SEC` 값을 보고
+> 16비트/17비트 모드와 카운터 값을 **컴파일 타임에 자동으로 계산**합니다.
 
 인터럽트 콜백에서는 플래그만 세우고 `main()` 루프에서 리셋합니다.
 (ISR 안에서 바로 리셋해도 되지만, UART 로그를 끝까지 내보내고 안전하게 종료하기 위함)
@@ -29,14 +39,14 @@ RTC 시각과 백업 레지스터에 저장한 리셋 횟수가 그대로 유지
 ## 2. 파일 구성
 
 ```
-STM32L562_RTC_10min_Reset/
-├── STM32L562_RTC_10min_Reset.ioc   # CubeMX 설정 파일 (시작점)
+STM32L562_RTC_Periodic_Reset/
+├── STM32L562_RTC_Periodic_Reset.ioc   # CubeMX 설정 파일 (시작점)
 ├── Core/
 │   ├── Inc/
 │   │   ├── main.h                  # 사용자 설정 (주기, 핀, LSI/LSE 선택)
 │   │   └── stm32l5xx_it.h
 │   └── Src/
-│       ├── main.c                  # RTC 초기화 + 10분 리셋 로직
+│       ├── main.c                  # RTC 초기화 + 주기적 리셋 로직
 │       ├── stm32l5xx_hal_msp.c     # RTC/UART MSP (클럭, NVIC, GPIO)
 │       └── stm32l5xx_it.c          # RTC_IRQHandler
 └── README.md
@@ -53,7 +63,7 @@ STM32L562_RTC_10min_Reset/
 ### 3-1. 프로젝트 생성
 1. STM32CubeIDE → `File > New > STM32 Project`
 2. Part Number 에 **STM32L562ZET6Q** (또는 사용 중인 파트) 입력 후 선택
-3. 프로젝트 이름: `STM32L562_RTC_10min_Reset`, Targeted Language: **C**
+3. 프로젝트 이름: `STM32L562_RTC_Periodic_Reset`, Targeted Language: **C**
 4. **"Options for TrustZone" 창이 뜨면 `TrustZone: Disabled` 선택** (본 예제 기준)
    - TrustZone 을 켜면 Secure/NonSecure 두 프로젝트가 생기고, RTC 인터럽트가
      `RTC_S_IRQn` / `RTC_S_IRQHandler` 로 바뀝니다. (5장 참고)
@@ -77,10 +87,13 @@ STM32L562_RTC_10min_Reset/
   |------|------|------|
   | Asynchronous Predivider value | `127` | `127` |
   | Synchronous Predivider value | `249` | `255` |
-  | Wake Up Clock | `RTC_WAKEUPCLOCK_CKSPRE` | 동일 |
-  | Wake Up Counter | **`599`** | 동일 |
+  | Wake Up Clock | `RTC_WAKEUPCLOCK_CK_SPRE_17BITS` | 동일 |
+  | Wake Up Counter | **`20863`** | 동일 |
 
   → `(Async+1) × (Sync+1) = 32000` 또는 `32768` 이 되어 `ck_spre = 1 Hz` 가 됩니다.
+  → 카운터 `20863` + 1 + 65536 = **86400초 = 24시간**
+  → CubeMX 버전에 따라 Wake Up Clock 목록에 17BITS 항목이 없을 수 있는데,
+    그때는 CubeMX 값은 그대로 두고 코드(`main.h`)의 자동 계산 값이 적용되므로 문제없습니다.
 
 - **Configuration → NVIC Settings**
   - ☑ **`RTC global interrupt`** 활성화 (Preemption Priority 5 권장)
@@ -111,15 +124,29 @@ STM32L562_RTC_10min_Reset/
 ## 4. 핵심 코드
 
 ### 4-1. Wakeup Timer 설정 (`MX_RTC_Init`)
+`main.h` 에서 주기에 맞는 모드/카운터를 자동으로 고릅니다.
 ```c
-/* ck_spre = 1 Hz 이므로 주기 = (WakeUpCounter + 1) 초
-   -> 10분(600초) = 599 + 1 */
-if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, (RESET_PERIOD_SEC - 1U),
-                                RTC_WAKEUPCLOCK_CKSPRE, 0U) != HAL_OK)
+#if   (RESET_PERIOD_SEC <= 65536U)          /* 최대 약 18.2시간 */
+  #define WUT_CLOCK_SEL   RTC_WAKEUPCLOCK_CK_SPRE_16BITS
+  #define WUT_COUNTER     (RESET_PERIOD_SEC - 1U)
+#elif (RESET_PERIOD_SEC <= 131072U)         /* 최대 약 36.4시간 */
+  #define WUT_CLOCK_SEL   RTC_WAKEUPCLOCK_CK_SPRE_17BITS
+  #define WUT_COUNTER     (RESET_PERIOD_SEC - 65536U - 1U)
+#else
+  #error "RESET_PERIOD_SEC 가 너무 큽니다(최대 131072초)."
+#endif
+```
+`main.c` 에서는 계산된 값을 그대로 넘기기만 합니다.
+```c
+/* 24시간 -> CK_SPRE_17BITS, WUT = 86400 - 65536 - 1 = 20863 */
+if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, WUT_COUNTER,
+                                WUT_CLOCK_SEL, 0U) != HAL_OK)
 {
   Error_Handler();
 }
 ```
+> HAL 버전이 오래되어 `HAL_RTCEx_SetWakeUpTimer_IT()` 이 3개 인자만 받는다면
+> 마지막 `0U`(WakeUpAutoClr)를 빼면 됩니다.
 
 ### 4-2. 인터럽트 핸들러 (`stm32l5xx_it.c`)
 ```c
@@ -145,11 +172,22 @@ if (g_reset_request)
 ```
 
 ### 4-4. 주기 변경
-`Core/Inc/main.h` 의 값 하나만 바꾸면 됩니다.
+`Core/Inc/main.h` 의 값 하나만 바꾸면 됩니다. 나머지는 전부 자동 계산됩니다.
 ```c
-#define RESET_PERIOD_SEC   600U   /* 10분. 예: 60U = 1분, 3600U = 1시간 */
+#define RESET_PERIOD_SEC   (24U * 3600U)   /* 86400초 = 24시간 */
 ```
-> 테스트할 때는 `60U`(1분) 정도로 줄여서 확인하는 것을 권장합니다.
+| 원하는 주기 | 설정 값 | 자동 선택되는 모드 / 카운터 |
+|------|------|------|
+| 1분 | `60U` | 16BITS / 59 |
+| 10분 | `600U` | 16BITS / 599 |
+| 1시간 | `3600U` | 16BITS / 3599 |
+| 12시간 | `(12U * 3600U)` | 16BITS / 43199 |
+| **24시간** | `(24U * 3600U)` | **17BITS / 20863** |
+| 36시간 | `(36U * 3600U)` | 17BITS / 64063 |
+| 36.4시간 초과 | — | ❌ `#error` (Alarm 방식 사용, 7장 참고) |
+
+> 24시간은 실제로 확인하는 데 하루가 걸리므로, 동작 검증은 `60U`(1분) 로 줄여서 하고
+> 확인이 끝난 뒤 `(24U * 3600U)` 로 되돌리는 것을 권장합니다.
 
 ---
 
@@ -179,59 +217,72 @@ if (g_reset_request)
    플래그는 읽은 뒤 `__HAL_RCC_CLEAR_RESET_FLAGS()` 로 반드시 지워야 다음 리셋 원인을
    정확히 구분할 수 있습니다.
 
+6. **24시간 주기에서는 클럭 정확도가 중요합니다.**
+   내부 **LSI 는 오차가 ±5% 수준**이라 24시간 기준 **최대 ±72분**까지 벌어질 수 있습니다.
+   "매일 정해진 시각에" 리셋해야 한다면 반드시 외부 32.768 kHz 크리스탈(**LSE**) 을 쓰고
+   `main.h` 의 `RTC_CLOCK_LSE` 를 `1` 로 설정하세요 (LSE 는 보통 ±20 ppm ≒ 하루 ±2초).
+   LSI 를 쓴 채 1시간을 넘는 주기를 설정하면 빌드 시 `#warning` 으로 알려줍니다.
+
+7. **주기를 바꿔도 리셋 시점은 "부팅 시점 기준"입니다.**
+   Wakeup Timer 는 리셋 직후 다시 0부터 세므로, 전원을 켠 시각으로부터 24시간마다
+   리셋됩니다. **매일 새벽 3시처럼 고정된 벽시계 시각**에 리셋하려면 7장의 Alarm 방식을 쓰세요.
+
 ---
 
 ## 6. 실행 결과 예시 (115200 8N1)
 
 ```
 ==========================================
- STM32L562 RTC 10-minute Software Reset
+ STM32L562 RTC Periodic Software Reset
 ==========================================
  Reset cause : NRST-PIN (CSR=0x0C000000)
  Soft reset count : 0
  RTC time    : 2000-01-01 00:00:00
- Next reset in 600 s (10 min)
+ Next reset in 86400 s (24h 00m)
 ------------------------------------------
 
-[RTC] 600 s elapsed -> Software reset now!
+... (24시간 경과) ...
+
+[RTC] 86400 s elapsed -> Software reset now!
 
 ==========================================
- STM32L562 RTC 10-minute Software Reset
+ STM32L562 RTC Periodic Software Reset
 ==========================================
  Reset cause : SOFTWARE (CSR=0x18000000)
  Soft reset count : 1
- RTC time    : 2000-01-01 00:10:00
- Next reset in 600 s (10 min)
+ RTC time    : 2000-01-02 00:00:00
+ Next reset in 86400 s (24h 00m)
 ------------------------------------------
 ```
 
+
 ---
 
-## 7. 대안 — RTC Alarm 방식
+## 7. 대안 — RTC Alarm 방식 (매일 정해진 시각에 리셋)
 
-Wakeup Timer 대신 Alarm A 로도 구현할 수 있습니다.
-(현재 시각 + 10분을 계산해 알람을 걸고, 콜백에서 리셋 + 다음 알람 재설정)
+"부팅 후 24시간"이 아니라 **매일 같은 벽시계 시각**(예: 새벽 3시)에 리셋하고 싶다면
+Wakeup Timer 대신 **Alarm A** 가 더 적합합니다.
+`AlarmMask` 에 `RTC_ALARMMASK_DATEWEEKDAY` 를 주면 날짜를 무시하고
+**하루에 한 번, 지정한 시:분:초에** 알람이 발생합니다 — 즉 24시간 주기가 그대로 나옵니다.
 
 ```c
-static void SetNextAlarm(void)
+/* 매일 03:00:00 에 리셋 */
+#define DAILY_RESET_HOUR    3U
+#define DAILY_RESET_MINUTE  0U
+
+static void SetDailyAlarm(void)
 {
   RTC_AlarmTypeDef sAlarm = {0};
-  RTC_TimeTypeDef  sTime  = {0};
-  RTC_DateTypeDef  sDate  = {0};
-  uint32_t sec;
 
-  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);   /* shadow 해제를 위해 필수 */
-
-  sec = (sTime.Hours * 3600U + sTime.Minutes * 60U + sTime.Seconds
-         + RESET_PERIOD_SEC) % 86400U;
-
-  sAlarm.AlarmTime.Hours   = sec / 3600U;
-  sAlarm.AlarmTime.Minutes = (sec % 3600U) / 60U;
-  sAlarm.AlarmTime.Seconds = sec % 60U;
-  sAlarm.AlarmMask         = RTC_ALARMMASK_DATEWEEKDAY;  /* 날짜 무시 */
-  sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
-  sAlarm.Alarm             = RTC_ALARM_A;
+  sAlarm.AlarmTime.Hours          = DAILY_RESET_HOUR;
+  sAlarm.AlarmTime.Minutes        = DAILY_RESET_MINUTE;
+  sAlarm.AlarmTime.Seconds        = 0U;
+  sAlarm.AlarmTime.SubSeconds     = 0U;
+  sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  sAlarm.AlarmMask                = RTC_ALARMMASK_DATEWEEKDAY;  /* 날짜 무시 = 매일 */
+  sAlarm.AlarmSubSecondMask       = RTC_ALARMSUBSECONDMASK_ALL;
+  sAlarm.Alarm                    = RTC_ALARM_A;
 
   if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
   {
@@ -241,10 +292,14 @@ static void SetNextAlarm(void)
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc_handle)
 {
-  g_reset_request = 1U;
+  g_reset_request = 1U;      /* 알람은 자동 반복되므로 재설정 불필요 */
 }
 ```
-`stm32l5xx_it.c` 의 `RTC_IRQHandler()` 에서는 `HAL_RTC_AlarmIRQHandler(&hrtc);` 를 호출합니다.
+- `stm32l5xx_it.c` 의 `RTC_IRQHandler()` 에서 `HAL_RTC_AlarmIRQHandler(&hrtc);` 를 호출합니다.
+- 이 방식은 **RTC 달력 시각이 실제 시각과 맞아야** 의미가 있으므로,
+  콜드 부트 시 `HAL_RTC_SetTime()` 으로 현재 시각을 넣어주어야 합니다.
 
-> 단순 주기 리셋이 목적이라면 자동 재장전이 되는 **Wakeup Timer 방식(기본)** 이 더 간단합니다.
-> IWDG(독립 워치독)는 최대 타임아웃이 약 32초라 10분 주기에는 사용할 수 없습니다.
+> **정리**
+> - 부팅 시점 기준 24시간마다 → **Wakeup Timer** (본 예제 기본, 설정 한 줄)
+> - 매일 고정된 시각에 → **Alarm A + DATEWEEKDAY 마스크**
+> - IWDG(독립 워치독)는 최대 타임아웃이 약 32초라 장주기 리셋에는 사용할 수 없습니다.

@@ -3,7 +3,7 @@
   ******************************************************************************
   * @file           : main.h
   * @brief          : Header for main.c file.
-  *                   STM32L562 - RTC Wakeup Timer 기반 10분 주기 소프트웨어 리셋
+  *                   STM32L562 - RTC Wakeup Timer 기반 주기적 소프트웨어 리셋
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -65,8 +65,36 @@ void Error_Handler(void);
 #define LED_GPIO_PORT         GPIOA
 #define LED_PIN               GPIO_PIN_5
 
-/* 소프트웨어 리셋 주기 [초] : 10분 = 600초 */
-#define RESET_PERIOD_SEC      600U
+/* ===== 소프트웨어 리셋 주기 =============================================
+ * 초 단위로 지정. 24시간 = 24 * 3600 = 86400초
+ * (예: 60U=1분, 600U=10분, 3600U=1시간, 86400U=24시간)
+ * ===================================================================== */
+#define RESET_PERIOD_SEC      (24U * 3600U)   /* 86400초 = 24시간 */
+
+/* --- Wakeup Timer 파라미터 자동 계산 (수정 불필요) -----------------------
+ * RTC WUT 카운터는 16bit 이므로 ck_spre(1Hz) 기준 최대 65536초(약 18.2h).
+ * 그보다 긴 주기는 WUCKSEL=11x (CK_SPRE_17BITS) 로 2^16(65536)을 더해
+ * 최대 131072초(약 36.4h)까지 만들 수 있다.
+ *   - 16BITS 모드 : 주기 = (WUT + 1) 초
+ *   - 17BITS 모드 : 주기 = (WUT + 1 + 65536) 초
+ * ---------------------------------------------------------------------- */
+#if   (RESET_PERIOD_SEC == 0U)
+  #error "RESET_PERIOD_SEC 는 1 이상이어야 합니다."
+#elif (RESET_PERIOD_SEC <= 65536U)
+  #define WUT_CLOCK_SEL       RTC_WAKEUPCLOCK_CK_SPRE_16BITS
+  #define WUT_COUNTER         (RESET_PERIOD_SEC - 1U)
+#elif (RESET_PERIOD_SEC <= 131072U)
+  #define WUT_CLOCK_SEL       RTC_WAKEUPCLOCK_CK_SPRE_17BITS
+  #define WUT_COUNTER         (RESET_PERIOD_SEC - 65536U - 1U)
+#else
+  #error "RESET_PERIOD_SEC 가 너무 큽니다(최대 131072초). 더 긴 주기는 RTC Alarm 방식을 사용하세요."
+#endif
+
+/* LSI 는 오차가 ±5% 수준이라 장주기에서는 편차가 커진다(24h -> 최대 ±72분).
+   장주기 사용 시 LSE(외부 32.768kHz 크리스탈) 를 강력히 권장한다. */
+#if (RTC_CLOCK_LSE == 0U) && (RESET_PERIOD_SEC > 3600U)
+  #warning "Long reset period with internal LSI (+/-5%). Set RTC_CLOCK_LSE to 1 for accuracy."
+#endif
 
 /* 백업 레지스터(TAMP_BKPxR) 용도 정의 */
 #define BKP_REG_MAGIC         RTC_BKP_DR0   /* 콜드부트 판별용 매직 값 */

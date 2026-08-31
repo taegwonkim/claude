@@ -2,11 +2,13 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : STM32L562 - RTC Wakeup Timer 를 이용한 10분 주기 소프트웨어 리셋
+  * @brief          : STM32L562 - RTC Wakeup Timer 를 이용한 주기적 소프트웨어 리셋
+  *                    (기본 설정 : 24시간 = 86400초)
   *
   * 동작 개요
   *  1) RTC 를 LSI(또는 LSE) 로 구동하고 Wakeup Timer 를 ck_spre(1Hz) 로 설정한다.
-  *  2) 카운터를 (600 - 1) 로 두어 정확히 600초(10분)마다 인터럽트가 발생한다.
+  *  2) 24시간은 16bit 카운터(최대 65536초)를 넘으므로 CK_SPRE_17BITS 모드
+  *     (2^16 가산)를 사용한다. 카운터 20863 + 1 + 65536 = 86400초.
   *  3) 인터럽트 콜백에서 플래그만 세우고, main 루프에서 HAL_NVIC_SystemReset() 호출.
   *  4) 리셋 후에도 RTC/백업도메인은 유지되므로 리셋 횟수를 백업 레지스터에 누적한다.
   *  5) RCC 리셋 플래그로 "소프트웨어 리셋"이었는지 부팅 시 확인/출력한다.
@@ -95,7 +97,7 @@ static void PrintBanner(void)
   HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
   printf("\r\n==========================================\r\n");
-  printf(" STM32L562 RTC 10-minute Software Reset\r\n");
+  printf(" STM32L562 RTC Periodic Software Reset\r\n");
   printf("==========================================\r\n");
   printf(" Reset cause : ");
   if (g_reset_flags & RCC_CSR_SFTRSTF)  { printf("SOFTWARE "); }
@@ -109,8 +111,10 @@ static void PrintBanner(void)
   printf(" RTC time    : 20%02d-%02d-%02d %02d:%02d:%02d\r\n",
          sDate.Year, sDate.Month, sDate.Date,
          sTime.Hours, sTime.Minutes, sTime.Seconds);
-  printf(" Next reset in %lu s (%lu min)\r\n",
-         (unsigned long)RESET_PERIOD_SEC, (unsigned long)(RESET_PERIOD_SEC / 60U));
+  printf(" Next reset in %lu s (%luh %02lum)\r\n",
+         (unsigned long)RESET_PERIOD_SEC,
+         (unsigned long)(RESET_PERIOD_SEC / 3600U),
+         (unsigned long)((RESET_PERIOD_SEC % 3600U) / 60U));
   printf("------------------------------------------\r\n");
 #endif
 }
@@ -352,12 +356,15 @@ static void MX_RTC_Init(void)
   /* USER CODE END Check_RTC_Calendar */
 
   /** Enable the WakeUp
-    * ck_spre = 1 Hz 이므로 주기 = (WakeUpCounter + 1) 초
-    * -> 10분(600초) = 599 + 1
-    * (최대 65536초 = 약 18시간까지 설정 가능)
+    * 주기 파라미터(WUT_CLOCK_SEL / WUT_COUNTER)는 main.h 에서
+    * RESET_PERIOD_SEC 값으로부터 자동 계산된다.
+    *   - 65536초 이하 : CK_SPRE_16BITS, 주기 = (WUT + 1) 초
+    *   - 그 이상      : CK_SPRE_17BITS, 주기 = (WUT + 1 + 65536) 초
+    * 24시간(86400초) -> CK_SPRE_17BITS, WUT = 20863
+    *   (20863 + 1 + 65536 = 86400)
     */
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, (RESET_PERIOD_SEC - 1U),
-                                  RTC_WAKEUPCLOCK_CKSPRE, 0U) != HAL_OK)
+  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, WUT_COUNTER,
+                                  WUT_CLOCK_SEL, 0U) != HAL_OK)
   {
     Error_Handler();
   }
@@ -429,7 +436,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /**
-  * @brief  RTC Wakeup Timer 인터럽트 콜백 (10분마다 호출)
+  * @brief  RTC Wakeup Timer 인터럽트 콜백 (RESET_PERIOD_SEC 마다 호출, 기본 24시간)
   * @note   ISR 컨텍스트이므로 여기서 바로 리셋하지 않고 플래그만 세운다.
   *         (즉시 리셋을 원하면 여기서 HAL_NVIC_SystemReset() 을 호출해도 된다.)
   */
