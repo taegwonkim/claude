@@ -1,0 +1,7 @@
+# STM32CubeIDE
+Debug/
+Release/
+.settings/
+*.launch
+# CubeMX
+.mxproject
