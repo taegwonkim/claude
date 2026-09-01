@@ -2,13 +2,14 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : STM32L562 - RTC Wakeup Timer 를 이용한 주기적 소프트웨어 리셋
-  *                    (기본 설정 : 24시간 = 86400초)
+  * @brief          : STM32L562 - RTC Alarm A 를 이용한 소프트웨어 리셋
+  *                    (기본 설정 : 매일 03:00:00)
   *
   * 동작 개요
-  *  1) RTC 를 LSI(또는 LSE) 로 구동하고 Wakeup Timer 를 ck_spre(1Hz) 로 설정한다.
-  *  2) 24시간은 16bit 카운터(최대 65536초)를 넘으므로 CK_SPRE_17BITS 모드
-  *     (2^16 가산)를 사용한다. 카운터 20863 + 1 + 65536 = 86400초.
+  *  1) RTC 를 LSI(또는 LSE) 로 구동하고 달력을 실제 시각으로 맞춘다.
+  *  2) Alarm A 에 AlarmMask = RTC_ALARMMASK_DATEWEEKDAY 를 주면 "날짜"가
+  *     비교에서 제외되어, 지정한 시:분:초마다(= 하루에 한 번) 알람이 발생한다.
+  *     즉 마스크만으로 24시간 주기가 만들어지고 재장전이 필요 없다.
   *  3) 인터럽트 콜백에서 플래그만 세우고, main 루프에서 HAL_NVIC_SystemReset() 호출.
   *  4) 리셋 후에도 RTC/백업도메인은 유지되므로 리셋 횟수를 백업 레지스터에 누적한다.
   *  5) RCC 리셋 플래그로 "소프트웨어 리셋"이었는지 부팅 시 확인/출력한다.
@@ -63,9 +64,7 @@ static void MX_USART1_UART_Init(void);
 static void CaptureResetCause(void);
 static void PrintBanner(void);
 static void SetInitialDateTime(void);
-#if (RESET_SOURCE == RESET_SRC_ALARM_A)
 static void RTC_SetResetAlarm(void);
-#endif
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -195,7 +194,7 @@ static void PrintBanner(void)
   HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
   printf("\r\n==========================================\r\n");
-  printf(" STM32L562 RTC Periodic Software Reset\r\n");
+  printf(" STM32L562 RTC Alarm A Reset (daily)\r\n");
   printf("==========================================\r\n");
   printf(" Reset cause : ");
   if (g_reset_flags & RCC_CSR_SFTRSTF)  { printf("SOFTWARE "); }
@@ -209,13 +208,7 @@ static void PrintBanner(void)
   printf(" RTC time    : 20%02d-%02d-%02d %02d:%02d:%02d\r\n",
          sDate.Year, sDate.Month, sDate.Date,
          sTime.Hours, sTime.Minutes, sTime.Seconds);
-#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
-  printf(" Trigger     : RTC WakeUp Timer\r\n");
-  printf(" Next reset in %lu s (%luh %02lum)\r\n",
-         (unsigned long)RESET_PERIOD_SEC,
-         (unsigned long)(RESET_PERIOD_SEC / 3600U),
-         (unsigned long)((RESET_PERIOD_SEC % 3600U) / 60U));
-#elif (ALARM_MODE == ALARM_MODE_DAILY_FIXED)
+#if (ALARM_MODE == ALARM_MODE_DAILY_FIXED)
   printf(" Trigger     : RTC Alarm A (daily fixed)\r\n");
   printf(" Next reset at %02u:%02u:%02u every day\r\n",
          (unsigned int)ALARM_RESET_HOUR,
@@ -298,22 +291,13 @@ int main(void)
       g_reset_request = 0U;
 
 #if (USE_DEBUG_UART == 1U)
-#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
-      printf("\r\n[RTC] %lu s elapsed -> Software reset now!\r\n",
-             (unsigned long)RESET_PERIOD_SEC);
-#else
       printf("\r\n[RTC] Alarm A fired -> Software reset now!\r\n");
-#endif
       /* UART 송신 완료 대기 (마지막 문자가 잘리지 않도록) */
       while (__HAL_UART_GET_FLAG(&huart_dbg, UART_FLAG_TC) == RESET) { }
 #endif
 
       /* 재시작 후 다시 설정하므로 여기서는 정리만 한다 */
-#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
-      HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
-#else
       HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_A);
-#endif
 
       /* ===== 소프트웨어 리셋 ===== */
       HAL_NVIC_SystemReset();
@@ -457,24 +441,9 @@ static void MX_RTC_Init(void)
   /* USER CODE END Check_RTC_Calendar */
 
   /* USER CODE BEGIN RTC_Init 2 */
-#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
-  /** Enable the WakeUp
-    * 주기 파라미터(WUT_CLOCK_SEL / WUT_COUNTER)는 main.h 에서
-    * RESET_PERIOD_SEC 값으로부터 자동 계산된다.
-    *   - 65536초 이하 : CK_SPRE_16BITS, 주기 = (WUT + 1) 초
-    *   - 그 이상      : CK_SPRE_17BITS, 주기 = (WUT + 1 + 65536) 초
-    * 24시간(86400초) -> CK_SPRE_17BITS, WUT = 20863
-    *   (20863 + 1 + 65536 = 86400)
-    */
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, WUT_COUNTER,
-                                  WUT_CLOCK_SEL, 0U) != HAL_OK)
-  {
-    Error_Handler();
-  }
-#else
-  /* Alarm A 방식 : 벽시계 시각 기준으로 알람을 건다 */
+  /* Alarm A 설정 : 벽시계 시각 기준으로 알람을 건다.
+     DAILY_FIXED 모드는 날짜를 마스킹하므로 매일 같은 시각에 자동 반복된다. */
   RTC_SetResetAlarm();
-#endif
   /* USER CODE END RTC_Init 2 */
 }
 
@@ -542,21 +511,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
-
-/**
-  * @brief  RTC Wakeup Timer 인터럽트 콜백 (RESET_PERIOD_SEC 마다 호출, 기본 24시간)
-  * @note   ISR 컨텍스트이므로 여기서 바로 리셋하지 않고 플래그만 세운다.
-  *         (즉시 리셋을 원하면 여기서 HAL_NVIC_SystemReset() 을 호출해도 된다.)
-  */
-void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc_handle)
-{
-  UNUSED(hrtc_handle);
-  g_reset_request = 1U;
-}
-
-#else /* RESET_SRC_ALARM_A */
 
 /**
   * @brief  리셋용 Alarm A 를 설정한다.
@@ -631,7 +585,6 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc_handle)
   g_reset_request = 1U;
 }
 
-#endif /* RESET_SOURCE */
 
 /* USER CODE END 4 */
 

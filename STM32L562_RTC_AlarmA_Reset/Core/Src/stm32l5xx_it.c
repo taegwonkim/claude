@@ -84,18 +84,14 @@ void SysTick_Handler(void)
 /**
   * @brief  This function handles RTC global interrupt.
   * @note   STM32L5 는 Alarm / WakeUp / Timestamp 등 RTC 인터럽트가
-  *         RTC_IRQn 하나로 통합되어 있다.
+  *         RTC_IRQn 하나로 통합되어 있다. 여기서는 Alarm 만 사용한다.
   */
 void RTC_IRQHandler(void)
 {
   /* USER CODE BEGIN RTC_IRQn 0 */
   /* USER CODE END RTC_IRQn 0 */
 
-#if (RESET_SOURCE == RESET_SRC_WAKEUP_TIMER)
-  HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
-#else
   HAL_RTC_AlarmIRQHandler(&hrtc);
-#endif
 
   /* USER CODE BEGIN RTC_IRQn 1 */
   /* USER CODE END RTC_IRQn 1 */
