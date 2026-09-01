@@ -51,6 +51,49 @@ Wakeup Timer 와 달리 Alarm 은 벽시계 시각을 보므로, 달력이 엉�
 
 ---
 
+## 1-1. 저전력 모드에 진입하지 않습니다
+
+RTC Alarm 은 저전력 모드에서 MCU 를 깨우는 용도로도 쓰이지만, 저전력 모드에
+**들어가야 하는 것은 아닙니다.** 알람은 RTC 달력과 알람 레지스터를 비교해
+인터럽트를 걸 뿐이고, MCU 가 풀스피드로 돌든 STOP 모드에 있든 무관합니다.
+
+이 프로젝트에는 저전력 진입 코드가 **하나도 없습니다.**
+
+| 사용하지 않는 API | 상태 |
+|---|---|
+| `HAL_PWR_EnterSLEEPMode()` | ❌ 없음 |
+| `HAL_PWR_EnterSTOPMode()` / `HAL_PWREx_EnterSTOP0/1/2Mode()` | ❌ 없음 |
+| `HAL_PWR_EnterSTANDBYMode()` / `HAL_PWREx_EnterSHUTDOWNMode()` | ❌ 없음 |
+| `__WFI()` / `__WFE()` | ❌ 없음 |
+
+`main()` 의 `while(1)` 은 `HAL_GetTick()` 을 폴링하며 LED 를 토글하는
+**완전 활성 상태의 busy loop** 입니다. MCU 는 리셋 시점까지 계속 동작하고,
+그 사이 원하는 애플리케이션 코드를 `/* USER CODE BEGIN 3 */` 에 넣으면 됩니다.
+
+> 반대로 저전력이 필요해지면, 이 루프 안에 `HAL_PWREx_EnterSTOP2Mode()` 한 줄만
+> 넣으면 그대로 저전력 버전이 됩니다. RTC 는 STOP 모드에서도 백업 도메인에서
+> 계속 돌기 때문에 나머지 코드는 손댈 필요가 없습니다.
+
+## 1-2. 살아있음(heartbeat) 로그
+
+계속 동작 중인지 확인하기 쉽도록 **1분마다 uptime 과 리셋까지 남은 시간**을
+UART 로 출력합니다.
+
+```c
+#define USE_HEARTBEAT_LOG     1U    /* 0 이면 출력 안 함 */
+#define HEARTBEAT_PERIOD_SEC  60U   /* 출력 주기 [초] */
+```
+
+```
+[ALIVE] uptime 00:01:00 | RTC 2026-09-01 14:21:11 | reset in 45529 s (12h 38m)
+[ALIVE] uptime 00:02:00 | RTC 2026-09-01 14:22:11 | reset in 45469 s (12h 37m)
+```
+
+LED 하트비트(500ms 토글)와 함께, MCU 가 잠들지 않고 도는지 육안/로그 양쪽으로
+확인할 수 있습니다.
+
+---
+
 ## 2. 파일 구성
 
 ```
@@ -261,9 +304,12 @@ if (g_reset_request)
  Trigger     : RTC Alarm A (daily fixed)
  Next reset at 03:00:00 every day
 ------------------------------------------
+[ALIVE] uptime 00:01:00 | RTC 2026-09-01 14:21:11 | reset in 45529 s (12h 38m)
+[ALIVE] uptime 00:02:00 | RTC 2026-09-01 14:22:11 | reset in 45469 s (12h 37m)
 
-... (다음 03:00:00) ...
+... (1분마다 계속 출력, 다음 03:00:00 까지) ...
 
+[ALIVE] uptime 12:38:49 | RTC 2026-09-02 02:59:00 | reset in 60 s (0h 01m)
 [RTC] Alarm A fired -> Software reset now!
 
 ==========================================

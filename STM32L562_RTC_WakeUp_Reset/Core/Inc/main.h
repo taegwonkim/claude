@@ -97,6 +97,12 @@ void Error_Handler(void);
   #warning "Long reset period with internal LSI (+/-5%). Set RTC_CLOCK_LSE to 1 for accuracy."
 #endif
 
+/* 살아있음(heartbeat) 로그 : HEARTBEAT_PERIOD_SEC 마다 uptime 과 리셋까지 남은
+   시간을 UART 로 출력한다. USE_DEBUG_UART 가 1 일 때만 동작한다.
+   장주기 리셋이 제대로 대기 중인지 눈으로 확인하는 용도. */
+#define USE_HEARTBEAT_LOG     1U
+#define HEARTBEAT_PERIOD_SEC  60U
+
 /* 백업 레지스터(TAMP_BKPxR) 용도 정의 */
 #define BKP_REG_MAGIC         RTC_BKP_DR0   /* 콜드부트 판별용 매직 값 */
 #define BKP_REG_RESET_COUNT   RTC_BKP_DR1   /* 소프트 리셋 누적 횟수    */

@@ -63,6 +63,9 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void CaptureResetCause(void);
 static void PrintBanner(void);
+#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
+static void PrintHeartbeat(void);
+#endif
 static void SetInitialDateTime(void);
 static void RTC_SetResetAlarm(void);
 /* USER CODE END PFP */
@@ -225,6 +228,54 @@ static void PrintBanner(void)
 #endif
 }
 
+#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
+/**
+  * @brief  살아있음 로그. HEARTBEAT_PERIOD_SEC 마다 호출된다.
+  * @note   저전력 모드에 진입하지 않고 계속 동작 중임을 확인하는 용도.
+  */
+static void PrintHeartbeat(void)
+{
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+  uint32_t up_sec = HAL_GetTick() / 1000U;      /* 부팅 후 경과 [초] */
+  uint32_t remain;
+
+  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+#if (ALARM_MODE == ALARM_MODE_DAILY_FIXED)
+  {
+    /* 현재 시각에서 다음 알람 시각까지 남은 시간 */
+    uint32_t now_sec = ((uint32_t)sTime.Hours * 3600U)
+                       + ((uint32_t)sTime.Minutes * 60U)
+                       + (uint32_t)sTime.Seconds;
+    uint32_t target_sec = ((uint32_t)ALARM_RESET_HOUR * 3600U)
+                          + ((uint32_t)ALARM_RESET_MINUTE * 60U)
+                          + (uint32_t)ALARM_RESET_SECOND;
+    remain = (target_sec + 86400U - now_sec) % 86400U;
+    if (remain == 0U)
+    {
+      remain = 86400U;
+    }
+  }
+#else
+  /* RELATIVE 모드의 알람은 부팅 시점에 걸리므로 uptime 으로 환산한다 */
+  remain = (up_sec >= RESET_PERIOD_SEC) ? 0U : (RESET_PERIOD_SEC - up_sec);
+#endif
+
+  printf("[ALIVE] uptime %02lu:%02lu:%02lu | RTC 20%02d-%02d-%02d %02d:%02d:%02d"
+         " | reset in %lu s (%luh %02lum)\r\n",
+         (unsigned long)(up_sec / 3600U),
+         (unsigned long)((up_sec % 3600U) / 60U),
+         (unsigned long)(up_sec % 60U),
+         sDate.Year, sDate.Month, sDate.Date,
+         sTime.Hours, sTime.Minutes, sTime.Seconds,
+         (unsigned long)remain,
+         (unsigned long)(remain / 3600U),
+         (unsigned long)((remain % 3600U) / 60U));
+}
+#endif /* USE_HEARTBEAT_LOG */
+
 /* USER CODE END 0 */
 
 /**
@@ -234,6 +285,9 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   uint32_t tick_led = 0U;
+#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
+  uint32_t tick_beat = 0U;
+#endif
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -286,6 +340,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    /* 이 루프는 저전력 모드에 진입하지 않는다.
+       (HAL_PWR_EnterSLEEPMode / STOPMode / STANDBYMode, __WFI 를 쓰지 않음)
+       MCU 는 리셋 시점까지 풀스피드로 계속 동작하며, RTC 는 백업 도메인에서
+       독립적으로 카운트하다가 시간이 되면 인터럽트를 발생시킨다. */
+
     if (g_reset_request != 0U)
     {
       g_reset_request = 0U;
@@ -304,8 +363,17 @@ int main(void)
       /* 여기로는 절대 돌아오지 않는다 */
     }
 
+#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
+    /* 살아있음 로그 : HEARTBEAT_PERIOD_SEC 마다 uptime / 남은 시간 출력 */
+    if ((HAL_GetTick() - tick_beat) >= (HEARTBEAT_PERIOD_SEC * 1000U))
+    {
+      tick_beat += (HEARTBEAT_PERIOD_SEC * 1000U);
+      PrintHeartbeat();
+    }
+#endif
+
 #if (USE_STATUS_LED == 1U)
-    /* 살아있음 표시 : 500ms 토글 */
+    /* 살아있음 표시 : LED 500ms 토글 */
     if ((HAL_GetTick() - tick_led) >= 500U)
     {
       tick_led = HAL_GetTick();

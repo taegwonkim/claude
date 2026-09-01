@@ -26,6 +26,12 @@ STM32CubeMX / STM32CubeIDE 기반, **STM32L562** 에서 RTC 로 주기적인
 ## 두 프로젝트의 공통 사항
 
 - 대상 : **STM32L562** (TrustZone Disabled 기준), STM32CubeIDE
+- **저전력 모드에 진입하지 않습니다.** 두 프로젝트 모두 `HAL_PWR_EnterSLEEPMode()`,
+  `EnterSTOPMode()`, `EnterSTANDBYMode()`, `__WFI()` 를 쓰지 않습니다.
+  MCU 는 리셋 시점까지 풀스피드로 계속 동작하고, RTC 만 백업 도메인에서
+  독립적으로 시간을 셉니다. ("WakeUp" 은 저전력에서 깨울 수 *있다*는 뜻일 뿐입니다)
+- **살아있음 확인** : LED 500ms 토글 + 1분마다 uptime/남은 시간 UART 로그
+  (`USE_HEARTBEAT_LOG`, `HEARTBEAT_PERIOD_SEC`)
 - 인터럽트 콜백에서는 플래그만 세우고 `main()` 루프에서 리셋 → UART 로그 보존
 - 부팅 시 `RCC->CSR` 로 **리셋 원인**(`SFTRSTF` 등) 판별 후 출력
 - **TAMP 백업 레지스터**에 소프트 리셋 누적 횟수 저장 (리셋해도 보존)
