@@ -13,25 +13,27 @@ namespace Stm32WifiConfigTool.Services
     /// 나누기만 하면 된다. 순수 문자열 변환만 담당하며, 시리얼 송수신/타이밍은
     /// <see cref="Stm32Commands"/>가 처리한다.
     ///
-    /// 메시지 분류(첫 필드 기준, 화이트리스트 방식 - 새 프레임 종류가 추가돼도 명령 응답
-    /// 매칭 로직이 오작동하지 않도록):
-    /// - 커맨드 응답: WIFI_R_ALL,... / WIFI_W_ALL,OK|ERR,... / MEAS_R_ALL,... / MEAS_W_ALL,OK|ERR,... /
-    ///   RESET_R_ALL,... / RESET_W_ALL,OK|ERR,... / ERR,... / HELP,...
-    /// - ESP32 상태(주기적 브로드캐스트 겸 STATUS 커맨드 응답): STATUS,&lt;번호&gt;
-    /// - 측정값: DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN — 첫 필드가 리터럴 "DC_" 접두어로
-    ///   시작하는 것으로 식별한다(샘플 개수 N은 고정되어 있지 않음 - 실측 결과 6개가 아니라
-    ///   12개까지 관측됨, docs/프로토콜_명세.md §2가 문서화한 "태그 없음/6개 고정" 포맷과는
-    ///   실제 다르므로 필드 개수가 아니라 이 접두어로 판별한다).
-    /// - 비동기 이벤트: EVENT,&lt;name&gt; (RESET_COUNT,&lt;count&gt;도 이 범주 - 부팅마다 1회 브로드캐스트)
+    /// 메시지 분류: 실측 결과 실제 MCU는 커맨드 응답에 "MEAS_R_ALL,..." 같은 태그를 붙이지
+    /// 않고 값만 맨몸으로 돌려준다(예: 쓰기 응답은 그냥 "OK", 읽기 응답은 그냥 "5000,200,0,1,0").
+    /// 이 저장소 문서(docs/프로토콜_명세.md)가 가정한 "태그 있는 응답"과 다르므로, 첫 필드가
+    /// 커맨드명과 같은지로 응답을 식별하는 화이트리스트 방식은 쓸 수 없다. 대신 "확실하게 비동기
+    /// 브로드캐스트로만 쓰이는 태그가 아니면 전부 응답 후보로 취급"하는 블랙리스트(제외) 방식을
+    /// 쓴다(<see cref="IsBroadcastFrame"/>) — 한 번에 하나의 커맨드-응답만 진행한다는 가정(여러
+    /// 패널이 동시에 커맨드를 보내지 않음) 하에, 대기 중 도착한 비-브로드캐스트 첫 줄을 그 커맨드의
+    /// 응답으로 본다. 응답이 태그 있는 형태("MEAS_R_ALL,...")로 오는 경우도(이 저장소가 만든
+    /// firmware/firmware-no-rtos처럼) 여전히 정상 인식되도록, 각 Get/Set 헬퍼(Stm32Commands.cs)는
+    /// 태그가 있으면 건너뛰고 없으면 그대로 쓰는 방식으로 둘 다 허용한다.
+    /// - 비동기 브로드캐스트(항상 응답 아님으로 제외): STATUS,&lt;번호&gt; / EVENT,&lt;name&gt; /
+    ///   RESET_COUNT,&lt;count&gt; / 측정값(DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN — 첫 필드가
+    ///   리터럴 "DC_" 접두어로 시작하는 것으로 식별, 샘플 개수 N은 고정 아님. 실측 결과 6개가
+    ///   아니라 12개까지 관측되어 필드 개수가 아니라 이 접두어로만 판별한다)
+    /// - 그 외 전부: 커맨드 응답 후보(태그가 있든 없든)
     /// </summary>
     public static class Stm32Protocol
     {
         public const char Stx = '\x02';
 
-        private static readonly HashSet<string> ReplyTags = new HashSet<string>
-        {
-            "WIFI_R_ALL", "WIFI_W_ALL", "MEAS_R_ALL", "MEAS_W_ALL", "RESET_R_ALL", "RESET_W_ALL", "ERR", "HELP"
-        };
+        private const string MeasurementTagPrefix = "DC_";
 
         /// <summary>WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 전체를 한 번에 조회한다.
         /// 응답: WIFI_R_ALL,ssid,pass_masked,server_ip,server_port,ON|OFF,ip,gateway,mask</summary>
@@ -87,15 +89,17 @@ namespace Stm32WifiConfigTool.Services
             return true;
         }
 
-        /// <summary>커맨드(SET/SAVE/GET/STATUS/HELP)에 대한 직접 응답 프레임인지: OK/ERR/SAVED/CONFIG/HELP.
-        /// STATUS는 주기적으로도 브로드캐스트되므로 여기 포함하지 않는다(별도 IsStatusFrame 사용).</summary>
-        public static bool IsReplyFrame(string[] fields) => fields != null && fields.Length > 0 && ReplyTags.Contains(fields[0]);
-
         public static bool IsErrorFrame(string[] fields) => fields != null && fields.Length > 0 && fields[0] == "ERR";
         public static bool IsStatusFrame(string[] fields) => fields != null && fields.Length > 0 && fields[0] == "STATUS";
         public static bool IsEventFrame(string[] fields) => fields != null && fields.Length > 0 && fields[0] == "EVENT";
+        public static bool IsResetCountFrame(string[] fields) => fields != null && fields.Length > 0 && fields[0] == "RESET_COUNT";
+        public static bool IsMeasurementFrame(string[] fields) =>
+            fields != null && fields.Length >= 3 && fields[0].StartsWith(MeasurementTagPrefix, StringComparison.Ordinal);
 
-        private const string MeasurementTagPrefix = "DC_";
+        /// <summary>비동기 브로드캐스트 프레임인지(=커맨드 응답 후보에서 제외해야 하는지). 클래스
+        /// 주석 참고 - 이것이 아닌 나머지 전부는 진행 중인 커맨드의 응답 후보로 취급한다.</summary>
+        public static bool IsBroadcastFrame(string[] fields) =>
+            IsStatusFrame(fields) || IsEventFrame(fields) || IsResetCountFrame(fields) || IsMeasurementFrame(fields);
 
         /// <summary>로그/메시지박스 표시용: 맨 앞 STX가 있으면 제거한다(없으면 원본 그대로).</summary>
         public static string DisplayText(string s)
@@ -133,11 +137,7 @@ namespace Stm32WifiConfigTool.Services
         public static bool TryParseMeasurementRecord(string[] fields, string sourceChannel, out MeasurementRecord record)
         {
             record = null;
-            if (fields == null || fields.Length < 3 || IsReplyFrame(fields) || IsStatusFrame(fields) || IsEventFrame(fields))
-            {
-                return false;
-            }
-            if (!fields[0].StartsWith(MeasurementTagPrefix, StringComparison.Ordinal))
+            if (!IsMeasurementFrame(fields))
             {
                 return false;
             }

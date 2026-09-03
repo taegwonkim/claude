@@ -194,18 +194,36 @@ Stm32WifiConfigTool/
 
 ## 프로토콜 참고
 
-`docs/프로토콜_명세.md` §1의 STX+CSV+CRLF 프레이밍, §2 측정값 포맷, ESP32 상태(STATUS,<번호>)
-프레임은 리포지토리 공용 규격을 그대로 따릅니다. **WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL은
-이 PC 도구에서 새로 도입한 커맨드로, 이 시점 기준 `firmware/`·`firmware-no-rtos/`(MCU 쪽)에는
-아직 구현되어 있지 않습니다** — 프레임 형태(필드 순서/개수, 응답 형식)는 `Services/Stm32Protocol.cs`의
-`BuildWifiWriteAll`/`BuildMeasWriteAll` 및 `Stm32Commands.cs`의 `GetWifiAllAsync` 등의 XML 주석에
-정의되어 있으니, MCU 측 `pc_comm.c`를 이 형식에 맞춰 구현해야 실제 통신이 됩니다(기존 SET/SAVE/
-GET,CONFIG/STATUS 커맨드 방식은 이 도구에서 제거되었습니다). 반대로 **`RESET_R_ALL`/`RESET_W_ALL`
-(§6, RTC 설정 패널)은 `firmware/`·`firmware-no-rtos/` 양쪽 `pc_comm.c`에 이미 구현되어 있어**
-바로 실제 MCU와 통신됩니다. MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은
-`firmware/Core/Src/fpga_link.c`, ESP32 상태 브로드캐스트/IP·MAC 조회는
-`firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`, RTC Wakeup Timer는
-`firmware/Core/Src/rtc_wakeup.c` 참고.
+`docs/프로토콜_명세.md` §1의 STX+CSV+CRLF 프레이밍은 리포지토리 공용 규격을 그대로 따릅니다.
+
+**중요 — 실제 장비의 커맨드 응답 형식이 이 저장소 문서/펌웨어와 다릅니다.** 실측 결과(2026-09,
+실제 MCU 대상 테스트) 각 설정 커맨드(WIFI_/MEAS_/RESET_ 등)의 응답은 `docs/프로토콜_명세.md`가
+가정한 "태그로 시작하는 응답"(예: `MEAS_R_ALL,5000,200,0,1`)이 아니라, **태그 없이 값만 맨몸으로**
+오는 `<STX>data,...,<CR><LF>` 형태입니다 — 쓰기 응답은 그냥 `OK`, 읽기 응답은 그냥 `5000,200,0,1,0`
+처럼 옵니다. 이는 지금 테스트 중인 MCU가 이 저장소의 `firmware/`·`firmware-no-rtos/` 코드를 그대로
+쓰고 있지 않을 가능성을 시사합니다(이 저장소 펌웨어는 항상 태그를 붙여 응답합니다, 예:
+`RESET_W_ALL,OK`).
+
+이 차이 때문에 처음엔 MEAS_R_ALL/MEAS_W_ALL이 "응답 타임아웃"으로 실패했습니다(첫 필드가
+커맨드명과 같은지로 응답 여부를 판별하던 화이트리스트 방식이라 태그 없는 응답을 아예 놓쳤음).
+지금은 **`Stm32Protocol.IsBroadcastFrame`이 확실한 비동기 브로드캐스트(STATUS/EVENT/RESET_COUNT/
+측정값(`DC_` 접두어))만 걸러내고, 그 나머지는 태그가 있든 없든 진행 중인 커맨드의 응답 후보로
+취급**하도록 바꿨습니다. `Stm32Commands.cs`의 각 Get/Set 헬퍼도 `StripTag()`로 태그가 있으면 떼고
+없으면 그대로 쓰는 방식이라, 이 저장소 펌웨어(태그 있음)와 실제 MCU(태그 없음) 양쪽 응답을 모두
+받아들입니다.
+
+**WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL은 이 PC 도구에서 새로 도입한 커맨드로, 이 시점
+기준 `firmware/`·`firmware-no-rtos/`(이 저장소 MCU 쪽)에는 아직 구현되어 있지 않습니다** —
+프레임 형태(필드 순서/개수, 응답 형식)는 `Services/Stm32Protocol.cs`의 `BuildWifiWriteAll`/
+`BuildMeasWriteAll` 및 `Stm32Commands.cs`의 `GetWifiAllAsync` 등의 XML 주석에 정의되어 있으니,
+MCU 측 `pc_comm.c`를 이 형식(태그 있는 응답이든 없는 응답이든 위 설명대로 둘 다 허용됨)에 맞춰
+구현하면 실제 통신이 됩니다(기존 SET/SAVE/GET,CONFIG/STATUS 커맨드 방식은 이 도구에서 제거되었습니다).
+반대로 **`RESET_R_ALL`/`RESET_W_ALL`(§6, RTC 설정 패널)은 `firmware/`·`firmware-no-rtos/` 양쪽
+`pc_comm.c`에 이미 구현되어 있습니다**(단, 실제 테스트 중인 MCU가 이 저장소 펌웨어와 다르다면
+이 커맨드도 마찬가지로 태그 없는 형태로 응답할 수 있습니다 — 위 설명대로 어느 쪽이든 동작합니다).
+MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`,
+ESP32 상태 브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`,
+RTC Wakeup Timer는 `firmware/Core/Src/rtc_wakeup.c` 참고.
 
 ## 알려진 제한사항
 
