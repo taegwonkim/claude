@@ -46,6 +46,9 @@ namespace Stm32WifiConfigTool.Services
                 settings.WifiPanelWidth = GetInt(map, "WifiPanelWidth", settings.WifiPanelWidth);
                 settings.MeasConfigPanelWidth = GetInt(map, "MeasConfigPanelWidth", settings.MeasConfigPanelWidth);
                 settings.RtcPanelWidth = GetInt(map, "RtcPanelWidth", settings.RtcPanelWidth);
+                settings.WindowWidth = GetInt(map, "WindowWidth", settings.WindowWidth);
+                settings.WindowHeight = GetInt(map, "WindowHeight", settings.WindowHeight);
+                settings.WindowMaximized = GetBool(map, "WindowMaximized", settings.WindowMaximized);
 
                 return settings;
             }
@@ -88,7 +91,10 @@ namespace Stm32WifiConfigTool.Services
                 "PortPanelWidth=" + settings.PortPanelWidth,
                 "WifiPanelWidth=" + settings.WifiPanelWidth,
                 "MeasConfigPanelWidth=" + settings.MeasConfigPanelWidth,
-                "RtcPanelWidth=" + settings.RtcPanelWidth
+                "RtcPanelWidth=" + settings.RtcPanelWidth,
+                "WindowWidth=" + settings.WindowWidth,
+                "WindowHeight=" + settings.WindowHeight,
+                "WindowMaximized=" + settings.WindowMaximized
             };
 
             File.WriteAllLines(FilePath, lines);

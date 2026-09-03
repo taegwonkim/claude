@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using Stm32WifiConfigTool.Models;
 using Stm32WifiConfigTool.Services;
@@ -21,10 +22,16 @@ namespace Stm32WifiConfigTool
     {
         private readonly ConnectionManager _conn = new ConnectionManager();
         private readonly AppSettings _settings = AppSettingsStore.Load();
+        private FormWindowState _lastWindowState;
 
         public MainForm()
         {
             InitializeComponent();
+
+            ApplySavedWindowBounds();
+            _lastWindowState = WindowState;
+            Resize += MainForm_Resize;
+            ResizeEnd += MainForm_ResizeEnd;
 
             _portPanel.Initialize(_conn, _settings);
             _wifiPanel.Initialize(_conn, _settings);
@@ -43,6 +50,63 @@ namespace Stm32WifiConfigTool
             Load += (s, e) => BeginInvoke(new Action(ApplySavedSplitterDistances));
 
             FormClosed += MainForm_FormClosed;
+        }
+
+        /// <summary>저장된 창 크기(px)를 복원한다. WindowWidth/Height가 0이면(아직 한 번도 저장된
+        /// 적 없음) MainForm.Designer.cs가 지정한 기본 ClientSize를 그대로 둔다. 화면 작업 영역보다
+        /// 크거나 MinimumSize보다 작은 값은 clamp한다.</summary>
+        private void ApplySavedWindowBounds()
+        {
+            if (_settings.WindowWidth > 0 && _settings.WindowHeight > 0)
+            {
+                Rectangle workArea = Screen.FromControl(this).WorkingArea;
+                int width = Math.Max(MinimumSize.Width, Math.Min(_settings.WindowWidth, workArea.Width));
+                int height = Math.Max(MinimumSize.Height, Math.Min(_settings.WindowHeight, workArea.Height));
+                Size = new Size(width, height);
+            }
+
+            if (_settings.WindowMaximized)
+            {
+                WindowState = FormWindowState.Maximized;
+            }
+        }
+
+        /// <summary>현재 창 크기/최대화 여부를 _settings에 반영하고 즉시 파일에 저장한다.
+        /// 최대화/최소화 상태에서는 RestoreBounds(창이 Normal 상태였을 때의 크기)를 사용한다
+        /// (WindowState.Maximized일 때 Size는 화면을 꽉 채운 크기라 그대로 저장하면 다음 실행 시
+        /// 항상 전체화면 크기로 시작하게 되어 버린다).</summary>
+        private void SaveWindowBounds()
+        {
+            if (WindowState == FormWindowState.Normal)
+            {
+                _settings.WindowWidth = Size.Width;
+                _settings.WindowHeight = Size.Height;
+                _settings.WindowMaximized = false;
+            }
+            else
+            {
+                _settings.WindowWidth = RestoreBounds.Width;
+                _settings.WindowHeight = RestoreBounds.Height;
+                _settings.WindowMaximized = WindowState == FormWindowState.Maximized;
+            }
+            SaveSettingsSafe();
+        }
+
+        /// <summary>최대화/최소화/복원처럼 드래그를 거치지 않는 상태 전환만 여기서 처리한다.
+        /// 드래그로 인한 연속적인 크기 변경은 이 이벤트가 매 픽셀마다 발생해 과도하므로
+        /// ResizeEnd(드래그 완료 시 1회)에서 처리한다.</summary>
+        private void MainForm_Resize(object sender, EventArgs e)
+        {
+            if (WindowState != _lastWindowState)
+            {
+                _lastWindowState = WindowState;
+                SaveWindowBounds();
+            }
+        }
+
+        private void MainForm_ResizeEnd(object sender, EventArgs e)
+        {
+            SaveWindowBounds();
         }
 
         /// <summary>저장된 패널 폭(px)을 각 스플리터에 복원한다. 창이 저장 당시보다 좁아졌거나

@@ -52,5 +52,12 @@ namespace Stm32WifiConfigTool.Models
         public int WifiPanelWidth { get; set; } = 840;
         public int MeasConfigPanelWidth { get; set; } = 300;
         public int RtcPanelWidth { get; set; } = 260;
+
+        /// <summary>메인 창 크기(px). 0이면 아직 저장된 값이 없다는 뜻이며, 이 경우 MainForm.
+        /// Designer.cs가 지정한 기본 크기를 그대로 사용한다(사용자가 창 크기를 한 번이라도
+        /// 조절하거나 최대화하면 그 이후부터 저장되어 다음 실행 시 그대로 복원된다).</summary>
+        public int WindowWidth { get; set; } = 0;
+        public int WindowHeight { get; set; } = 0;
+        public bool WindowMaximized { get; set; } = false;
     }
 }
