@@ -18,7 +18,10 @@ namespace Stm32WifiConfigTool.Services
     /// - 커맨드 응답: WIFI_R_ALL,... / WIFI_W_ALL,OK|ERR,... / MEAS_R_ALL,... / MEAS_W_ALL,OK|ERR,... /
     ///   RESET_R_ALL,... / RESET_W_ALL,OK|ERR,... / ERR,... / HELP,...
     /// - ESP32 상태(주기적 브로드캐스트 겸 STATUS 커맨드 응답): STATUS,&lt;번호&gt;
-    /// - 측정값(그 외 전부, 정확히 8개 필드): &lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6 ("DATA" 태그 없음)
+    /// - 측정값: DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN — 첫 필드가 리터럴 "DC_" 접두어로
+    ///   시작하는 것으로 식별한다(샘플 개수 N은 고정되어 있지 않음 - 실측 결과 6개가 아니라
+    ///   12개까지 관측됨, docs/프로토콜_명세.md §2가 문서화한 "태그 없음/6개 고정" 포맷과는
+    ///   실제 다르므로 필드 개수가 아니라 이 접두어로 판별한다).
     /// - 비동기 이벤트: EVENT,&lt;name&gt; (RESET_COUNT,&lt;count&gt;도 이 범주 - 부팅마다 1회 브로드캐스트)
     /// </summary>
     public static class Stm32Protocol
@@ -92,6 +95,8 @@ namespace Stm32WifiConfigTool.Services
         public static bool IsStatusFrame(string[] fields) => fields != null && fields.Length > 0 && fields[0] == "STATUS";
         public static bool IsEventFrame(string[] fields) => fields != null && fields.Length > 0 && fields[0] == "EVENT";
 
+        private const string MeasurementTagPrefix = "DC_";
+
         /// <summary>로그/메시지박스 표시용: 맨 앞 STX가 있으면 제거한다(없으면 원본 그대로).</summary>
         public static string DisplayText(string s)
         {
@@ -121,16 +126,18 @@ namespace Stm32WifiConfigTool.Services
             }
         }
 
-        /// <summary>측정값 프레임("&lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6", "DATA" 태그 없음)인지 확인하고
-        /// 파싱한다. 커맨드 응답/STATUS가 아니고 정확히 8개 필드일 때만 측정값으로 인정한다.</summary>
+        /// <summary>측정값 프레임("DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN")인지 확인하고 파싱한다.
+        /// 첫 필드가 "DC_" 접두어로 시작하는지로 식별한다(실측 결과 샘플 개수가 고정이 아니어서
+        /// 필드 개수로는 판별할 수 없음 - 위 클래스 주석 참고). 접두어 확인 후에는 MAC을 포함해
+        /// 최소 1개 이상의 샘플 필드가 있어야 하고, 샘플 필드는 모두 정수로 파싱되어야 한다.</summary>
         public static bool TryParseMeasurementRecord(string[] fields, string sourceChannel, out MeasurementRecord record)
         {
             record = null;
-            if (fields == null || IsReplyFrame(fields) || IsStatusFrame(fields) || IsEventFrame(fields))
+            if (fields == null || fields.Length < 3 || IsReplyFrame(fields) || IsStatusFrame(fields) || IsEventFrame(fields))
             {
                 return false;
             }
-            if (fields.Length != 8)
+            if (!fields[0].StartsWith(MeasurementTagPrefix, StringComparison.Ordinal))
             {
                 return false;
             }
@@ -149,7 +156,7 @@ namespace Stm32WifiConfigTool.Services
             {
                 ReceivedAt = DateTime.Now,
                 SourceChannel = sourceChannel,
-                DcIp = fields[0],
+                DcIp = fields[0].Substring(MeasurementTagPrefix.Length),
                 MacAddress = fields[1],
                 Samples = samples.ToArray(),
                 RawLine = string.Join(",", fields)

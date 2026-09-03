@@ -271,7 +271,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._colSamples.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
             this._colSamples.DataPropertyName = "SamplesText";
-            this._colSamples.HeaderText = "Data1..6";
+            this._colSamples.HeaderText = "Data1..N";
             this._colSamples.Name = "_colSamples";
             this._colSamples.ReadOnly = true;
             this._colSamples.Width = 260;

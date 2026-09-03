@@ -9,7 +9,8 @@ using Stm32WifiConfigTool.Services;
 namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// FPGA 측정값("&lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6" 프레임) 표시 패널. USB/UART 채널을
+    /// FPGA 측정값("DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN" 프레임, 첫 필드 "DC_" 접두어로 식별,
+    /// 샘플 개수는 고정이 아님) 표시 패널. USB/UART 채널을
     /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있다. 화면은 좌/우로 나뉘어
     /// 있다: 좌측은 측정값 그리드, 우측은 그 외 모든 프레임(위쪽 STATUS,&lt;번호&gt; 전용 로그 +
     /// 아래쪽 EVENT/RESET_COUNT/커맨드 응답 등 일반 로그)이다 — ESP32 상태는 별도 EspStatusPanel

@@ -94,10 +94,12 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 6. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
    화면이 좌/우로 나뉘어 있습니다(경계선을 드래그해 폭 조절 가능, 조절한 폭은
    `AppSettings.MeasurementGridWidth`로 저장되어 재시작 후에도 유지됩니다):
-   - **좌측 — 측정값 그리드**: FPGA 트리거 결과로 MCU가 보내는 `<DC IP>,<MAC>,data1,...,data6`
-     프레임("DATA" 같은 태그 없음, 정확히 8개 필드, `docs/프로토콜_명세.md` §2)만 표로 보여줍니다.
-     `DC IP`/`MAC`은 이 장치(ESP32)의 station IP/MAC 주소로, 측정값을 보낸 장치를 구분하는
-     용도입니다.
+   - **좌측 — 측정값 그리드**: FPGA 트리거 결과로 MCU가 보내는 `DC_<dc_ip>,<mac>,data1,...,dataN`
+     프레임만 표로 보여줍니다. 첫 필드가 리터럴 `DC_` 접두어로 시작하는지로 식별하며(샘플 개수
+     N은 고정이 아닙니다 — 실측 결과 6개가 아니라 12개까지 관측되어, 이 접두어 기준으로만
+     판별하도록 되어 있습니다. `docs/프로토콜_명세.md` §2가 문서화한 "태그 없음/6개 고정"
+     포맷과는 실제 다르니 유의하세요). `DC IP`/`MAC`은 이 장치(ESP32)의 station IP/MAC
+     주소로, 측정값을 보낸 장치를 구분하는 용도입니다(그리드에는 `DC_` 접두어를 뗀 IP만 표시).
    - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지 프레임을 전부 보여줍니다.
      - 위쪽 **STATUS** 로그: `STATUS,<번호>` 프레임만 골라 `STATUS:<번호>` 형태로 표시합니다
        (예: `STATUS:3`). ESP32 상태 번호 자체는 4번 패널(ESP32 상태 보기)에서도 큰 글씨로
@@ -186,7 +188,7 @@ Stm32WifiConfigTool/
     NetConfig.cs
     MeasurementConfig.cs    - Reference/Offset/Resistance/Interval Time
     RtcConfig.cs            - RTC 리셋 주기(초) (신규)
-    MeasurementRecord.cs    - DC IP/MAC + data1..6
+    MeasurementRecord.cs    - DC IP/MAC + data1..N (개수 가변)
     AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
 
