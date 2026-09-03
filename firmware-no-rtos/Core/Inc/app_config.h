@@ -57,6 +57,20 @@ extern "C" {
 #define APP_FLASH_CONFIG_SECTOR_ADDR (0x000000U)
 #define APP_FLASH_SECTOR_SIZE        (4096U)
 
+/* ----------------------------------------------------------------------- */
+/* RTC Wakeup Timer 기반 주기적 리셋 (docs/프로토콜_명세.md §6) */
+/* ----------------------------------------------------------------------- */
+/* RESET_W_ALL로 저장하는 설정의 플래시 위치: NetConfig(섹터0) 다음 섹터 */
+#define APP_FLASH_RESET_CONFIG_SECTOR_ADDR (0x001000U)
+
+/* RTC Wakeup Timer는 ck_spre(1Hz) + 16bit 모드 기준 최대 65536초까지 표현 가능
+ * (WUTR 레지스터가 15bit라 (WUTR+1)초, WUTR 최대값 0xFFFF -> 65536초 ≈ 18.2시간).
+ * 더 긴 주기가 필요하면 17bit 모드(RTC_WAKEUPCLOCK_CK_SPRE_17BITS, 최대 131072초)로
+ * 확장 가능하나 본 구현 범위에서는 16bit 모드만 지원한다. */
+#define APP_RESET_MIN_PERIOD_SEC     (1U)
+#define APP_RESET_MAX_PERIOD_SEC     (65536U)
+#define APP_RESET_DEFAULT_PERIOD_SEC (3600U) /* 기본 1시간, RESET_W_ALL로 변경 가능 */
+
 #ifdef __cplusplus
 }
 #endif

@@ -99,8 +99,10 @@ super-loop는 **선점형이 아니므로**, 한 `*_Poll()` 호출이 오래 걸
      `App_Init();` 1회 호출 (`#include "app_main.h"` 추가).
    - `while (1) { ... }`의 `/* USER CODE BEGIN 3 */` 영역에서 `App_Run();` 호출.
 2. **`Core/Src/stm32l5xx_it.c`**: `firmware/`와 동일 — CubeMX가 생성한 그대로 두면 됩니다.
-   `HAL_GPIO_EXTI_Callback()`/`HAL_UARTEx_RxEventCallback()`은 `Core/Src/app_it_callbacks.c`
-   (본 디렉터리에도 동일하게 포함) 한 곳에만 정의되어 있습니다.
+   `HAL_GPIO_EXTI_Callback()`/`HAL_UARTEx_RxEventCallback()`/
+   `HAL_RTCEx_WakeUpTimerEventCallback()`은 `Core/Src/app_it_callbacks.c`
+   (본 디렉터리에도 동일하게 포함) 한 곳에만 정의되어 있습니다. RTC 설정 자체는
+   `firmware/docs/CubeMX_설정가이드.md` §8-1을 그대로 따르면 됩니다(RTOS 유무와 무관한 설정).
 3. **`Core/Src/usbd_cdc_if.c`**: `firmware/`와 동일 — `CDC_Receive_FS()`의
    `USER CODE BEGIN 6` 영역에서 `PC_Comm_FeedUSB(Buf, *Len);` 호출.
 
@@ -120,10 +122,14 @@ Core/Inc/
   pc_comm.h             - PC 커맨드 파서 (PcComm_Task -> PcComm_Poll)
   fpga_link.h           - FPGA START 송신 + 트리거/ADC 수신 (세마포어 -> 플래그, Task -> Poll)
   status_led.h          - LED_RUN/LED_WIFI 제어 (firmware/와 동일)
+  reset_config.h         - RTC 리셋 주기(초) 설정 구조체 + CRC32 + 플래시 로드/세이브 (firmware/와 동일, 섹터1)
+  rtc_wakeup.h           - RTC Wakeup Timer 무장 + 백업 레지스터 리셋 카운터 (firmware/와 동일,
+                          RTOS API 미사용 코드라 두 변형 간 차이 없음)
 Core/Src/
   (위 헤더들의 구현)
   app_main.c            - App_Init()/App_Run(), 측정값 큐/설정저장 요청/WiFi연결요청 구현
-  app_it_callbacks.c    - HAL_UARTEx_RxEventCallback/HAL_GPIO_EXTI_Callback 단일 정의 + dispatch
+  app_it_callbacks.c    - HAL_UARTEx_RxEventCallback/HAL_GPIO_EXTI_Callback/
+                          HAL_RTCEx_WakeUpTimerEventCallback 단일 정의 + dispatch
                           (firmware/와 동일 — 호출 대상 함수 시그니처가 그대로라 변경 없음)
 ```
 

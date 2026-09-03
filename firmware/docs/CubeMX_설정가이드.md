@@ -118,6 +118,30 @@ STM32L562는 TrustZone(Cortex-M33) MCU입니다. 이 프로젝트 범위에서�
 - GPIO PH1(`FROM_FPGA`)을 GPIO_EXTI1로 설정, Pull-up, Trigger: **Falling edge**.
 - NVIC → EXTI1 interrupt Enable, Preemption Priority는 아래 "인터럽트 우선순위" 절 참고.
 
+## 8-1. RTC (Wakeup Timer, 주기적 자동 리셋용)
+
+시스템을 계속 동작시키다가 설정된 주기(초)마다 자동으로 리셋(`NVIC_SystemReset()`)시키는
+용도로만 RTC를 사용합니다(날짜/시각(Calendar) 자체는 사용하지 않음, `firmware/Core/Src/rtc_wakeup.c`,
+`docs/프로토콜_명세.md` §6 참고). CubeMX에서 아래와 같이 설정하세요.
+
+- Pinout & Configuration → **Timers → RTC**를 체크(Activate)합니다.
+- **Activate Clock Source**: 체크 필요(RTC 자체 활성화). Clock Configuration 탭에서 RTC 클럭
+  소스로 보드에 32.768kHz 크리스탈이 실장되어 있으면 **LSE**를, 없으면 **LSI**(내부 저속 RC,
+  정확도는 떨어지지만 리셋 주기 오차가 문제되지 않는 용도라면 충분)를 선택합니다.
+- **Activate Calendar**: 체크할 필요 없음(달력/시각 기능은 이 프로젝트에서 쓰지 않음. Wakeup
+  Timer는 Calendar와 독립적으로 동작).
+- **WakeUp**: RTC 설정 화면의 `WakeUp` 서브탭(버전에 따라 명칭이 다를 수 있음)에서 Wakeup Timer를
+  활성화할 필요는 없습니다 — Wakeup Timer는 CubeMX GUI로 미리 값을 박아두지 않고, 코드
+  (`rtc_wakeup.c`의 `HAL_RTCEx_SetWakeUpTimer_IT()`)가 부팅 시(그리고 `RESET_W_ALL` 커맨드
+  수신 시) 저장된 주기값으로 매번 다시 무장(arm)하기 때문입니다. GUI에서는 RTC 활성화 및
+  클럭 소스 선택만 하면 됩니다.
+- **NVIC**: System Core → NVIC 탭에서 **RTC wake-up interrupt through EXTI line(RTC_WKUP_IRQn)**을
+  Enable 하세요. 우선순위는 아래 §9의 NVIC 우선순위 표에 함께 정리되어 있습니다(Preemption
+  Priority 7 — 리셋을 유발하는 인터럽트라 지연되어도 시스템에 해가 없는 가장 낮은 우선순위로 둡니다).
+- **RTC 백업 레지스터**: 리셋 누적 횟수는 `RTC_BKP_DR0`에 저장됩니다(별도 CubeMX 설정 불필요 —
+  RTC를 Activate하면 백업 레지스터 접근용 HAL 함수(`HAL_RTCEx_BKUPRead/Write`)가 자동으로
+  사용 가능해집니다). 백업 도메인이므로 `NVIC_SystemReset()`(웜 리셋)에도 값이 유지됩니다.
+
 ## 9. FreeRTOS (Middleware and Software Packs → FREERTOS)
 
 좌측 IP 트리에서 **Middleware and Software Packs → FREERTOS**를 체크하면 우측에 설정 화면이
@@ -198,6 +222,7 @@ ISR은 raw ≥ 5를 만족해야 안전**합니다 — 실무적으로는 **Pree
 | USART3 (PC) + DMA | 5 | 0 |
 | USB (FS Device) | 6 | 0 |
 | SPI2 (Flash, 폴링 사용시 불필요) | 7 | 0 |
+| RTC_WKUP_IRQn (Wakeup Timer, 주기적 리셋) | 7 | 1 |
 | SysTick | CubeMX가 커널 틱으로 자동 관리(그룹 내 최저 우선순위) | - |
 
 > Pinout & Configuration → **System Core → NVIC** 탭(전체 인터럽트를 한 표로 보여주는 곳)에서
@@ -232,13 +257,14 @@ SRAM 256KB 대비 위 사용량은 여유가 충분하므로 별도 MPU 세밀 �
      생성하므로, CubeMX Tasks and Queues 탭에서 별도로 태스크를 추가할 필요는 없습니다.
 
 2. **`Core/Src/stm32l5xx_it.c`**
-   - `EXTI1_IRQHandler`, `USARTx_IRQHandler` 모두 CubeMX가 생성한 그대로 두면 됩니다
-     (내부에서 `HAL_GPIO_EXTI_IRQHandler`/`HAL_UART_IRQHandler`를 호출 → 아래 콜백으로 이어짐).
-   - 수정 불필요. `HAL_GPIO_EXTI_Callback()`과 `HAL_UARTEx_RxEventCallback()`은
-     `Core/Src/app_it_callbacks.c`(본 리포지토리 신규 파일)에 **한 곳에만** 정의되어 있으며,
-     여기서 `esp32_at.c`/`fpga_link.c`/`pc_comm.c`로 이벤트를 나눠 전달합니다
-     (HAL weak 콜백은 프로젝트 전체에서 한 번만 정의 가능하므로, 각 드라이버가 직접 정의하지 않고
-     이 파일이 대신 dispatch합니다).
+   - `EXTI1_IRQHandler`, `USARTx_IRQHandler`, `RTC_WKUP_IRQHandler` 모두 CubeMX가 생성한 그대로
+     두면 됩니다(내부에서 `HAL_GPIO_EXTI_IRQHandler`/`HAL_UART_IRQHandler`/
+     `HAL_RTCEx_WakeUpTimerIRQHandler`를 호출 → 아래 콜백으로 이어짐).
+   - 수정 불필요. `HAL_GPIO_EXTI_Callback()`, `HAL_UARTEx_RxEventCallback()`,
+     `HAL_RTCEx_WakeUpTimerEventCallback()`은 `Core/Src/app_it_callbacks.c`(본 리포지토리 신규
+     파일)에 **한 곳에만** 정의되어 있으며, 여기서 `esp32_at.c`/`fpga_link.c`/`pc_comm.c`/
+     `rtc_wakeup.c`로 이벤트를 나눠 전달합니다(HAL weak 콜백은 프로젝트 전체에서 한 번만 정의
+     가능하므로, 각 드라이버가 직접 정의하지 않고 이 파일이 대신 dispatch합니다).
 
 3. **`Core/Src/usbd_cdc_if.c`** (USB_DEVICE 미들웨어가 생성)
    - `static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)` 함수의

@@ -6,6 +6,7 @@
 #include "pc_comm.h"
 #include "fpga_link.h"
 #include "status_led.h"
+#include "rtc_wakeup.h"
 #include "cmsis_os2.h"
 #include <string.h>
 #include <stdio.h>
@@ -168,7 +169,7 @@ void App_FreeRTOS_Init(void)
 {
     NetConfig_t cfg;
 
-    /* SPI2/USART1/USART2/USART3/USB는 이 시점(osKernelStart 이전)에 main()에서 이미 초기화되어 있음 */
+    /* SPI2/USART1/USART2/USART3/USB/RTC는 이 시점(osKernelStart 이전)에 main()에서 이미 초기화되어 있음 */
     (void)W25Q40_Init();
     if (!NetConfig_Load(&cfg)) {
         NetConfig_SetDefaults(&cfg);
@@ -180,6 +181,11 @@ void App_FreeRTOS_Init(void)
 
     PcComm_Init(&cfg);
     FpgaLink_Init();
+
+    /* USART3/USB가 준비된 뒤에 호출: 부팅 리셋 카운터 증가 + RESET_COUNT 브로드캐스트 +
+     * RTC Wakeup Timer 무장(설정된 주기가 지나면 RtcWakeup_OnWakeupTimerEvent()가
+     * NVIC_SystemReset()을 호출해 이 초기화 과정을 처음부터 반복하게 된다) */
+    RtcWakeup_Init();
 
     /* 부팅 시 로드한 설정으로 ESP32_Task가 최초 WiFi 연결을 시도하도록 요청 */
     osMessageQueuePut(g_wifiEventQueueId, &cfg, 0U, 0U);

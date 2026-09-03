@@ -82,11 +82,14 @@ Core/Inc/
   pc_comm.h             - PC 커맨드 파서 (USART3 + USB CDC 공용)
   fpga_link.h           - MCU→FPGA START 커맨드 송신(1회) + FPGA 트리거(EXTI, PH1)/ADC(USART2) 수신
   status_led.h          - LED_RUN(PC13) 하트비트, LED_WIFI(PC14) 연결 표시
+  reset_config.h         - RTC 리셋 주기(초) 설정 구조체 + CRC32 + 플래시 로드/세이브 (섹터1)
+  rtc_wakeup.h           - RTC Wakeup Timer 무장 + 백업 레지스터 리셋 카운터 (docs/프로토콜_명세.md §6)
   app_freertos.h        - 태스크/큐 생성 진입점 (freertos.c에서 호출)
 Core/Src/
   (위 헤더들의 구현)
   app_freertos.c        - App_FreeRTOS_Init(), ESP32_Task/Config_Task 본체
-  app_it_callbacks.c    - HAL_UARTEx_RxEventCallback/HAL_GPIO_EXTI_Callback 단일 정의 + dispatch
+  app_it_callbacks.c    - HAL_UARTEx_RxEventCallback/HAL_GPIO_EXTI_Callback/
+                          HAL_RTCEx_WakeUpTimerEventCallback 단일 정의 + dispatch
 ```
 
 ## 빌드 방법 (요약)

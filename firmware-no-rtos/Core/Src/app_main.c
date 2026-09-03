@@ -6,6 +6,7 @@
 #include "pc_comm.h"
 #include "fpga_link.h"
 #include "status_led.h"
+#include "rtc_wakeup.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -195,13 +196,20 @@ void App_Init(void)
 {
     NetConfig_t cfg;
 
-    /* SPI2/USART1/USART2/USART3/USB는 이 시점 이전에 main()에서 이미 초기화되어 있음 */
+    /* SPI2/USART1/USART2/USART3/USB/RTC는 이 시점 이전에 main()에서 이미 초기화되어 있음 */
     (void)W25Q40_Init();
     if (!NetConfig_Load(&cfg)) {
         NetConfig_SetDefaults(&cfg);
     }
 
     PcComm_Init(&cfg);
+
+    /* USART3/USB가 준비된 뒤에 호출: 부팅 리셋 카운터 증가 + RESET_COUNT 브로드캐스트 +
+     * RTC Wakeup Timer 무장. 아래 ESP32 프로브 대기 루프가(RTOS가 없어 무한정) 멈춰 있어도
+     * 설정된 주기가 지나면 RtcWakeup_OnWakeupTimerEvent()가 NVIC_SystemReset()을 호출해
+     * App_Init()부터 다시 시작하므로, ESP32 무응답 시의 워치독 역할도 겸한다. */
+    RtcWakeup_Init();
+
     FpgaLink_Init();
     Esp32_Init();
 
@@ -211,7 +219,8 @@ void App_Init(void)
 
         /* RTOS가 없으므로 이 루프가 성공할 때까지 App_Run()은 아직 한 번도 돌지 않는다 —
          * 즉 ESP32가 응답할 때까지 PC 커맨드/FPGA 트리거는 전혀 처리되지 않는다
-         * (firmware-no-rtos/README.md "RTOS 미사용의 결과" 참고). */
+         * (firmware-no-rtos/README.md "RTOS 미사용의 결과" 참고. 다만 RTC Wakeup Timer는
+         * 이 대기 중에도 계속 카운트하므로 설정된 주기가 지나면 강제로 리셋되어 복구된다). */
         while (!Esp32_Probe()) {
             HAL_Delay(1000U);
             probe_fail_count++;

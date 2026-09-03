@@ -4,6 +4,7 @@
 #include "app_config.h"
 #include "app_freertos.h" /* g_cfgEventQueueId */
 #include "esp32_at.h"      /* Esp32_GetLinkState (STATUS 커맨드용) */
+#include "rtc_wakeup.h"    /* RtcWakeup_GetPeriodSec/SetPeriodSec (RESET_R_ALL/RESET_W_ALL) */
 #include "usbd_cdc_if.h"   /* CDC_Transmit_FS (USB_DEVICE 미들웨어 생성) */
 #include "cmsis_os2.h"
 #include <string.h>
@@ -214,6 +215,35 @@ static void ProcessStatus(void)
     PcComm_BroadcastFrame(buf);
 }
 
+/* <STX>RESET_W_ALL,<seconds><CR><LF>: RTC Wakeup Timer 주기적 리셋 간격(초)을 설정한다.
+ * 성공 시 즉시 플래시에 저장하고 Wakeup Timer를 새 값으로 재무장한다(docs/프로토콜_명세.md §6). */
+static void ProcessResetWriteAll(char *fields[], int field_count)
+{
+    long seconds;
+
+    if (field_count < 2) {
+        PcComm_BroadcastFrame("RESET_W_ALL,ERR,MISSING_ARGS");
+        return;
+    }
+
+    seconds = strtol(fields[1], NULL, 10);
+    if (seconds <= 0 || !RtcWakeup_SetPeriodSec((uint32_t)seconds)) {
+        PcComm_BroadcastFrame("RESET_W_ALL,ERR,INVALID_SECONDS");
+        return;
+    }
+
+    PcComm_BroadcastFrame("RESET_W_ALL,OK");
+}
+
+/* <STX>RESET_R_ALL<CR><LF>: 현재 설정된 리셋 주기(초)를 조회한다. */
+static void ProcessResetReadAll(void)
+{
+    char buf[32];
+
+    snprintf(buf, sizeof(buf), "RESET_R_ALL,%lu", (unsigned long)RtcWakeup_GetPeriodSec());
+    PcComm_BroadcastFrame(buf);
+}
+
 static void ProcessFrame(char *line)
 {
     char *fields[PC_FRAME_MAX_FIELDS];
@@ -240,10 +270,15 @@ static void ProcessFrame(char *line)
         ProcessGetConfig();
     } else if (strcmp(cmd, "STATUS") == 0) {
         ProcessStatus();
+    } else if (strcmp(cmd, "RESET_W_ALL") == 0) {
+        ProcessResetWriteAll(fields, field_count);
+    } else if (strcmp(cmd, "RESET_R_ALL") == 0) {
+        ProcessResetReadAll();
     } else if (strcmp(cmd, "HELP") == 0) {
         PcComm_BroadcastFrame(
             "HELP,SET SSID=<s> / SET PASS=<s> / SET SERVER_IP=<ip> / SET SERVER_PORT=<port> / "
-            "SET DHCP=ON|OFF / SET IP=<ip> / SET GATEWAY=<ip> / SET MASK=<ip> / SAVE / GET CONFIG / STATUS / HELP");
+            "SET DHCP=ON|OFF / SET IP=<ip> / SET GATEWAY=<ip> / SET MASK=<ip> / SAVE / GET CONFIG / STATUS / "
+            "RESET_W_ALL,<seconds> / RESET_R_ALL / HELP");
     } else {
         PcComm_BroadcastFrame("ERR,UNKNOWN_COMMAND");
     }
