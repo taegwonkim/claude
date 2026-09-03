@@ -35,6 +35,10 @@ namespace Stm32WifiConfigTool.Models
         public string MeasurementDisplayChannel { get; set; } = "Both";
         public bool MeasurementAutoScroll { get; set; } = true;
 
+        /// <summary>측정값 보기 패널 내부의 좌(측정값 그리드)/우(STATUS + 그 외 수신값 로그) 스플리터
+        /// 위치(px, 좌측 폭). 다른 패널 폭들과 마찬가지로 드래그 즉시 저장되고 재시작 후 복원된다.</summary>
+        public int MeasurementGridWidth { get; set; } = 550;
+
         /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
         public string EspStatusDisplayChannel { get; set; } = "Both";
 

@@ -36,9 +36,14 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
 않은 채** 이전 실행 파일을 그대로 실행 중인 경우에도 같은 증상으로 보일 수 있으니, 솔루션을
 완전히 다시 빌드한 뒤 테스트하세요.
 
+하단 **측정값 보기** 패널(6번, 전체 폭) 내부에도 별도의 좌/우 스플리터가 하나 더 있습니다(좌:
+측정값 그리드, 우: STATUS + 그 외 값 로그, `Panels/MeasurementPanel.cs`의 `_splitDisplay`) — 위
+5개 패널과 같은 드래그·즉시 저장 방식이며 `AppSettings.MeasurementGridWidth`로 저장됩니다.
+
 MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 프레임을 구분해서 각각 다른 패널에
 표시**합니다(둘 다 첫 필드로 구분되며, 응답 대기 로직도 이 둘을 명령 응답과 혼동하지 않도록
-`Stm32Protocol.cs`의 화이트리스트 방식으로 분류합니다).
+`Stm32Protocol.cs`의 화이트리스트 방식으로 분류합니다). 측정값 보기 패널 우측에는 이 둘 외에도
+STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레임이 한데 모여 표시됩니다.
 
 1. **포트 설정** (좌상단, `Panels/PortSettingsPanel.cs`)
    USB/UART 각각 COM 포트, Baud Rate, 읽기/쓰기 타임아웃(ms)을 설정하고 연결/해제합니다.
@@ -87,16 +92,25 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
    - 하단에 수신 이력(시각/채널/번호/텍스트)을 로그로 쌓고, "지우기"로 초기화합니다.
 
 6. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
-   FPGA 트리거 결과로 MCU가 보내는 `<DC IP>,<MAC>,data1,...,data6` 프레임("DATA" 같은 태그
-   없음, `docs/프로토콜_명세.md` §2)을 표로 보여줍니다. `DC IP`/`MAC`은 이 장치(ESP32)의
-   station IP/MAC 주소로, 측정값을 보낸 장치를 구분하는 용도입니다.
-   - "표시 채널": USB / UART / 둘 다 — 어느 채널에서 온 데이터를 그릴지 선택.
+   화면이 좌/우로 나뉘어 있습니다(경계선을 드래그해 폭 조절 가능, 조절한 폭은
+   `AppSettings.MeasurementGridWidth`로 저장되어 재시작 후에도 유지됩니다):
+   - **좌측 — 측정값 그리드**: FPGA 트리거 결과로 MCU가 보내는 `<DC IP>,<MAC>,data1,...,data6`
+     프레임("DATA" 같은 태그 없음, 정확히 8개 필드, `docs/프로토콜_명세.md` §2)만 표로 보여줍니다.
+     `DC IP`/`MAC`은 이 장치(ESP32)의 station IP/MAC 주소로, 측정값을 보낸 장치를 구분하는
+     용도입니다.
+   - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지 프레임을 전부 보여줍니다.
+     - 위쪽 **STATUS** 로그: `STATUS,<번호>` 프레임만 골라 `STATUS:<번호>` 형태로 표시합니다
+       (예: `STATUS:3`). ESP32 상태 번호 자체는 4번 패널(ESP32 상태 보기)에서도 큰 글씨로
+       별도로 보이지만, 여기서는 수신 이력을 시간순으로 훑어볼 수 있습니다.
+     - 아래쪽 일반 로그: `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` / `EVENT,TCP_CONNECTED` /
+       `EVENT,TCP_CLOSED` 등 MCU의 비동기 알림, `RESET_COUNT,<count>`(RTC 리셋마다 1회, §6),
+       그리고 다른 패널이 보낸 커맨드에 대한 응답 프레임(`WIFI_R_ALL,...`/`MEAS_R_ALL,...`/
+       `RESET_R_ALL,...`/`ERR,...` 등, 같은 채널에 붙어 있는 모든 패널이 라인을 함께 받으므로)까지
+       원본 필드를 콤마로 이어붙인 텍스트로 모두 표시됩니다.
+   - "표시 채널": USB / UART / 둘 다 — 어느 채널에서 온 데이터를 그릴지 선택(좌/우 모두 동일하게 적용).
    - "자동 스크롤": 새 측정값이 들어올 때마다 그리드를 자동으로 맨 아래로 스크롤합니다.
-   - "지우기": 그리드와 이벤트 로그를 모두 비웁니다.
+   - "지우기": 그리드와 STATUS 로그, 일반 로그를 모두 비웁니다.
    - "CSV로 저장": 현재까지 쌓인 측정값을 CSV 파일로 내보냅니다.
-   - 하단 "이벤트 로그"에는 `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` /
-     `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED` 등 MCU의 비동기 알림이 표시됩니다
-     (ESP32 상태 번호 자체는 4번 패널에서 별도로 봅니다).
 
 ## Visual Studio 디자이너로 폼/패널 편집하기
 

@@ -14,15 +14,20 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Button _clearButton;
         private System.Windows.Forms.Button _exportButton;
         private System.Windows.Forms.CheckBox _autoScrollCheck;
+        private System.Windows.Forms.SplitContainer _splitDisplay;
+        private System.Windows.Forms.TableLayoutPanel _leftLayout;
         private System.Windows.Forms.DataGridView _grid;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colReceivedAt;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colChannel;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colDcIp;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colMac;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colSamples;
+        private System.Windows.Forms.Label _countLabel;
+        private System.Windows.Forms.TableLayoutPanel _rightLayout;
+        private System.Windows.Forms.Label _statusCaptionLabel;
+        private System.Windows.Forms.TextBox _statusLogBox;
         private System.Windows.Forms.Label _eventLabel;
         private System.Windows.Forms.TextBox _eventLogBox;
-        private System.Windows.Forms.Label _countLabel;
 
         #region Component Designer generated code
 
@@ -41,19 +46,30 @@ namespace Stm32WifiConfigTool.Panels
             this._clearButton = new System.Windows.Forms.Button();
             this._exportButton = new System.Windows.Forms.Button();
             this._autoScrollCheck = new System.Windows.Forms.CheckBox();
+            this._splitDisplay = new System.Windows.Forms.SplitContainer();
+            this._leftLayout = new System.Windows.Forms.TableLayoutPanel();
             this._grid = new System.Windows.Forms.DataGridView();
             this._colReceivedAt = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colChannel = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colDcIp = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colMac = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colSamples = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._countLabel = new System.Windows.Forms.Label();
+            this._rightLayout = new System.Windows.Forms.TableLayoutPanel();
+            this._statusCaptionLabel = new System.Windows.Forms.Label();
+            this._statusLogBox = new System.Windows.Forms.TextBox();
             this._eventLabel = new System.Windows.Forms.Label();
             this._eventLogBox = new System.Windows.Forms.TextBox();
-            this._countLabel = new System.Windows.Forms.Label();
             this._root.SuspendLayout();
             this._topRow.SuspendLayout();
             this._channelGroup.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._splitDisplay)).BeginInit();
+            this._splitDisplay.Panel1.SuspendLayout();
+            this._splitDisplay.Panel2.SuspendLayout();
+            this._splitDisplay.SuspendLayout();
+            this._leftLayout.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._grid)).BeginInit();
+            this._rightLayout.SuspendLayout();
             this.SuspendLayout();
             //
             // _root
@@ -61,18 +77,14 @@ namespace Stm32WifiConfigTool.Panels
             this._root.ColumnCount = 1;
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Controls.Add(this._topRow, 0, 0);
-            this._root.Controls.Add(this._grid, 0, 1);
-            this._root.Controls.Add(this._eventLabel, 0, 2);
-            this._root.Controls.Add(this._eventLogBox, 0, 3);
+            this._root.Controls.Add(this._splitDisplay, 0, 1);
             this._root.Dock = System.Windows.Forms.DockStyle.Fill;
             this._root.Location = new System.Drawing.Point(0, 0);
             this._root.Name = "_root";
             this._root.Padding = new System.Windows.Forms.Padding(6);
-            this._root.RowCount = 4;
+            this._root.RowCount = 2;
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 70F));
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 30F));
+            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Size = new System.Drawing.Size(900, 400);
             this._root.TabIndex = 0;
             //
@@ -170,6 +182,38 @@ namespace Stm32WifiConfigTool.Panels
             this._autoScrollCheck.Text = "자동 스크롤";
             this._autoScrollCheck.CheckedChanged += new System.EventHandler(this.AutoScrollCheck_CheckedChanged);
             //
+            // _splitDisplay (좌: 측정값 그리드 | 우: STATUS + 그 외 수신값 로그.
+            // 사용자가 경계선을 드래그해 폭을 조절할 수 있고, 조절한 폭은 저장된다.)
+            //
+            this._splitDisplay.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._splitDisplay.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            this._splitDisplay.Location = new System.Drawing.Point(9, 68);
+            this._splitDisplay.Name = "_splitDisplay";
+            this._splitDisplay.Panel1.Controls.Add(this._leftLayout);
+            this._splitDisplay.Panel1MinSize = 300;
+            this._splitDisplay.Panel2.Controls.Add(this._rightLayout);
+            this._splitDisplay.Panel2MinSize = 260;
+            this._splitDisplay.Size = new System.Drawing.Size(882, 323);
+            this._splitDisplay.SplitterDistance = 550;
+            this._splitDisplay.SplitterWidth = 6;
+            this._splitDisplay.TabIndex = 1;
+            this._splitDisplay.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitDisplay_SplitterMoved);
+            //
+            // _leftLayout (측정값 그리드 + 건수 라벨)
+            //
+            this._leftLayout.ColumnCount = 1;
+            this._leftLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this._leftLayout.Controls.Add(this._grid, 0, 0);
+            this._leftLayout.Controls.Add(this._countLabel, 0, 1);
+            this._leftLayout.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._leftLayout.Location = new System.Drawing.Point(0, 0);
+            this._leftLayout.Name = "_leftLayout";
+            this._leftLayout.RowCount = 2;
+            this._leftLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this._leftLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._leftLayout.Size = new System.Drawing.Size(550, 323);
+            this._leftLayout.TabIndex = 0;
+            //
             // _grid
             //
             this._grid.AllowUserToAddRows = false;
@@ -182,13 +226,13 @@ namespace Stm32WifiConfigTool.Panels
             this._colMac,
             this._colSamples});
             this._grid.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._grid.Location = new System.Drawing.Point(9, 68);
+            this._grid.Location = new System.Drawing.Point(3, 3);
             this._grid.Name = "_grid";
             this._grid.ReadOnly = true;
             this._grid.RowHeadersVisible = false;
             this._grid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this._grid.Size = new System.Drawing.Size(882, 210);
-            this._grid.TabIndex = 1;
+            this._grid.Size = new System.Drawing.Size(544, 297);
+            this._grid.TabIndex = 0;
             //
             // _colReceivedAt
             //
@@ -232,39 +276,86 @@ namespace Stm32WifiConfigTool.Panels
             this._colSamples.ReadOnly = true;
             this._colSamples.Width = 260;
             //
+            // _countLabel
+            //
+            this._countLabel.Dock = System.Windows.Forms.DockStyle.Top;
+            this._countLabel.Location = new System.Drawing.Point(3, 303);
+            this._countLabel.Name = "_countLabel";
+            this._countLabel.Padding = new System.Windows.Forms.Padding(0, 2, 3, 0);
+            this._countLabel.Size = new System.Drawing.Size(544, 20);
+            this._countLabel.TabIndex = 1;
+            this._countLabel.Text = "0건";
+            this._countLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
+            // _rightLayout (STATUS 표시 + 그 외 수신값 로그 - 측정값(TryParseMeasurementRecord로
+            // 인식되는 8필드 프레임)이 아닌 나머지 프레임은 모두 여기 표시된다: STATUS,&lt;번호&gt;는
+            // 위쪽 _statusLogBox에 "STATUS:&lt;번호&gt;" 형태로, 그 외(EVENT/RESET_COUNT/커맨드
+            // 응답 등)는 아래쪽 _eventLogBox에 원본 필드를 콤마로 이어붙인 텍스트로 표시된다.)
+            //
+            this._rightLayout.ColumnCount = 1;
+            this._rightLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this._rightLayout.Controls.Add(this._statusCaptionLabel, 0, 0);
+            this._rightLayout.Controls.Add(this._statusLogBox, 0, 1);
+            this._rightLayout.Controls.Add(this._eventLabel, 0, 2);
+            this._rightLayout.Controls.Add(this._eventLogBox, 0, 3);
+            this._rightLayout.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._rightLayout.Location = new System.Drawing.Point(0, 0);
+            this._rightLayout.Name = "_rightLayout";
+            this._rightLayout.RowCount = 4;
+            this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 140F));
+            this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this._rightLayout.Size = new System.Drawing.Size(326, 323);
+            this._rightLayout.TabIndex = 0;
+            //
+            // _statusCaptionLabel
+            //
+            this._statusCaptionLabel.Dock = System.Windows.Forms.DockStyle.Top;
+            this._statusCaptionLabel.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this._statusCaptionLabel.Location = new System.Drawing.Point(3, 0);
+            this._statusCaptionLabel.Name = "_statusCaptionLabel";
+            this._statusCaptionLabel.Padding = new System.Windows.Forms.Padding(0, 4, 0, 2);
+            this._statusCaptionLabel.Size = new System.Drawing.Size(320, 23);
+            this._statusCaptionLabel.TabIndex = 0;
+            this._statusCaptionLabel.Text = "STATUS";
+            //
+            // _statusLogBox
+            //
+            this._statusLogBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._statusLogBox.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8.5F);
+            this._statusLogBox.Location = new System.Drawing.Point(3, 26);
+            this._statusLogBox.Multiline = true;
+            this._statusLogBox.Name = "_statusLogBox";
+            this._statusLogBox.ReadOnly = true;
+            this._statusLogBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this._statusLogBox.Size = new System.Drawing.Size(320, 134);
+            this._statusLogBox.TabIndex = 1;
+            //
             // _eventLabel
             //
-            this._eventLabel.Location = new System.Drawing.Point(9, 278);
+            this._eventLabel.Dock = System.Windows.Forms.DockStyle.Top;
+            this._eventLabel.Location = new System.Drawing.Point(3, 163);
             this._eventLabel.Name = "_eventLabel";
             this._eventLabel.Padding = new System.Windows.Forms.Padding(0, 6, 0, 2);
-            this._eventLabel.Size = new System.Drawing.Size(220, 23);
+            this._eventLabel.Size = new System.Drawing.Size(320, 23);
             this._eventLabel.TabIndex = 2;
-            this._eventLabel.Text = "이벤트 로그 (WIFI/TCP 상태 등)";
+            this._eventLabel.Text = "그 외 수신값 (EVENT/RESET_COUNT/커맨드 응답 등)";
             //
             // _eventLogBox
             //
             this._eventLogBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._eventLogBox.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8.5F);
-            this._eventLogBox.Location = new System.Drawing.Point(9, 301);
+            this._eventLogBox.Location = new System.Drawing.Point(3, 189);
             this._eventLogBox.Multiline = true;
             this._eventLogBox.Name = "_eventLogBox";
             this._eventLogBox.ReadOnly = true;
             this._eventLogBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this._eventLogBox.Size = new System.Drawing.Size(882, 90);
+            this._eventLogBox.Size = new System.Drawing.Size(320, 131);
             this._eventLogBox.TabIndex = 3;
-            //
-            // _countLabel
-            //
-            this._countLabel.Location = new System.Drawing.Point(0, 380);
-            this._countLabel.Name = "_countLabel";
-            this._countLabel.Size = new System.Drawing.Size(900, 20);
-            this._countLabel.TabIndex = 1;
-            this._countLabel.Text = "0건";
-            this._countLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             //
             // MeasurementPanel
             //
-            this.Controls.Add(this._countLabel);
             this.Controls.Add(this._root);
             this.Name = "MeasurementPanel";
             this.Size = new System.Drawing.Size(900, 400);
@@ -274,7 +365,13 @@ namespace Stm32WifiConfigTool.Panels
             this._topRow.PerformLayout();
             this._channelGroup.ResumeLayout(false);
             this._channelGroup.PerformLayout();
+            this._splitDisplay.Panel1.ResumeLayout(false);
+            this._splitDisplay.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this._splitDisplay)).EndInit();
+            this._splitDisplay.ResumeLayout(false);
+            this._leftLayout.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this._grid)).EndInit();
+            this._rightLayout.ResumeLayout(false);
             this.ResumeLayout(false);
         }
 

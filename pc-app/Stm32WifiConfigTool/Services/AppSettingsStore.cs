@@ -40,6 +40,7 @@ namespace Stm32WifiConfigTool.Services
                 settings.RtcConfigCommandTimeoutMs = GetInt(map, "RtcConfigCommandTimeoutMs", settings.RtcConfigCommandTimeoutMs);
                 settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
+                settings.MeasurementGridWidth = GetInt(map, "MeasurementGridWidth", settings.MeasurementGridWidth);
                 settings.EspStatusDisplayChannel = GetString(map, "EspStatusDisplayChannel", settings.EspStatusDisplayChannel);
                 settings.PortPanelWidth = GetInt(map, "PortPanelWidth", settings.PortPanelWidth);
                 settings.WifiPanelWidth = GetInt(map, "WifiPanelWidth", settings.WifiPanelWidth);
@@ -82,6 +83,7 @@ namespace Stm32WifiConfigTool.Services
                 "RtcConfigCommandTimeoutMs=" + settings.RtcConfigCommandTimeoutMs,
                 "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
                 "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,
+                "MeasurementGridWidth=" + settings.MeasurementGridWidth,
                 "EspStatusDisplayChannel=" + settings.EspStatusDisplayChannel,
                 "PortPanelWidth=" + settings.PortPanelWidth,
                 "WifiPanelWidth=" + settings.WifiPanelWidth,

@@ -10,8 +10,10 @@ namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
     /// FPGA 측정값("&lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6" 프레임) 표시 패널. USB/UART 채널을
-    /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있고, 별도 영역에 WIFI/TCP 관련
-    /// EVENT 라인 로그도 보여준다. ESP32 상태(STATUS,&lt;번호&gt;)는 별도 EspStatusPanel에서 표시한다.
+    /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있다. 화면은 좌/우로 나뉘어
+    /// 있다: 좌측은 측정값 그리드, 우측은 그 외 모든 프레임(위쪽 STATUS,&lt;번호&gt; 전용 로그 +
+    /// 아래쪽 EVENT/RESET_COUNT/커맨드 응답 등 일반 로그)이다 — ESP32 상태는 별도 EspStatusPanel
+    /// 에서도 표시되지만, 여기 우측 상단에서도 수신 이력을 확인할 수 있다.
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -44,6 +46,38 @@ namespace Stm32WifiConfigTool.Panels
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
+
+            /* MainForm의 상단 4개 스플리터와 동일한 이유로 BeginInvoke를 통해 지연 복원한다:
+             * 생성 직후에는 SplitContainer의 Width가 아직 최종값으로 안정되지 않을 수 있다. */
+            Load += (s, e) => BeginInvoke(new Action(ApplySavedSplitterDistance));
+        }
+
+        private void ApplySavedSplitterDistance()
+        {
+            int min = _splitDisplay.Panel1MinSize;
+            int max = _splitDisplay.Width - _splitDisplay.Panel2MinSize - _splitDisplay.SplitterWidth;
+            if (max < min)
+            {
+                return; /* 아직 폭이 좁아 유효 범위를 계산할 수 없음 - 디자이너 기본값 유지 */
+            }
+            _splitDisplay.SplitterDistance = Math.Max(min, Math.Min(max, _settings.MeasurementGridWidth));
+        }
+
+        private void SplitDisplay_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            if (_settings == null)
+            {
+                return;
+            }
+            _settings.MeasurementGridWidth = _splitDisplay.SplitterDistance;
+            try
+            {
+                AppSettingsStore.Save(_settings);
+            }
+            catch (Exception)
+            {
+                /* 설정 저장 실패(권한/디스크 문제 등)로 UI 동작 자체가 막히면 안 되므로 무시 */
+            }
         }
 
         private void ShowUsb_CheckedChanged(object sender, EventArgs e)
@@ -133,10 +167,19 @@ namespace Stm32WifiConfigTool.Panels
                     _grid.FirstDisplayedScrollingRowIndex = _grid.Rows.Count - 1;
                 }
             }
-            else if (Stm32Protocol.IsEventFrame(fields))
+            else if (Stm32Protocol.TryParseStatus(fields, out int statusNumber))
             {
-                string eventText = string.Join(",", fields);
-                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] " + eventText + Environment.NewLine);
+                /* 측정값이 아닌 프레임 중 STATUS,<번호>는 우측 상단 전용 로그에 "STATUS:<번호>"
+                 * 형태로 표시한다(다른 EVENT/응답 등과는 별도 - ESP32 상태를 한눈에 훑어보기 위함). */
+                _statusLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) +
+                    "] STATUS:" + statusNumber + Environment.NewLine);
+            }
+            else
+            {
+                /* 측정값도 STATUS도 아닌 나머지 전부(EVENT/RESET_COUNT/커맨드 응답 등)는 우측 하단
+                 * 일반 로그에 원본 필드를 콤마로 이어붙인 텍스트로 표시한다. */
+                string text = string.Join(",", fields);
+                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] " + text + Environment.NewLine);
             }
         }
 
@@ -144,6 +187,7 @@ namespace Stm32WifiConfigTool.Panels
         {
             _records.Clear();
             _countLabel.Text = "0건";
+            _statusLogBox.Clear();
             _eventLogBox.Clear();
         }
 
