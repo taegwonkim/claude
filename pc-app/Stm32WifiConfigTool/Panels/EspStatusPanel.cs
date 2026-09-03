@@ -7,7 +7,8 @@ using Stm32WifiConfigTool.Services;
 namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// ESP32 상태("STATUS,&lt;번호&gt;" 프레임) 표시 패널. MCU는 측정값 전송 사이사이에
+    /// ESP32 상태("STATUS,&lt;번호&gt;" 또는 실측 형식 "STATUS:&lt;번호&gt;", STX 유무 무관 -
+    /// <see cref="Stm32Protocol.TryParseStatusText"/> 참고) 표시 패널. MCU는 측정값 전송 사이사이에
     /// 이 프레임을 주기적으로 브로드캐스트한다(docs/프로토콜_명세.md §1). 측정값 프레임과는
     /// 별도로 구분해서 여기 표시한다. USB/UART 채널을 선택해 어느 쪽(또는 둘 다)을 표시할지
     /// 고를 수 있다. UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
@@ -113,12 +114,10 @@ namespace Stm32WifiConfigTool.Panels
                 return;
             }
 
-            if (!Stm32Protocol.TryParseFrame(line, out string[] fields))
-            {
-                return; /* STX 없는 잡음/깨진 프레임 - 무시 */
-            }
-
-            if (!Stm32Protocol.TryParseStatus(fields, out int statusNumber))
+            /* STX 유무와 관계없이 처리한다(실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않음),
+             * 콤마 "STATUS,<번호>"와 콜론 "STATUS:<번호>" 형식을 모두 인식한다. */
+            string payload = Stm32Protocol.DisplayText(line);
+            if (!Stm32Protocol.TryParseStatusText(payload, out int statusNumber))
             {
                 return; /* STATUS 프레임이 아님 */
             }
@@ -130,7 +129,7 @@ namespace Stm32WifiConfigTool.Panels
             _currentStatusLabel.ForeColor = ColorForStatus(statusNumber);
             _lastUpdateLabel.Text = "마지막 수신: " + now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "]";
 
-            AppendLog(now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] STATUS," + statusNumber + " (" + text + ")");
+            AppendLog(now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] STATUS:" + statusNumber + " (" + text + ")");
         }
 
         private void AppendLog(string text)

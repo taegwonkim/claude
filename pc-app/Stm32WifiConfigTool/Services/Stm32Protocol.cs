@@ -107,15 +107,24 @@ namespace Stm32WifiConfigTool.Services
             return (!string.IsNullOrEmpty(s) && s[0] == Stx) ? s.Substring(1) : s;
         }
 
-        /// <summary>STATUS,&lt;번호&gt; 프레임에서 상태 번호를 꺼낸다.</summary>
-        public static bool TryParseStatus(string[] fields, out int statusNumber)
+        /// <summary>STX 유무와 관계없이(<see cref="DisplayText"/>로 이미 STX를 뗀) 원본 텍스트에서
+        /// STATUS 상태 번호를 꺼낸다. 이 저장소 firmware/docs가 가정한 "STATUS,&lt;번호&gt;"(콤마)
+        /// 뿐 아니라, 실측된 실제 MCU의 "STATUS:&lt;번호&gt;"(콜론) 형식도 함께 받아들인다.</summary>
+        public static bool TryParseStatusText(string text, out int statusNumber)
         {
             statusNumber = 0;
-            if (!IsStatusFrame(fields) || fields.Length < 2)
+            const string prefix = "STATUS";
+            if (string.IsNullOrEmpty(text) || text.Length <= prefix.Length ||
+                !text.StartsWith(prefix, StringComparison.Ordinal))
             {
                 return false;
             }
-            return int.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out statusNumber);
+            char sep = text[prefix.Length];
+            if (sep != ':' && sep != ',')
+            {
+                return false;
+            }
+            return int.TryParse(text.Substring(prefix.Length + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out statusNumber);
         }
 
         /// <summary>Esp32_LinkState_t 값(0/1/2)을 사람이 읽을 수 있는 텍스트로 변환한다.</summary>
