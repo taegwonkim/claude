@@ -6,7 +6,8 @@ using Stm32WifiConfigTool.Models;
 namespace Stm32WifiConfigTool.Services
 {
     /// <summary>
-    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
+    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RESET_R_ALL/RESET_W_ALL 프레임을 보내고 응답
+    /// 프레임을 기다리는 async 헬퍼.
     /// 측정값/EVENT/STATUS 프레임은 비동기 텔레메트리(브로드캐스트)이므로 일반 커맨드 응답으로
     /// 취급하지 않고 건너뛴다(<see cref="Stm32Protocol.IsReplyFrame"/> 화이트리스트 참고).
     /// STX가 없는(깨진/잡음) 라인도 응답으로 취급하지 않고 무시한다.
@@ -145,6 +146,38 @@ namespace Stm32WifiConfigTool.Services
             if (reply.Length < 2 || reply[0] != "MEAS_W_ALL" || reply[1] != "OK")
             {
                 throw new InvalidOperationException("MEAS_W_ALL 실패: " + string.Join(",", reply));
+            }
+        }
+
+        /// <summary>RESET_R_ALL을 보내고 단일 프레임 응답 "RESET_R_ALL,seconds"를 RtcConfig로 변환한다.</summary>
+        public static async Task<RtcConfig> GetResetAllAsync(SerialLinkService link, int timeoutMs)
+        {
+            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdResetReadAll, timeoutMs);
+
+            if (fields.Length == 0 || fields[0] != "RESET_R_ALL")
+            {
+                throw new InvalidOperationException("RESET_R_ALL 응답 형식 오류: " + string.Join(",", fields));
+            }
+            if (fields.Length < 2)
+            {
+                throw new InvalidOperationException("RESET_R_ALL 응답 필드 부족 (" + fields.Length + "/2)");
+            }
+
+            int.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int periodSec);
+
+            return new RtcConfig { PeriodSec = periodSec };
+        }
+
+        /// <summary>cfg.PeriodSec을 RESET_W_ALL 한 프레임으로 전송한다. 응답 2번째 필드가 "OK"가
+        /// 아니면(ERR,MISSING_ARGS / ERR,INVALID_SECONDS 등) 실패로 간주해 예외를 던진다.</summary>
+        public static async Task SetResetAllAsync(SerialLinkService link, RtcConfig cfg, int timeoutMs)
+        {
+            string command = Stm32Protocol.BuildResetWriteAll(cfg.PeriodSec);
+            string[] reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
+
+            if (reply.Length < 2 || reply[0] != "RESET_W_ALL" || reply[1] != "OK")
+            {
+                throw new InvalidOperationException("RESET_W_ALL 실패: " + string.Join(",", reply));
             }
         }
     }

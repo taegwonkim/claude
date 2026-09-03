@@ -10,28 +10,28 @@ STM32L562C + FreeRTOS 펌웨어(리포지토리의 `firmware/Core/`, `docs/프�
 1. Visual Studio 2022에서 `Stm32WifiConfigTool.sln` 열기
 2. F5(디버그 실행) 또는 Ctrl+Shift+B(빌드)
 
-## 구성 (창 1개, 패널 5개 동시 표시)
+## 구성 (창 1개, 패널 6개 동시 표시)
 
 MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기 경유)** 두 채널에 항상
 동일한 데이터를 미러링합니다. 두 채널 모두 `STX(0x02) + Data1,Data2,...,DataN + CR(0x0D) + LF(0x0A)`
 프레임 포맷을 사용합니다(필드는 콤마로 구분, `docs/프로토콜_명세.md` §1). 이 도구는 두 채널을
-완전히 독립적으로 연결·해제할 수 있고, 별도 팝업 창을 띄우지 않고 **메인 창 하나 안에서 다섯
+완전히 독립적으로 연결·해제할 수 있고, 별도 팝업 창을 띄우지 않고 **메인 창 하나 안에서 여섯
 패널을 항상 동시에** 볼 수 있게 도킹 배치했습니다: 좌상단 포트 설정, 중앙상단 WiFi 설정,
-그 오른쪽 Measurement 설정, 우상단 ESP32 상태, 하단 전체 폭 측정값/상태 보기.
+그 오른쪽 Measurement 설정, 그 오른쪽 RTC 설정, 우상단 ESP32 상태, 하단 전체 폭 측정값/상태 보기.
 
-**패널 폭 조절**: 상단 4개 패널(포트/WiFi/Measurement 설정/ESP32 상태) 사이 경계선에 마우스를
-올리면 커서가 ↔ 모양으로 바뀝니다 — 그 상태로 드래그하면 각 패널의 폭을 원하는 대로 조절할 수
-있습니다(`SplitContainer` 3개를 중첩해 구현, 너무 좁아져 내부 컨트롤이 잘리지 않도록 각 패널에
-최소 폭이 걸려 있습니다). 조절한 폭은 **드래그를 놓는 즉시 설정 파일(`settings.ini`)에 바로
-저장**되어(`MainForm.SaveSettingsSafe()`), 프로그램을 닫을 때까지 기다리지 않고도 다음 실행
+**패널 폭 조절**: 상단 5개 패널(포트/WiFi/Measurement 설정/RTC 설정/ESP32 상태) 사이 경계선에
+마우스를 올리면 커서가 ↔ 모양으로 바뀝니다 — 그 상태로 드래그하면 각 패널의 폭을 원하는 대로
+조절할 수 있습니다(`SplitContainer` 4개를 중첩해 구현, 너무 좁아져 내부 컨트롤이 잘리지 않도록
+각 패널에 최소 폭이 걸려 있습니다). 조절한 폭은 **드래그를 놓는 즉시 설정 파일(`settings.ini`)에
+바로 저장**되어(`MainForm.SaveSettingsSafe()`), 프로그램을 닫을 때까지 기다리지 않고도 다음 실행
 시 그대로 복원됩니다 — 창의 X 버튼이 아니라 디버거 중지/작업 관리자 등으로 프로세스를 강제
 종료해도 마지막으로 드래그를 놓은 시점의 폭은 이미 파일에 기록되어 있습니다
-(`AppSettings.PortPanelWidth` / `WifiPanelWidth` / `MeasConfigPanelWidth`).
+(`AppSettings.PortPanelWidth` / `WifiPanelWidth` / `MeasConfigPanelWidth` / `RtcPanelWidth`).
 
 **폭이 복원되지 않을 때 확인할 것**: 폭을 조절한 뒤 `%AppData%\Stm32WifiConfigTool\settings.ini`
-파일을 열어 `PortPanelWidth`/`WifiPanelWidth`/`MeasConfigPanelWidth` 값이 실제로 조절한 값으로
-바뀌었는지 확인하세요. 바뀌어 있는데도 다음 실행 시 반영되지 않는다면 복원 로직(`MainForm.
-MainForm_Load` → `ApplySavedSplitterDistances()`) 쪽 문제이고, 값 자체가 바뀌지 않는다면
+파일을 열어 `PortPanelWidth`/`WifiPanelWidth`/`MeasConfigPanelWidth`/`RtcPanelWidth` 값이 실제로
+조절한 값으로 바뀌었는지 확인하세요. 바뀌어 있는데도 다음 실행 시 반영되지 않는다면 복원 로직
+(`MainForm.MainForm_Load` → `ApplySavedSplitterDistances()`) 쪽 문제이고, 값 자체가 바뀌지 않는다면
 저장이 안 되는 것이므로 원인이 다릅니다. 또한 Visual Studio에서 코드만 바꾸고 **다시 빌드하지
 않은 채** 이전 실행 파일을 그대로 실행 중인 경우에도 같은 증상으로 보일 수 있으니, 솔루션을
 완전히 다시 빌드한 뒤 테스트하세요.
@@ -66,14 +66,27 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
    - "Write": 입력값 전체를 `MEAS_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
    - WiFi 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖습니다.
 
-4. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
+4. **RTC 설정** (Measurement 설정 오른쪽, `Panels/RtcConfigPanel.cs`, 신규)
+   RTC Wakeup Timer 기반 주기적 리셋 간격(초)을 설정합니다(`docs/프로토콜_명세.md` §6).
+   시스템은 계속 동작하다가 이 주기가 되면 자동으로 리셋되고, 리셋마다 USART3/USB로
+   `RESET_COUNT,<count>` 프레임을 1회 브로드캐스트합니다(누적 리셋 횟수 모니터링용 — 이
+   패널 자체는 설정값 Read/Write만 다루며, `RESET_COUNT` 브로드캐스트는 별도로 확인하려면
+   포트 설정 패널의 원시 수신 로그나 터미널 프로그램을 이용하세요).
+   - "Read": `RESET_R_ALL` 프레임으로 현재 설정된 리셋 주기(초)를 읽어와 화면에 채웁니다.
+   - "Write": 입력한 리셋 주기(초, 1~65536)를 `RESET_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
+     성공 시 MCU가 즉시 플래시에 저장하고 Wakeup Timer를 새 값으로 재무장합니다.
+   - WiFi/Measurement 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖습니다.
+   - **이 커맨드는 `firmware/`·`firmware-no-rtos/` 양쪽 모두 이미 구현되어 있습니다**
+     (아래 WIFI_R_ALL/MEAS_R_ALL 계열과 달리 실제 MCU와 바로 통신됩니다).
+
+5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 `STATUS,<번호>` 프레임을 표시합니다. 측정값 프레임
    전송 사이사이에 도착하며, 측정값 패널과는 별도로 여기서만 다룹니다.
    - 현재 상태를 큰 글씨로(색상: DOWN=빨강, WIFI_UP=주황, TCP_UP=초록) 표시.
    - "표시 채널": USB / UART / 둘 다.
    - 하단에 수신 이력(시각/채널/번호/텍스트)을 로그로 쌓고, "지우기"로 초기화합니다.
 
-5. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
+6. **측정값 보기** (하단, 전체 폭, `Panels/MeasurementPanel.cs`)
    FPGA 트리거 결과로 MCU가 보내는 `<DC IP>,<MAC>,data1,...,data6` 프레임("DATA" 같은 태그
    없음, `docs/프로토콜_명세.md` §2)을 표로 보여줍니다. `DC IP`/`MAC`은 이 장치(ESP32)의
    station IP/MAC 주소로, 측정값을 보낸 장치를 구분하는 용도입니다.
@@ -87,9 +100,9 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
 
 ## Visual Studio 디자이너로 폼/패널 편집하기
 
-5개 패널(`PortSettingsPanel`, `WifiConfigPanel`, `MeasurementConfigPanel`, `EspStatusPanel`,
-`MeasurementPanel`)과 `SerialChannelPanel`(USB/UART 공용 하위 컨트롤), `MainForm`은 모두
-**표준 WinForms 디자이너
+6개 패널(`PortSettingsPanel`, `WifiConfigPanel`, `MeasurementConfigPanel`, `RtcConfigPanel`,
+`EspStatusPanel`, `MeasurementPanel`)과 `SerialChannelPanel`(USB/UART 공용 하위 컨트롤), `MainForm`은
+모두 **표준 WinForms 디자이너
 구조**(`<이름>.cs` + `<이름>.Designer.cs`)로 되어 있어 Visual Studio에서 더블클릭하면 디자이너
 화면이 뜨고 드래그 앤 드롭/속성 창으로 편집할 수 있습니다.
 
@@ -116,9 +129,9 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
 
 ## 설정값 저장 (포트/보레이트/타임아웃 등)
 
-포트 설정(각 채널의 COM 포트/Baud Rate/읽기·쓰기 타임아웃), WiFi 설정·Measurement 설정 패널의
-명령 전송 채널·커맨드 타임아웃, 측정값 보기 패널의 표시 채널·자동 스크롤 여부, ESP32 상태 보기
-패널의 표시 채널은 프로그램을 닫을 때 자동으로 다음 위치에 저장되고, 다음 실행 시 그대로
+포트 설정(각 채널의 COM 포트/Baud Rate/읽기·쓰기 타임아웃), WiFi 설정·Measurement 설정·RTC 설정
+패널의 명령 전송 채널·커맨드 타임아웃, 측정값 보기 패널의 표시 채널·자동 스크롤 여부, ESP32 상태
+보기 패널의 표시 채널은 프로그램을 닫을 때 자동으로 다음 위치에 저장되고, 다음 실행 시 그대로
 복원됩니다:
 
 ```
@@ -138,12 +151,13 @@ MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "Read"(`WIFI_R_ALL`)로 
 Stm32WifiConfigTool/
   Stm32WifiConfigTool.csproj
   Program.cs               - 진입점
-  MainForm.cs / .Designer.cs  - 단일 메인 창, 5개 패널을 도킹 배치 + ConnectionManager/설정 소유
+  MainForm.cs / .Designer.cs  - 단일 메인 창, 6개 패널을 도킹 배치 + ConnectionManager/설정 소유
   Panels/                   - UserControl(디자이너 지원), MainForm에 모두 도킹되어 표시
     SerialChannelPanel.cs / .Designer.cs  - USB 또는 UART 채널 1개의 연결 UI (PortSettingsPanel이 2개 사용)
     PortSettingsPanel.cs / .Designer.cs
     WifiConfigPanel.cs / .Designer.cs
     MeasurementConfigPanel.cs / .Designer.cs  - Reference/Offset/Resistance/Interval Time 설정
+    RtcConfigPanel.cs / .Designer.cs      - RTC Wakeup Timer 리셋 주기(초) 설정 (신규)
     EspStatusPanel.cs / .Designer.cs      - ESP32 상태(STATUS,<번호>) 전용 패널
     MeasurementPanel.cs / .Designer.cs
   Services/
@@ -151,11 +165,13 @@ Stm32WifiConfigTool/
     SerialLinkService.cs    - 시리얼 연결 1개(연결/해제, 라인 단위 수신, 타임아웃)
     ConnectionManager.cs    - Usb/Uart SerialLinkService 2개를 앱 전체에서 공유
     Stm32Protocol.cs        - STX+CSV+CRLF 프레임 빌더/파서, 메시지 종류 분류(화이트리스트)
-    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL async 요청-응답 헬퍼
+    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RESET_R_ALL/RESET_W_ALL
+                              async 요청-응답 헬퍼
     AppSettingsStore.cs     - PC측 UI 설정 로드/저장 (%AppData%\Stm32WifiConfigTool\settings.ini)
   Models/
     NetConfig.cs
     MeasurementConfig.cs    - Reference/Offset/Resistance/Interval Time
+    RtcConfig.cs            - RTC 리셋 주기(초) (신규)
     MeasurementRecord.cs    - DC IP/MAC + data1..6
     AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
@@ -168,9 +184,12 @@ Stm32WifiConfigTool/
 아직 구현되어 있지 않습니다** — 프레임 형태(필드 순서/개수, 응답 형식)는 `Services/Stm32Protocol.cs`의
 `BuildWifiWriteAll`/`BuildMeasWriteAll` 및 `Stm32Commands.cs`의 `GetWifiAllAsync` 등의 XML 주석에
 정의되어 있으니, MCU 측 `pc_comm.c`를 이 형식에 맞춰 구현해야 실제 통신이 됩니다(기존 SET/SAVE/
-GET,CONFIG/STATUS 커맨드 방식은 이 도구에서 제거되었습니다). MCU 쪽 커맨드 파서는
-`firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`, ESP32 상태
-브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c` 참고.
+GET,CONFIG/STATUS 커맨드 방식은 이 도구에서 제거되었습니다). 반대로 **`RESET_R_ALL`/`RESET_W_ALL`
+(§6, RTC 설정 패널)은 `firmware/`·`firmware-no-rtos/` 양쪽 `pc_comm.c`에 이미 구현되어 있어**
+바로 실제 MCU와 통신됩니다. MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은
+`firmware/Core/Src/fpga_link.c`, ESP32 상태 브로드캐스트/IP·MAC 조회는
+`firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`, RTC Wakeup Timer는
+`firmware/Core/Src/rtc_wakeup.c` 참고.
 
 ## 알려진 제한사항
 

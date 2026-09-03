@@ -36,12 +36,15 @@ namespace Stm32WifiConfigTool.Services
                 settings.WifiCommandTimeoutMs = GetInt(map, "WifiCommandTimeoutMs", settings.WifiCommandTimeoutMs);
                 settings.MeasConfigCommandChannel = GetString(map, "MeasConfigCommandChannel", settings.MeasConfigCommandChannel);
                 settings.MeasConfigCommandTimeoutMs = GetInt(map, "MeasConfigCommandTimeoutMs", settings.MeasConfigCommandTimeoutMs);
+                settings.RtcConfigCommandChannel = GetString(map, "RtcConfigCommandChannel", settings.RtcConfigCommandChannel);
+                settings.RtcConfigCommandTimeoutMs = GetInt(map, "RtcConfigCommandTimeoutMs", settings.RtcConfigCommandTimeoutMs);
                 settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
                 settings.EspStatusDisplayChannel = GetString(map, "EspStatusDisplayChannel", settings.EspStatusDisplayChannel);
                 settings.PortPanelWidth = GetInt(map, "PortPanelWidth", settings.PortPanelWidth);
                 settings.WifiPanelWidth = GetInt(map, "WifiPanelWidth", settings.WifiPanelWidth);
                 settings.MeasConfigPanelWidth = GetInt(map, "MeasConfigPanelWidth", settings.MeasConfigPanelWidth);
+                settings.RtcPanelWidth = GetInt(map, "RtcPanelWidth", settings.RtcPanelWidth);
 
                 return settings;
             }
@@ -75,12 +78,15 @@ namespace Stm32WifiConfigTool.Services
                 "WifiCommandTimeoutMs=" + settings.WifiCommandTimeoutMs,
                 "MeasConfigCommandChannel=" + settings.MeasConfigCommandChannel,
                 "MeasConfigCommandTimeoutMs=" + settings.MeasConfigCommandTimeoutMs,
+                "RtcConfigCommandChannel=" + settings.RtcConfigCommandChannel,
+                "RtcConfigCommandTimeoutMs=" + settings.RtcConfigCommandTimeoutMs,
                 "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
                 "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,
                 "EspStatusDisplayChannel=" + settings.EspStatusDisplayChannel,
                 "PortPanelWidth=" + settings.PortPanelWidth,
                 "WifiPanelWidth=" + settings.WifiPanelWidth,
-                "MeasConfigPanelWidth=" + settings.MeasConfigPanelWidth
+                "MeasConfigPanelWidth=" + settings.MeasConfigPanelWidth,
+                "RtcPanelWidth=" + settings.RtcPanelWidth
             };
 
             File.WriteAllLines(FilePath, lines);

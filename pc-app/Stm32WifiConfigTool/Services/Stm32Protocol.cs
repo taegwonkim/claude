@@ -15,10 +15,11 @@ namespace Stm32WifiConfigTool.Services
     ///
     /// 메시지 분류(첫 필드 기준, 화이트리스트 방식 - 새 프레임 종류가 추가돼도 명령 응답
     /// 매칭 로직이 오작동하지 않도록):
-    /// - 커맨드 응답: WIFI_R_ALL,... / WIFI_W_ALL,OK|ERR,... / MEAS_R_ALL,... / MEAS_W_ALL,OK|ERR,... / ERR,... / HELP,...
+    /// - 커맨드 응답: WIFI_R_ALL,... / WIFI_W_ALL,OK|ERR,... / MEAS_R_ALL,... / MEAS_W_ALL,OK|ERR,... /
+    ///   RESET_R_ALL,... / RESET_W_ALL,OK|ERR,... / ERR,... / HELP,...
     /// - ESP32 상태(주기적 브로드캐스트 겸 STATUS 커맨드 응답): STATUS,&lt;번호&gt;
     /// - 측정값(그 외 전부, 정확히 8개 필드): &lt;DC IP&gt;,&lt;MAC&gt;,data1,...,data6 ("DATA" 태그 없음)
-    /// - 비동기 이벤트: EVENT,&lt;name&gt;
+    /// - 비동기 이벤트: EVENT,&lt;name&gt; (RESET_COUNT,&lt;count&gt;도 이 범주 - 부팅마다 1회 브로드캐스트)
     /// </summary>
     public static class Stm32Protocol
     {
@@ -26,7 +27,7 @@ namespace Stm32WifiConfigTool.Services
 
         private static readonly HashSet<string> ReplyTags = new HashSet<string>
         {
-            "WIFI_R_ALL", "WIFI_W_ALL", "MEAS_R_ALL", "MEAS_W_ALL", "ERR", "HELP"
+            "WIFI_R_ALL", "WIFI_W_ALL", "MEAS_R_ALL", "MEAS_W_ALL", "RESET_R_ALL", "RESET_W_ALL", "ERR", "HELP"
         };
 
         /// <summary>WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 전체를 한 번에 조회한다.
@@ -56,6 +57,17 @@ namespace Stm32WifiConfigTool.Services
                    offsetMv.ToString(CultureInfo.InvariantCulture) + "," +
                    resistanceMOhm.ToString(CultureInfo.InvariantCulture) + "," +
                    intervalSec.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>RTC Wakeup Timer 리셋 주기(초)를 한 번에 조회한다.
+        /// 응답: RESET_R_ALL,seconds</summary>
+        public static readonly string CmdResetReadAll = Stx + "RESET_R_ALL";
+
+        /// <summary>RTC Wakeup Timer 리셋 주기(초)를 MCU에 전달한다. 응답: RESET_W_ALL,OK 또는
+        /// RESET_W_ALL,ERR,&lt;reason&gt; (MISSING_ARGS/INVALID_SECONDS)</summary>
+        public static string BuildResetWriteAll(int periodSec)
+        {
+            return Stx + "RESET_W_ALL," + periodSec.ToString(CultureInfo.InvariantCulture);
         }
 
         /// <summary>SerialLinkService.LineReceived로 전달된 한 줄을 파싱한다. 맨 앞이 STX가 아니면

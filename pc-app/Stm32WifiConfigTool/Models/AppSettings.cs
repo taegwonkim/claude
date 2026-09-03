@@ -27,6 +27,10 @@ namespace Stm32WifiConfigTool.Models
         public string MeasConfigCommandChannel { get; set; } = "Usb";
         public int MeasConfigCommandTimeoutMs { get; set; } = 3000;
 
+        /// <summary>RTC(리셋 주기) 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
+        public string RtcConfigCommandChannel { get; set; } = "Usb";
+        public int RtcConfigCommandTimeoutMs { get; set; } = 3000;
+
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
         public string MeasurementDisplayChannel { get; set; } = "Both";
         public bool MeasurementAutoScroll { get; set; } = true;
@@ -34,13 +38,15 @@ namespace Stm32WifiConfigTool.Models
         /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
         public string EspStatusDisplayChannel { get; set; } = "Both";
 
-        /// <summary>상단 4개 패널 사이 스플리터 위치(px). 사용자가 경계선을 드래그해 각 패널의
+        /// <summary>상단 5개 패널 사이 스플리터 위치(px). 사용자가 경계선을 드래그해 각 패널의
         /// 폭을 조절하면 실시간으로 갱신되고, 앱 재시작 후에도 유지된다.
         /// PortPanelWidth: 포트 설정 패널 폭. WifiPanelWidth: (전체 폭 - 포트 폭) 중 WiFi 설정이
         /// 차지하는 폭. MeasConfigPanelWidth: (WifiPanelWidth 오른쪽 나머지) 중 Measurement 설정이
-        /// 차지하는 폭. ESP32 상태 패널은 남는 폭을 그대로 사용한다(별도 저장하지 않음).</summary>
+        /// 차지하는 폭. RtcPanelWidth: (MeasConfigPanelWidth 오른쪽 나머지) 중 RTC 설정이 차지하는
+        /// 폭. ESP32 상태 패널은 그 오른쪽에 남는 폭을 그대로 사용한다(별도 저장하지 않음).</summary>
         public int PortPanelWidth { get; set; } = 460;
         public int WifiPanelWidth { get; set; } = 840;
         public int MeasConfigPanelWidth { get; set; } = 300;
+        public int RtcPanelWidth { get; set; } = 260;
     }
 }

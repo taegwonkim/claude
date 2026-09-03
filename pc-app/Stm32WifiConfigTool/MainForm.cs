@@ -7,13 +7,13 @@ namespace Stm32WifiConfigTool
 {
     /// <summary>
     /// STM32L562C WiFi 계측 브릿지 PC 도구의 메인(유일한) 창.
-    /// 포트 설정(좌상단) / WiFi 설정(중앙상단) / Measurement 설정(중앙상단 우측) / ESP32 상태(우상단) /
+    /// 포트 설정(좌상단) / WiFi 설정(중앙상단) / Measurement 설정 / RTC 설정 / ESP32 상태(우상단) /
     /// 측정값·상태 보기(하단, 전체 폭)를 별도 창을 띄우지 않고 한 창 안에서 동시에 볼 수 있도록
-    /// 도킹 배치한다. 상단 4개 패널은 <see cref="SplitContainer"/> 3개를 중첩해 구성했으므로
+    /// 도킹 배치한다. 상단 5개 패널은 <see cref="SplitContainer"/> 4개를 중첩해 구성했으므로
     /// 사용자가 패널 사이 경계선을 마우스로 드래그해 각 패널의 폭을 자유롭게 조절할 수 있다
     /// (드래그 중 실시간으로 <see cref="AppSettings"/>에 반영되고, 앱 재시작 후에도 유지된다).
     /// UI 레이아웃은 <c>MainForm.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
-    /// USB/UART 연결(ConnectionManager)은 이 창이 소유하며, 5개 패널이 모두 공유한다.
+    /// USB/UART 연결(ConnectionManager)은 이 창이 소유하며, 6개 패널이 모두 공유한다.
     /// 포트/보레이트/타임아웃 등 UI 설정은 시작 시 AppSettingsStore.Load()로 복원하고,
     /// 종료 시 Save()로 저장해 다음 실행에도 그대로 유지된다.
     /// </summary>
@@ -29,6 +29,7 @@ namespace Stm32WifiConfigTool
             _portPanel.Initialize(_conn, _settings);
             _wifiPanel.Initialize(_conn, _settings);
             _measConfigPanel.Initialize(_conn, _settings);
+            _rtcConfigPanel.Initialize(_conn, _settings);
             _espStatusPanel.Initialize(_conn, _settings);
             _measurementPanel.Initialize(_conn, _settings);
 
@@ -52,6 +53,7 @@ namespace Stm32WifiConfigTool
             SetSplitterDistanceClamped(_splitPortWifi, _settings.PortPanelWidth);
             SetSplitterDistanceClamped(_splitWifiMeas, _settings.WifiPanelWidth);
             SetSplitterDistanceClamped(_splitMeasStatus, _settings.MeasConfigPanelWidth);
+            SetSplitterDistanceClamped(_splitRtcStatus, _settings.RtcPanelWidth);
         }
 
         private static void SetSplitterDistanceClamped(SplitContainer split, int distance)
@@ -80,6 +82,12 @@ namespace Stm32WifiConfigTool
         private void SplitMeasStatus_SplitterMoved(object sender, SplitterEventArgs e)
         {
             _settings.MeasConfigPanelWidth = _splitMeasStatus.SplitterDistance;
+            SaveSettingsSafe();
+        }
+
+        private void SplitRtcStatus_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            _settings.RtcPanelWidth = _splitRtcStatus.SplitterDistance;
             SaveSettingsSafe();
         }
 
