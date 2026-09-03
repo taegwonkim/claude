@@ -28,6 +28,16 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
 종료해도 마지막으로 드래그를 놓은 시점의 폭은 이미 파일에 기록되어 있습니다
 (`AppSettings.PortPanelWidth` / `WifiPanelWidth` / `MeasConfigPanelWidth` / `RtcPanelWidth`).
 
+**패널을 좁힐 때 입력란도 함께 줄어듭니다**: 각 패널 안의 텍스트박스/콤보박스/NumericUpDown
+입력 필드(SSID, 서버 IP, Reference/Offset/Resistance/Interval, 리셋 주기, 포트/Baud Rate/
+타임아웃 등)는 `Anchor = Top|Left|Right`로 설정되어 있어, 패널 폭이 줄어들면 필드 폭도 함께
+줄어들고(넓어지면 함께 넓어짐) 오른쪽 여백이 남지 않습니다. WiFi 설정 패널의 "비밀번호 변경"
+체크박스처럼 필드 오른쪽에 나란히 있는 컨트롤은 `Anchor = Top|Right`로 반대쪽(오른쪽 테두리)에
+고정해 필드가 넓어져도 겹치지 않게 했습니다. 왼쪽의 짧은 캡션 라벨(SSID/Baud Rate 등)은 크기가
+고정이라 그대로 두었습니다. `Anchor`는 (앞서 도입한) `Location`+`Size` 자유 배치와 함께 써도
+Visual Studio 디자이너의 드래그 크기 조절 핸들을 막지 않으므로, 여전히 디자이너에서 위치/크기를
+자유롭게 편집할 수 있습니다.
+
 **폭이 복원되지 않을 때 확인할 것**: 폭을 조절한 뒤 `%AppData%\Stm32WifiConfigTool\settings.ini`
 파일을 열어 `PortPanelWidth`/`WifiPanelWidth`/`MeasConfigPanelWidth`/`RtcPanelWidth` 값이 실제로
 조절한 값으로 바뀌었는지 확인하세요. 바뀌어 있는데도 다음 실행 시 반영되지 않는다면 복원 로직

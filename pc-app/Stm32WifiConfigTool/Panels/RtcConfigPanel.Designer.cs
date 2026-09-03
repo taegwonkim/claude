@@ -136,6 +136,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _periodBox
             //
+            this._periodBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._periodBox.Location = new System.Drawing.Point(130, 22);
             this._periodBox.Maximum = new decimal(new int[] { 65536, 0, 0, 0 });
             this._periodBox.Minimum = new decimal(new int[] { 1, 0, 0, 0 });

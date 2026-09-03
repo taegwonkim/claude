@@ -157,6 +157,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _referenceBox
             //
+            this._referenceBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._referenceBox.DecimalPlaces = 2;
             this._referenceBox.Location = new System.Drawing.Point(150, 22);
             this._referenceBox.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
@@ -175,6 +176,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _offsetBox
             //
+            this._offsetBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._offsetBox.DecimalPlaces = 2;
             this._offsetBox.Location = new System.Drawing.Point(150, 60);
             this._offsetBox.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
@@ -193,6 +195,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _resistanceBox
             //
+            this._resistanceBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._resistanceBox.DecimalPlaces = 2;
             this._resistanceBox.Location = new System.Drawing.Point(150, 98);
             this._resistanceBox.Maximum = new decimal(new int[] { 10000000, 0, 0, 0 });
@@ -211,6 +214,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _intervalBox
             //
+            this._intervalBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._intervalBox.DecimalPlaces = 1;
             this._intervalBox.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
             this._intervalBox.Location = new System.Drawing.Point(150, 136);

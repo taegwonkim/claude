@@ -85,6 +85,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _portRow
             //
+            this._portRow.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._portRow.Controls.Add(this._portCombo);
             this._portRow.Controls.Add(this._refreshButton);
             this._portRow.Controls.Add(this._clearButton);
@@ -135,6 +136,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _baudCombo
             //
+            this._baudCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._baudCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this._baudCombo.Location = new System.Drawing.Point(125, 56);
             this._baudCombo.Name = "_baudCombo";
@@ -152,6 +154,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _readTimeout
             //
+            this._readTimeout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._readTimeout.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             this._readTimeout.Location = new System.Drawing.Point(125, 90);
             this._readTimeout.Maximum = new decimal(new int[] { 60000, 0, 0, 0 });
@@ -172,6 +175,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _writeTimeout
             //
+            this._writeTimeout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._writeTimeout.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             this._writeTimeout.Location = new System.Drawing.Point(125, 124);
             this._writeTimeout.Maximum = new decimal(new int[] { 60000, 0, 0, 0 });
@@ -183,6 +187,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _connectButton
             //
+            this._connectButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._connectButton.Location = new System.Drawing.Point(125, 161);
             this._connectButton.Name = "_connectButton";
             this._connectButton.Size = new System.Drawing.Size(300, 30);
@@ -202,6 +207,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _statusLabel
             //
+            this._statusLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._statusLabel.ForeColor = System.Drawing.Color.Firebrick;
             this._statusLabel.Location = new System.Drawing.Point(125, 199);
             this._statusLabel.Name = "_statusLabel";

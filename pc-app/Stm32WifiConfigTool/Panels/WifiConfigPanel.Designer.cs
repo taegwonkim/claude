@@ -178,6 +178,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _ssidBox
             //
+            this._ssidBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._ssidBox.Location = new System.Drawing.Point(150, 22);
             this._ssidBox.MaxLength = 31;
             this._ssidBox.Name = "_ssidBox";
@@ -195,6 +196,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _passwordBox
             //
+            this._passwordBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._passwordBox.Enabled = false;
             this._passwordBox.Location = new System.Drawing.Point(150, 56);
             this._passwordBox.MaxLength = 63;
@@ -205,6 +207,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _changePasswordCheck
             //
+            this._changePasswordCheck.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this._changePasswordCheck.AutoSize = true;
             this._changePasswordCheck.Location = new System.Drawing.Point(490, 58);
             this._changePasswordCheck.Name = "_changePasswordCheck";
@@ -224,6 +227,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _serverIpBox
             //
+            this._serverIpBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._serverIpBox.Location = new System.Drawing.Point(150, 90);
             this._serverIpBox.Name = "_serverIpBox";
             this._serverIpBox.Size = new System.Drawing.Size(454, 23);
@@ -240,6 +244,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _serverPortBox
             //
+            this._serverPortBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._serverPortBox.Location = new System.Drawing.Point(150, 124);
             this._serverPortBox.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
             this._serverPortBox.Name = "_serverPortBox";
@@ -270,6 +275,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _staticIpBox
             //
+            this._staticIpBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._staticIpBox.Enabled = false;
             this._staticIpBox.Location = new System.Drawing.Point(150, 192);
             this._staticIpBox.Name = "_staticIpBox";
@@ -287,6 +293,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _gatewayBox
             //
+            this._gatewayBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._gatewayBox.Enabled = false;
             this._gatewayBox.Location = new System.Drawing.Point(150, 226);
             this._gatewayBox.Name = "_gatewayBox";
@@ -304,6 +311,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _maskBox
             //
+            this._maskBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._maskBox.Enabled = false;
             this._maskBox.Location = new System.Drawing.Point(150, 260);
             this._maskBox.Name = "_maskBox";

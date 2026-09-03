@@ -44,6 +44,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _channelGroup
             //
+            this._channelGroup.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._channelGroup.Controls.Add(this._showUsb);
             this._channelGroup.Controls.Add(this._showUart);
             this._channelGroup.Controls.Add(this._showBoth);
@@ -85,6 +86,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _currentGroup
             //
+            this._currentGroup.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._currentGroup.Controls.Add(this._currentStatusLabel);
             this._currentGroup.Controls.Add(this._lastUpdateLabel);
             this._currentGroup.Location = new System.Drawing.Point(9, 68);
@@ -106,6 +108,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _lastUpdateLabel
             //
+            this._lastUpdateLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._lastUpdateLabel.ForeColor = System.Drawing.Color.DimGray;
             this._lastUpdateLabel.Location = new System.Drawing.Point(10, 58);
             this._lastUpdateLabel.Name = "_lastUpdateLabel";
@@ -133,6 +136,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _logBox
             //
+            this._logBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._logBox.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8.5F);
             this._logBox.Location = new System.Drawing.Point(9, 222);
             this._logBox.Multiline = true;
