@@ -103,10 +103,18 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    - "Write": 화면의 입력값(SSID/Password/서버 IP·Port/DHCP)을 `WIFI_W_ALL` 한 프레임에 담아
      MCU에 전달합니다. DHCP는 동일하게 `1`/`0`으로 인코딩하며, **IP/Gateway/Mask 3개 필드는
      DHCP를 사용하지 않을 때(정적 IP 모드)만 DHCP 필드 뒤에 덧붙여 전송**합니다(DHCP 사용
-     시에는 이 3개 필드 자체를 보내지 않아 응답과 대칭을 이룹니다). "비밀번호 변경"을
-     체크하지 않았으면 빈 문자열로 전송되며, 이 경우 MCU는 기존 저장된 비밀번호를 유지해야
-     합니다(`Models/NetConfig.cs`의 `Password` 필드 설명 참고). 저장되면 MCU가 자동으로
-     WiFi/서버 재접속을 시도합니다.
+     시에는 이 3개 필드 자체를 보내지 않아 응답과 대칭을 이룹니다).
+     > **알려진 버그 수정**: "비밀번호 변경"을 체크하지 않고 다른 값(SSID/서버 IP 등)만 바꿔
+     > Write하면 Password 필드가 빈 문자열로 전송되었는데, MCU가 이 빈 값을 "기존 값 유지"가
+     > 아니라 그대로 저장해버려 저장된 비밀번호가 지워지는 문제가 있었습니다(문서가 처음
+     > 가정했던 "PASS가 비어 있으면 기존 저장값 유지" 동작과 실제 MCU가 다릅니다). 이제
+     > `WifiConfigPanel`이 이번 실행에서 마지막으로 MCU에 성공적으로 전달한 비밀번호를
+     > `_lastKnownPassword`에 메모리로만 기억해두었다가, "비밀번호 변경"을 체크하지 않은
+     > Write에서는 빈 문자열 대신 이 값을 다시 실어 보냅니다(디스크에는 여전히 저장하지
+     > 않습니다 — 앱을 새로 시작한 뒤 아직 비밀번호를 한 번도 입력/전송하지 않았다면 여전히
+     > 빈 문자열이 전송되는 것은 불가피합니다). `Models/NetConfig.cs`의 `Password` 필드 설명과
+     > `WifiConfigPanel.ReadConfigFromUi()` 참고. 저장되면 MCU가 자동으로 WiFi/서버 재접속을
+     > 시도합니다.
    - 상단 "명령 전송 채널"에서 USB/UART 중 커맨드를 보낼 채널을 고릅니다.
    - **"Read"에 성공한 값(비밀번호 제외)은 로컬에 캐시되어 다음 실행 시 화면에 미리
      채워집니다**(`AppSettings.WifiSsidCache` 등, `WifiConfigPanel.Initialize()`/

@@ -13,7 +13,10 @@ namespace Stm32WifiConfigTool.Panels
     /// 포함되지 않으므로, "Read" 응답에 이 필드들이 없으면 화면의 기존 값을 그대로 둔다
     /// (<see cref="ApplyConfigToUi"/>, <see cref="Services.Stm32Commands.GetWifiAllAsync"/> 참고).
     /// "Read" 성공 시 값(비밀번호 제외)을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
-    /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
+    /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용). 비밀번호는 디스크에
+    /// 캐시하지 않지만, "비밀번호 변경"을 체크하지 않고 다른 값만 바꿔 Write할 때 실제로 지워진
+    /// 값이 MCU에 전달되는 것을 막기 위해 이번 실행에서 마지막으로 보낸 값을 메모리에만 잠깐
+    /// 기억해둔다(<see cref="_lastKnownPassword"/> 참고).
     /// UI 레이아웃은 <c>WifiConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
     /// 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -23,6 +26,15 @@ namespace Stm32WifiConfigTool.Panels
     {
         private ConnectionManager _conn;
         private AppSettings _settings;
+
+        /// <summary>이번 실행에서 실제로 MCU에 마지막으로 전달된 비밀번호(메모리에만 유지 - 파일에는
+        /// 절대 저장하지 않는다, 보안 원칙은 그대로 유지). "비밀번호 변경"을 체크하지 않고 SSID/서버
+        /// IP 등 다른 값만 바꿔 "Write"하면 <see cref="ReadConfigFromUi"/>가 이 값을 다시 실어 보낸다
+        /// - 빈 문자열을 보내면 MCU가 기존 비밀번호를 유지할 것이라 가정했으나, 실측 결과 MCU가
+        /// 그 빈 값을 그대로 저장해 비밀번호가 지워지는 것으로 확인되어 이렇게 우회한다. 앱을 새로
+        /// 시작한 뒤 아직 비밀번호를 한 번도 입력하지 않았다면 여전히 빈 문자열이다(비밀번호 자체를
+        /// 디스크에 캐시하지 않으므로 불가피함).</summary>
+        private string _lastKnownPassword = string.Empty;
 
         /// <summary>설정값 그룹(<c>_fieldsGroup</c>) 각 입력란의 우측 여백(px) - 그룹 박스 오른쪽
         /// 테두리에서 입력란 오른쪽 끝까지의 거리. 이 값 하나만 바꾸면 SSID/서버 IP/서버 Port/
@@ -153,7 +165,7 @@ namespace Stm32WifiConfigTool.Panels
             return new NetConfig
             {
                 Ssid = _ssidBox.Text.Trim(),
-                Password = _changePasswordCheck.Checked ? _passwordBox.Text : string.Empty,
+                Password = _changePasswordCheck.Checked ? _passwordBox.Text : _lastKnownPassword,
                 ServerIp = _serverIpBox.Text.Trim(),
                 ServerPort = (int)_serverPortBox.Value,
                 DhcpEnabled = _dhcpCheck.Checked,
@@ -244,6 +256,7 @@ namespace Stm32WifiConfigTool.Panels
             {
                 Log("WIFI_W_ALL 전송...");
                 await Stm32Commands.SetWifiAllAsync(SelectedLink, cfg, (int)_cmdTimeoutBox.Value);
+                _lastKnownPassword = cfg.Password; /* 다음 Write에서도 이 값을 이어서 보내 비밀번호가 지워지지 않도록 함 */
                 Log("WIFI_W_ALL 완료 (MCU가 자동으로 WiFi 재접속을 시도합니다)");
                 MessageBox.Show(this, "전달되었습니다.", "WiFi 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
