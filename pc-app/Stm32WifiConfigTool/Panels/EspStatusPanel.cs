@@ -10,8 +10,8 @@ namespace Stm32WifiConfigTool.Panels
     /// ESP32 상태("STATUS,&lt;번호&gt;" 또는 실측 형식 "STATUS:&lt;번호&gt;", STX 유무 무관 -
     /// <see cref="Stm32Protocol.TryParseStatusText"/> 참고) 표시 패널. MCU는 측정값 전송 사이사이에
     /// 이 프레임을 주기적으로 브로드캐스트한다(docs/프로토콜_명세.md §1). 측정값 프레임과는
-    /// 별도로 구분해서 여기 표시한다. USB/UART 채널을 선택해 어느 쪽(또는 둘 다)을 표시할지
-    /// 고를 수 있다. UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
+    /// 별도로 구분해서 여기 표시한다. USB/UART 채널을 선택해 어느 쪽을 표시할지 고를 수 있다.
+    /// UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
     /// 디자이너로 편집 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는
     /// 생성 직후 <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을
     /// 연결해야 한다. MainForm에 다른 패널들과 함께 한 창에 도킹되어 표시된다.
@@ -35,9 +35,8 @@ namespace Stm32WifiConfigTool.Panels
             _conn = conn;
             _settings = settings;
 
-            _showUsb.Checked = settings.EspStatusDisplayChannel == "Usb";
+            _showUsb.Checked = settings.EspStatusDisplayChannel != "Uart";
             _showUart.Checked = settings.EspStatusDisplayChannel == "Uart";
-            _showBoth.Checked = settings.EspStatusDisplayChannel != "Usb" && settings.EspStatusDisplayChannel != "Uart";
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
@@ -59,20 +58,8 @@ namespace Stm32WifiConfigTool.Panels
             }
         }
 
-        private void ShowBoth_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_showBoth.Checked && _settings != null)
-            {
-                _settings.EspStatusDisplayChannel = "Both";
-            }
-        }
-
         private bool IsChannelSelected(LinkChannel channel)
         {
-            if (_showBoth.Checked)
-            {
-                return true;
-            }
             return (channel == LinkChannel.Usb && _showUsb.Checked) || (channel == LinkChannel.Uart && _showUart.Checked);
         }
 

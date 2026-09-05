@@ -52,16 +52,18 @@ namespace Stm32WifiConfigTool.Models
         /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 값.</summary>
         public int RtcPeriodSecCache { get; set; } = 3600;
 
-        /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
-        public string MeasurementDisplayChannel { get; set; } = "Both";
+        /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
+        /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.MeasurementPanel.Initialize"/> 참고.)</summary>
+        public string MeasurementDisplayChannel { get; set; } = "Usb";
         public bool MeasurementAutoScroll { get; set; } = true;
 
         /// <summary>측정값 보기 패널 내부의 좌(측정값 그리드)/우(STATUS + 그 외 수신값 로그) 스플리터
         /// 위치(px, 좌측 폭). 다른 패널 폭들과 마찬가지로 드래그 즉시 저장되고 재시작 후 복원된다.</summary>
         public int MeasurementGridWidth { get; set; } = 550;
 
-        /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
-        public string EspStatusDisplayChannel { get; set; } = "Both";
+        /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
+        /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.EspStatusPanel.Initialize"/> 참고.)</summary>
+        public string EspStatusDisplayChannel { get; set; } = "Usb";
 
         /// <summary>상단 5개 패널 사이 스플리터 위치(px). 사용자가 경계선을 드래그해 각 패널의
         /// 폭을 조절하면 실시간으로 갱신되고, 앱 재시작 후에도 유지된다.

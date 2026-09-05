@@ -11,7 +11,7 @@ namespace Stm32WifiConfigTool.Panels
     /// <summary>
     /// FPGA 측정값("DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN" 프레임, 첫 필드 "DC_" 접두어로 식별,
     /// 샘플 개수는 고정이 아님) 표시 패널. USB/UART 채널을
-    /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있다. 화면은 좌/우로 나뉘어
+    /// 선택해 어느 쪽 라인을 화면에 표시할지 고를 수 있다. 화면은 좌/우로 나뉘어
     /// 있다: 좌측은 측정값 그리드, 우측은 그 외 모든 프레임(EVENT/RESET_COUNT/커맨드 응답/STATUS
     /// 등)을 한 로그에 원본 그대로 모아 보여준다 — ESP32 상태(STATUS)는 별도 EspStatusPanel의
     /// "현재 ESP32 상태"에 이미 크게 표시되므로 여기서는 별도 칸을 두지 않는다. 측정값이 아닌
@@ -41,9 +41,8 @@ namespace Stm32WifiConfigTool.Panels
             _conn = conn;
             _settings = settings;
 
-            _showUsb.Checked = settings.MeasurementDisplayChannel == "Usb";
+            _showUsb.Checked = settings.MeasurementDisplayChannel != "Uart";
             _showUart.Checked = settings.MeasurementDisplayChannel == "Uart";
-            _showBoth.Checked = settings.MeasurementDisplayChannel != "Usb" && settings.MeasurementDisplayChannel != "Uart";
             _autoScrollCheck.Checked = settings.MeasurementAutoScroll;
 
             _conn.Usb.LineReceived += OnLineReceived;
@@ -98,14 +97,6 @@ namespace Stm32WifiConfigTool.Panels
             }
         }
 
-        private void ShowBoth_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_showBoth.Checked && _settings != null)
-            {
-                _settings.MeasurementDisplayChannel = "Both";
-            }
-        }
-
         private void AutoScrollCheck_CheckedChanged(object sender, EventArgs e)
         {
             if (_settings != null)
@@ -116,10 +107,6 @@ namespace Stm32WifiConfigTool.Panels
 
         private bool IsChannelSelected(LinkChannel channel)
         {
-            if (_showBoth.Checked)
-            {
-                return true;
-            }
             return (channel == LinkChannel.Usb && _showUsb.Checked) || (channel == LinkChannel.Uart && _showUart.Checked);
         }
 

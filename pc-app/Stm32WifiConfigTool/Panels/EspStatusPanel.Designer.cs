@@ -8,7 +8,6 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.GroupBox _channelGroup;
         private System.Windows.Forms.RadioButton _showUsb;
         private System.Windows.Forms.RadioButton _showUart;
-        private System.Windows.Forms.RadioButton _showBoth;
         private System.Windows.Forms.GroupBox _currentGroup;
         private System.Windows.Forms.Label _currentStatusLabel;
         private System.Windows.Forms.Label _lastUpdateLabel;
@@ -27,7 +26,6 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup = new System.Windows.Forms.GroupBox();
             this._showUsb = new System.Windows.Forms.RadioButton();
             this._showUart = new System.Windows.Forms.RadioButton();
-            this._showBoth = new System.Windows.Forms.RadioButton();
             this._currentGroup = new System.Windows.Forms.GroupBox();
             this._currentStatusLabel = new System.Windows.Forms.Label();
             this._lastUpdateLabel = new System.Windows.Forms.Label();
@@ -47,16 +45,16 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._channelGroup.Controls.Add(this._showUsb);
             this._channelGroup.Controls.Add(this._showUart);
-            this._channelGroup.Controls.Add(this._showBoth);
             this._channelGroup.Location = new System.Drawing.Point(9, 9);
             this._channelGroup.Name = "_channelGroup";
-            this._channelGroup.Size = new System.Drawing.Size(282, 50);
+            this._channelGroup.Size = new System.Drawing.Size(150, 50);
             this._channelGroup.TabIndex = 0;
             this._channelGroup.TabStop = false;
             this._channelGroup.Text = "표시 채널";
             //
             // _showUsb
             //
+            this._showUsb.Checked = true;
             this._showUsb.Location = new System.Drawing.Point(10, 20);
             this._showUsb.Name = "_showUsb";
             this._showUsb.Size = new System.Drawing.Size(55, 22);
@@ -72,17 +70,6 @@ namespace Stm32WifiConfigTool.Panels
             this._showUart.TabIndex = 1;
             this._showUart.Text = "UART";
             this._showUart.CheckedChanged += new System.EventHandler(this.ShowUart_CheckedChanged);
-            //
-            // _showBoth
-            //
-            this._showBoth.Checked = true;
-            this._showBoth.Location = new System.Drawing.Point(140, 20);
-            this._showBoth.Name = "_showBoth";
-            this._showBoth.Size = new System.Drawing.Size(60, 22);
-            this._showBoth.TabIndex = 2;
-            this._showBoth.TabStop = true;
-            this._showBoth.Text = "둘 다";
-            this._showBoth.CheckedChanged += new System.EventHandler(this.ShowBoth_CheckedChanged);
             //
             // _currentGroup
             //
