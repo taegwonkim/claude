@@ -50,6 +50,12 @@ namespace Stm32WifiConfigTool.Panels
         /// 포함되어 있다.</summary>
         private static readonly string[] IconFontCandidates = { "Segoe Fluent Icons", "Segoe MDL2 Assets" };
 
+        /// <summary>아이콘 폰트로 바뀔 때 새로고침 버튼의 폭/높이(정사각형, px). 아이콘 폰트는
+        /// 줄 높이가 커서 AutoSize에 맡기면 버튼이 <c>_portRow</c>(높이 30px) 밖으로 튀어나와
+        /// 아래 Baud Rate 행과 겹치므로, 이 값으로 고정한다(<see cref="ApplyRefreshButtonIcon"/>
+        /// 참고) - 행 높이(30px)에서 버튼 시작 y좌표(3px)를 뺀 값 이하로 유지할 것.</summary>
+        private const int RefreshButtonIconSize = 26;
+
         public SerialChannelPanel()
         {
             InitializeComponent();
@@ -86,8 +92,11 @@ namespace Stm32WifiConfigTool.Panels
 
         /// <summary>설치된 폰트 중에 <see cref="IconFontCandidates"/>가 있으면 "새로고침" 텍스트
         /// 대신 그 폰트로 렌더링한 새로고침 글리프(<see cref="RefreshGlyph"/>)를 버튼에 표시한다
-        /// (툴팁으로 "새로고침"을 계속 알려주므로 뜻은 그대로 전달된다). 아이콘 폰트가 없는
-        /// 환경(예: 일부 서버 코어)에서는 디자이너가 잡아둔 "새로고침" 텍스트를 그대로 둔다.</summary>
+        /// (툴팁으로 "새로고침"을 계속 알려주므로 뜻은 그대로 전달된다). 이때 AutoSize를 끄고
+        /// <see cref="RefreshButtonIconSize"/> 정사각형으로 크기를 고정하는데, 아이콘 폰트의 줄
+        /// 높이가 커서 AutoSize에 맡기면 버튼이 <c>_portRow</c> 밖으로 튀어나와 아래 Baud Rate
+        /// 행과 겹치기 때문이다. 아이콘 폰트가 없는 환경(예: 일부 서버 코어)에서는 디자이너가
+        /// 잡아둔 "새로고침" 텍스트(AutoSize 유지)를 그대로 둔다.</summary>
         private void ApplyRefreshButtonIcon()
         {
             using (var installed = new InstalledFontCollection())
@@ -100,6 +109,9 @@ namespace Stm32WifiConfigTool.Panels
                     {
                         continue;
                     }
+                    _refreshButton.AutoSize = false;
+                    _refreshButton.TextAlign = ContentAlignment.MiddleCenter;
+                    _refreshButton.Size = new Size(RefreshButtonIconSize, RefreshButtonIconSize);
                     _refreshButton.Font = new Font(candidate, 12F, FontStyle.Regular);
                     _refreshButton.Text = RefreshGlyph;
                     return;
