@@ -80,6 +80,13 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    다른 패널에서 명령을 보내거나 데이터를 받으려면 먼저 여기서 연결해야 합니다.
    - "새로고침": OS에 연결된 COM 포트 목록을 다시 읽어옵니다.
    - "연결"/"연결 해제": 포트를 열고 닫습니다.
+   - **각 행(포트/Baud Rate/타임아웃/연결/상태) 오른쪽 여백을 조절하려면**: `SerialChannelPanel.cs`의
+     `FieldRightMargin` 상수(px) 하나만 바꾸면 됩니다(WiFi 설정 패널의 `FieldRightMargin`과 같은
+     방식). 포트 콤보박스와 그 오른쪽 "새로고침" 버튼 사이 간격은 `RefreshButtonGap` 상수로
+     조절합니다 - 포트 콤보박스는 Anchor=Left|Right로 늘어나고 "새로고침" 버튼은 Anchor=Right로
+     오른쪽 끝에 고정되어 따라갑니다(WiFi 설정 패널의 비밀번호 입력란/"비밀번호 변경" 체크박스와
+     같은 방식). USB/UART 패널은 이 `SerialChannelPanel`을 그대로 재사용하므로 두 패널 모두에
+     동일하게 적용됩니다.
 
 2. **WiFi 설정** (중앙상단, `Panels/WifiConfigPanel.cs`)
    SSID/비밀번호, 서버 IP·Port, DHCP on/off, DHCP off일 때의 정적 IP/Gateway/Netmask를 설정합니다.

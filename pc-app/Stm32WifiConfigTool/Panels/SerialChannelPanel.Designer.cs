@@ -7,7 +7,7 @@ namespace Stm32WifiConfigTool.Panels
 
         private System.Windows.Forms.GroupBox _groupBox;
         private System.Windows.Forms.Label _portLabel;
-        private System.Windows.Forms.FlowLayoutPanel _portRow;
+        private System.Windows.Forms.Panel _portRow;
         private System.Windows.Forms.ComboBox _portCombo;
         private System.Windows.Forms.Button _refreshButton;
         private System.Windows.Forms.Label _baudLabel;
@@ -30,7 +30,7 @@ namespace Stm32WifiConfigTool.Panels
         {
             this._groupBox = new System.Windows.Forms.GroupBox();
             this._portLabel = new System.Windows.Forms.Label();
-            this._portRow = new System.Windows.Forms.FlowLayoutPanel();
+            this._portRow = new System.Windows.Forms.Panel();
             this._portCombo = new System.Windows.Forms.ComboBox();
             this._refreshButton = new System.Windows.Forms.Button();
             this._baudLabel = new System.Windows.Forms.Label();
@@ -81,7 +81,8 @@ namespace Stm32WifiConfigTool.Panels
             this._portLabel.Text = "포트";
             this._portLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _portRow
+            // _portRow (자유 배치 - _portCombo는 Anchor=Left|Right로 늘어나고, _refreshButton은
+            // Anchor=Right로 오른쪽 끝에 고정된 채 따라간다.)
             //
             this._portRow.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._portRow.Controls.Add(this._portCombo);
@@ -90,20 +91,21 @@ namespace Stm32WifiConfigTool.Panels
             this._portRow.Name = "_portRow";
             this._portRow.Size = new System.Drawing.Size(300, 30);
             this._portRow.TabIndex = 1;
-            this._portRow.WrapContents = false;
             //
             // _portCombo
             //
+            this._portCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._portCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._portCombo.Location = new System.Drawing.Point(3, 3);
+            this._portCombo.Location = new System.Drawing.Point(0, 3);
             this._portCombo.Name = "_portCombo";
             this._portCombo.Size = new System.Drawing.Size(130, 23);
             this._portCombo.TabIndex = 0;
             //
             // _refreshButton
             //
+            this._refreshButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this._refreshButton.AutoSize = true;
-            this._refreshButton.Location = new System.Drawing.Point(139, 3);
+            this._refreshButton.Location = new System.Drawing.Point(136, 3);
             this._refreshButton.Name = "_refreshButton";
             this._refreshButton.Size = new System.Drawing.Size(90, 25);
             this._refreshButton.TabIndex = 1;

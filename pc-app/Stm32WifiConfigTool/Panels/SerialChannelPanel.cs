@@ -19,9 +19,38 @@ namespace Stm32WifiConfigTool.Panels
         private SerialLinkService _link;
         private ChannelSettings _settings;
 
+        /// <summary>그룹 박스(<c>_groupBox</c>) 각 행(포트/Baud Rate/읽기·쓰기 타임아웃/연결/상태)의
+        /// 우측 여백(px) - 그룹 박스 오른쪽 테두리에서 각 입력란 오른쪽 끝까지의 거리. 이 값 하나만
+        /// 바꾸면 모든 행의 우측 여백이 함께 바뀐다(<see cref="ApplyFieldRightMargins"/> 참고). 각
+        /// 행은 Anchor=Top|Left|Right이므로 패널 크기가 바뀌어도 이 여백은 항상 유지된다.</summary>
+        private const int FieldRightMargin = 15;
+
+        /// <summary>포트 콤보박스와 그 오른쪽의 "새로고침" 버튼 사이의 간격(px).</summary>
+        private const int RefreshButtonGap = 6;
+
         public SerialChannelPanel()
         {
             InitializeComponent();
+            ApplyFieldRightMargins();
+        }
+
+        /// <summary>디자이너가 잡아둔 각 행의 고정 Width/Location 대신, <see cref="FieldRightMargin"/>/
+        /// <see cref="RefreshButtonGap"/> 하나로 우측 여백을 계산해 적용한다 - Anchor가 이 초기
+        /// 배치를 기준으로 거리를 고정하므로, 이 메서드가 실제로 적용되는 여백을 결정한다(디자이너의
+        /// 고정 Size는 디자인 타임 미리보기용).</summary>
+        private void ApplyFieldRightMargins()
+        {
+            int right = _groupBox.Width - FieldRightMargin;
+
+            _portRow.Width = right - _portRow.Left;
+            _baudCombo.Width = right - _baudCombo.Left;
+            _readTimeout.Width = right - _readTimeout.Left;
+            _writeTimeout.Width = right - _writeTimeout.Left;
+            _connectButton.Width = right - _connectButton.Left;
+            _statusLabel.Width = right - _statusLabel.Left;
+
+            _refreshButton.Left = _portRow.Width - _refreshButton.Width;
+            _portCombo.Width = _refreshButton.Left - RefreshButtonGap - _portCombo.Left;
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. PortSettingsPanel이 생성 직후 1회 호출.</summary>
