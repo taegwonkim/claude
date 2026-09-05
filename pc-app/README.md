@@ -28,6 +28,15 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
 종료해도 마지막으로 드래그를 놓은 시점의 폭은 이미 파일에 기록되어 있습니다
 (`AppSettings.PortPanelWidth` / `WifiPanelWidth` / `MeasConfigPanelWidth` / `RtcPanelWidth`).
 
+> **알려진 버그 수정**: WiFi 설정 패널만 폭을 조절해도 재실행 시 원래 크기로 돌아가는 문제가
+> 있었습니다. 원인은 `_splitWifiMeas`(포트/WiFi 스플리터의 오른쪽 나머지를 다시 WiFi | 나머지로
+> 나누는 스플리터)가 다른 3개와 달리 `FixedPanel = Panel2`로 되어 있었던 것 — 이 설정은 "창
+> 크기가 바뀌면 WiFi 쪽(Panel1)이 늘어나고 줄어드는 나머지(Panel2)는 고정 폭을 유지"하는
+> 뜻이라, 창 크기 복원 등으로 창이 리사이즈될 때마다 `WifiPanelWidth`로 복원해둔 값이 매번
+> 자동으로 재계산되어 덮어써졌습니다. 다른 3개 스플리터처럼 `FixedPanel = Panel1`로 바꿔서
+> WiFi 폭 자체가 불변으로 유지되고 나머지(Measurement/RTC/ESP32 상태 쪽)가 창 크기 변화를
+> 흡수하도록 고쳤습니다.
+
 **패널을 좁힐 때 입력란도 함께 줄어듭니다**: 각 패널 안의 텍스트박스/콤보박스/NumericUpDown
 입력 필드(SSID, 서버 IP, Reference/Offset/Resistance/Interval, 리셋 주기, 포트/Baud Rate/
 타임아웃 등)는 `Anchor = Top|Left|Right`로 설정되어 있어, 패널 폭이 줄어들면 필드 폭도 함께
@@ -59,7 +68,6 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    USB/UART 각각 COM 포트, Baud Rate, 읽기/쓰기 타임아웃(ms)을 설정하고 연결/해제합니다.
    다른 패널에서 명령을 보내거나 데이터를 받으려면 먼저 여기서 연결해야 합니다.
    - "새로고침": OS에 연결된 COM 포트 목록을 다시 읽어옵니다.
-   - "지우기": 선택된 COM 포트를 비웁니다(연결 중에는 비활성화).
    - "연결"/"연결 해제": 포트를 열고 닫습니다.
 
 2. **WiFi 설정** (중앙상단, `Panels/WifiConfigPanel.cs`)
@@ -73,13 +81,18 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      (`Models/NetConfig.cs`의 `Password` 필드 설명 참고). 저장되면 MCU가 자동으로
      WiFi/서버 재접속을 시도합니다.
    - 상단 "명령 전송 채널"에서 USB/UART 중 커맨드를 보낼 채널을 고릅니다.
+   - **"Read"에 성공한 값(비밀번호 제외)은 로컬에 캐시되어 다음 실행 시 화면에 미리
+     채워집니다**(`AppSettings.WifiSsidCache` 등, `WifiConfigPanel.Initialize()`/
+     `SaveConfigCache()` 참고 — MCU 재조회 전 참고용일 뿐 원본은 항상 MCU이며, 비밀번호만
+     예외적으로 캐시하지 않고 항상 빈 채로 시작합니다).
 
 3. **Measurement 설정** (WiFi 설정 오른쪽, `Panels/MeasurementConfigPanel.cs`, 신규)
    측정 모듈의 Reference(mV, 측정 상한치) / Offset(mV, 상한치 초과 시 노이즈 여유값) /
    Resistance(mOhm, 선간 저항 측정값) / Interval Time(sec, 측정 간격)을 설정합니다.
    - "Read": `MEAS_R_ALL` 프레임으로 현재값을 읽어와 화면에 채웁니다.
    - "Write": 입력값 전체를 `MEAS_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
-   - WiFi 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖습니다.
+   - WiFi 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖고, "Read" 값도
+     동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
 
 4. **RTC 설정** (Measurement 설정 오른쪽, `Panels/RtcConfigPanel.cs`, 신규)
    RTC Wakeup Timer 기반 주기적 리셋 간격(초)을 설정합니다(`docs/프로토콜_명세.md` §6).
@@ -90,7 +103,8 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    - "Read": `RESET_R_ALL` 프레임으로 현재 설정된 리셋 주기(초)를 읽어와 화면에 채웁니다.
    - "Write": 입력한 리셋 주기(초, 1~65536)를 `RESET_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
      성공 시 MCU가 즉시 플래시에 저장하고 Wakeup Timer를 새 값으로 재무장합니다.
-   - WiFi/Measurement 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖습니다.
+   - WiFi/Measurement 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖고,
+     "Read" 값도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
    - **이 커맨드는 `firmware/`·`firmware-no-rtos/` 양쪽 모두 이미 구현되어 있습니다**
      (아래 WIFI_R_ALL/MEAS_R_ALL 계열과 달리 실제 MCU와 바로 통신됩니다).
 
@@ -113,22 +127,19 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      판별하도록 되어 있습니다. `docs/프로토콜_명세.md` §2가 문서화한 "태그 없음/6개 고정"
      포맷과는 실제 다르니 유의하세요). `DC IP`/`MAC`은 이 장치(ESP32)의 station IP/MAC
      주소로, 측정값을 보낸 장치를 구분하는 용도입니다(그리드에는 `DC_` 접두어를 뗀 IP만 표시).
-   - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지는 STX 유무나 태그
-     형식에 관계없이 전부 보여줍니다(`Stm32Protocol.DisplayText`가 STX를 있으면 떼고 없으면
-     그대로 두며, 빈 줄만 무시합니다 — 실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않았습니다).
-     - 위쪽 **STATUS** 로그: 콤마 형식(`STATUS,<번호>`, `docs/프로토콜_명세.md` §1)과 콜론 형식
-       (`STATUS:<번호>`, 실측) 둘 다 골라 `STATUS:<번호>` 형태로 표시합니다(예: `STATUS:3`).
-       ESP32 상태 번호 자체는 4번 패널(ESP32 상태 보기)에서도 큰 글씨로 별도로 보이지만, 여기서는
-       수신 이력을 시간순으로 훑어볼 수 있습니다.
-     - 아래쪽 일반 로그: `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` / `EVENT,TCP_CONNECTED` /
-       `EVENT,TCP_CLOSED` 등 MCU의 비동기 알림, `RESET_COUNT,<count>`(RTC 리셋마다 1회, §6),
-       다른 패널이 보낸 커맨드에 대한 응답 프레임(`WIFI_R_ALL,...`/`MEAS_R_ALL,...`/
-       `RESET_R_ALL,...`/`ERR,...` 등, 같은 채널에 붙어 있는 모든 패널이 라인을 함께 받으므로),
-       그리고 위 두 범주(측정값/STATUS) 어디에도 속하지 않는 그 외 모든 값까지 원본 그대로
-       모두 표시됩니다.
+   - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지를 한 로그에 원본
+     그대로 모아 보여줍니다(높이 전체를 채움) — STX 유무나 태그 형식에 관계없이 전부 표시되며
+     (`Stm32Protocol.DisplayText`가 STX를 있으면 떼고 없으면 그대로 두며, 빈 줄만 무시합니다 —
+     실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않았습니다), `STATUS,<번호>`/`STATUS:<번호>`,
+     `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` / `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED`
+     등 MCU의 비동기 알림, `RESET_COUNT,<count>`(RTC 리셋마다 1회, §6), 다른 패널이 보낸 커맨드에
+     대한 응답 프레임(`WIFI_R_ALL,...`/`MEAS_R_ALL,...`/`RESET_R_ALL,...`/`ERR,...` 등, 같은
+     채널에 붙어 있는 모든 패널이 라인을 함께 받으므로)까지 모두 포함됩니다. ESP32 상태 번호
+     자체는 4번 패널(ESP32 상태 보기)에서 큰 글씨로 별도로 보이므로, 여기서는 STATUS만을 위한
+     별도 칸을 두지 않습니다(중복 방지).
    - "표시 채널": USB / UART / 둘 다 — 어느 채널에서 온 데이터를 그릴지 선택(좌/우 모두 동일하게 적용).
    - "자동 스크롤": 새 측정값이 들어올 때마다 그리드를 자동으로 맨 아래로 스크롤합니다.
-   - "지우기": 그리드와 STATUS 로그, 일반 로그를 모두 비웁니다.
+   - "지우기": 그리드와 우측 로그를 모두 비웁니다.
    - "CSV로 저장": 현재까지 쌓인 측정값을 CSV 파일로 내보냅니다.
 
 ## Visual Studio 디자이너로 폼/패널 편집하기

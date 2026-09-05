@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using Stm32WifiConfigTool.Models;
 
@@ -34,10 +35,22 @@ namespace Stm32WifiConfigTool.Services
 
                 settings.WifiCommandChannel = GetString(map, "WifiCommandChannel", settings.WifiCommandChannel);
                 settings.WifiCommandTimeoutMs = GetInt(map, "WifiCommandTimeoutMs", settings.WifiCommandTimeoutMs);
+                settings.WifiSsidCache = GetString(map, "WifiSsidCache", settings.WifiSsidCache);
+                settings.WifiServerIpCache = GetString(map, "WifiServerIpCache", settings.WifiServerIpCache);
+                settings.WifiServerPortCache = GetInt(map, "WifiServerPortCache", settings.WifiServerPortCache);
+                settings.WifiDhcpEnabledCache = GetBool(map, "WifiDhcpEnabledCache", settings.WifiDhcpEnabledCache);
+                settings.WifiStaticIpCache = GetString(map, "WifiStaticIpCache", settings.WifiStaticIpCache);
+                settings.WifiGatewayCache = GetString(map, "WifiGatewayCache", settings.WifiGatewayCache);
+                settings.WifiNetmaskCache = GetString(map, "WifiNetmaskCache", settings.WifiNetmaskCache);
                 settings.MeasConfigCommandChannel = GetString(map, "MeasConfigCommandChannel", settings.MeasConfigCommandChannel);
                 settings.MeasConfigCommandTimeoutMs = GetInt(map, "MeasConfigCommandTimeoutMs", settings.MeasConfigCommandTimeoutMs);
+                settings.MeasReferenceMvCache = GetDouble(map, "MeasReferenceMvCache", settings.MeasReferenceMvCache);
+                settings.MeasOffsetMvCache = GetDouble(map, "MeasOffsetMvCache", settings.MeasOffsetMvCache);
+                settings.MeasResistanceMOhmCache = GetDouble(map, "MeasResistanceMOhmCache", settings.MeasResistanceMOhmCache);
+                settings.MeasIntervalSecCache = GetDouble(map, "MeasIntervalSecCache", settings.MeasIntervalSecCache);
                 settings.RtcConfigCommandChannel = GetString(map, "RtcConfigCommandChannel", settings.RtcConfigCommandChannel);
                 settings.RtcConfigCommandTimeoutMs = GetInt(map, "RtcConfigCommandTimeoutMs", settings.RtcConfigCommandTimeoutMs);
+                settings.RtcPeriodSecCache = GetInt(map, "RtcPeriodSecCache", settings.RtcPeriodSecCache);
                 settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
                 settings.MeasurementGridWidth = GetInt(map, "MeasurementGridWidth", settings.MeasurementGridWidth);
@@ -80,10 +93,22 @@ namespace Stm32WifiConfigTool.Services
                 "Uart.WriteTimeoutMs=" + settings.Uart.WriteTimeoutMs,
                 "WifiCommandChannel=" + settings.WifiCommandChannel,
                 "WifiCommandTimeoutMs=" + settings.WifiCommandTimeoutMs,
+                "WifiSsidCache=" + settings.WifiSsidCache,
+                "WifiServerIpCache=" + settings.WifiServerIpCache,
+                "WifiServerPortCache=" + settings.WifiServerPortCache,
+                "WifiDhcpEnabledCache=" + settings.WifiDhcpEnabledCache,
+                "WifiStaticIpCache=" + settings.WifiStaticIpCache,
+                "WifiGatewayCache=" + settings.WifiGatewayCache,
+                "WifiNetmaskCache=" + settings.WifiNetmaskCache,
                 "MeasConfigCommandChannel=" + settings.MeasConfigCommandChannel,
                 "MeasConfigCommandTimeoutMs=" + settings.MeasConfigCommandTimeoutMs,
+                "MeasReferenceMvCache=" + settings.MeasReferenceMvCache.ToString(CultureInfo.InvariantCulture),
+                "MeasOffsetMvCache=" + settings.MeasOffsetMvCache.ToString(CultureInfo.InvariantCulture),
+                "MeasResistanceMOhmCache=" + settings.MeasResistanceMOhmCache.ToString(CultureInfo.InvariantCulture),
+                "MeasIntervalSecCache=" + settings.MeasIntervalSecCache.ToString(CultureInfo.InvariantCulture),
                 "RtcConfigCommandChannel=" + settings.RtcConfigCommandChannel,
                 "RtcConfigCommandTimeoutMs=" + settings.RtcConfigCommandTimeoutMs,
+                "RtcPeriodSecCache=" + settings.RtcPeriodSecCache,
                 "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
                 "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,
                 "MeasurementGridWidth=" + settings.MeasurementGridWidth,
@@ -147,6 +172,16 @@ namespace Stm32WifiConfigTool.Services
         private static bool GetBool(Dictionary<string, string> map, string key, bool fallback)
         {
             if (map.TryGetValue(key, out string value) && bool.TryParse(value, out bool parsed))
+            {
+                return parsed;
+            }
+            return fallback;
+        }
+
+        private static double GetDouble(Dictionary<string, string> map, string key, double fallback)
+        {
+            if (map.TryGetValue(key, out string value) &&
+                double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
             {
                 return parsed;
             }

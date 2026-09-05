@@ -103,7 +103,7 @@ namespace Stm32WifiConfigTool
             // _splitWifiMeas (좌: WiFi 설정 | 우: Measurement 설정 + ESP32 상태)
             //
             this._splitWifiMeas.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._splitWifiMeas.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            this._splitWifiMeas.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             this._splitWifiMeas.Location = new System.Drawing.Point(0, 0);
             this._splitWifiMeas.Name = "_splitWifiMeas";
             this._splitWifiMeas.Panel1.Controls.Add(this._wifiPanel);

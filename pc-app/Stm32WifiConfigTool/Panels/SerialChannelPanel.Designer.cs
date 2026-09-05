@@ -10,7 +10,6 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.FlowLayoutPanel _portRow;
         private System.Windows.Forms.ComboBox _portCombo;
         private System.Windows.Forms.Button _refreshButton;
-        private System.Windows.Forms.Button _clearButton;
         private System.Windows.Forms.Label _baudLabel;
         private System.Windows.Forms.ComboBox _baudCombo;
         private System.Windows.Forms.Label _readTimeoutLabel;
@@ -34,7 +33,6 @@ namespace Stm32WifiConfigTool.Panels
             this._portRow = new System.Windows.Forms.FlowLayoutPanel();
             this._portCombo = new System.Windows.Forms.ComboBox();
             this._refreshButton = new System.Windows.Forms.Button();
-            this._clearButton = new System.Windows.Forms.Button();
             this._baudLabel = new System.Windows.Forms.Label();
             this._baudCombo = new System.Windows.Forms.ComboBox();
             this._readTimeoutLabel = new System.Windows.Forms.Label();
@@ -88,7 +86,6 @@ namespace Stm32WifiConfigTool.Panels
             this._portRow.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._portRow.Controls.Add(this._portCombo);
             this._portRow.Controls.Add(this._refreshButton);
-            this._portRow.Controls.Add(this._clearButton);
             this._portRow.Location = new System.Drawing.Point(125, 22);
             this._portRow.Name = "_portRow";
             this._portRow.Size = new System.Drawing.Size(300, 30);
@@ -108,22 +105,11 @@ namespace Stm32WifiConfigTool.Panels
             this._refreshButton.AutoSize = true;
             this._refreshButton.Location = new System.Drawing.Point(139, 3);
             this._refreshButton.Name = "_refreshButton";
-            this._refreshButton.Size = new System.Drawing.Size(75, 25);
+            this._refreshButton.Size = new System.Drawing.Size(90, 25);
             this._refreshButton.TabIndex = 1;
             this._refreshButton.Text = "새로고침";
             this._refreshButton.UseVisualStyleBackColor = true;
             this._refreshButton.Click += new System.EventHandler(this.RefreshButton_Click);
-            //
-            // _clearButton
-            //
-            this._clearButton.AutoSize = true;
-            this._clearButton.Location = new System.Drawing.Point(220, 3);
-            this._clearButton.Name = "_clearButton";
-            this._clearButton.Size = new System.Drawing.Size(70, 25);
-            this._clearButton.TabIndex = 2;
-            this._clearButton.Text = "지우기";
-            this._clearButton.UseVisualStyleBackColor = true;
-            this._clearButton.Click += new System.EventHandler(this.ClearButton_Click);
             //
             // _baudLabel
             //

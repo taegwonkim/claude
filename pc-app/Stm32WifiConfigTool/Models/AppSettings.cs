@@ -11,8 +11,11 @@ namespace Stm32WifiConfigTool.Models
 
     /// <summary>
     /// 앱 재시작 후에도 유지할 PC측 UI 설정. AppSettingsStore가 로컬 파일로 저장/로드한다.
-    /// SSID/비밀번호/서버 IP 등 WiFi 접속 정보는 MCU 플래시에 저장되는 값이 원본(source of truth)이므로
-    /// 여기에는 포함하지 않는다 - 특히 비밀번호를 PC에 평문으로 남기지 않기 위함.
+    /// WiFi/Measurement/RTC 설정 패널에서 "Read"에 성공한 값은 각 *Cache 필드에 저장되어 다음
+    /// 실행 시 화면에 미리 채워진다(원본은 항상 MCU이고, 이 캐시는 마지막으로 확인한 값을
+    /// 보여주기 위한 참고용일 뿐이다 - "Write"만 하고 "Read"는 하지 않으면 갱신되지 않는다).
+    /// 유일한 예외는 WiFi 비밀번호로, PC에 평문으로 남기지 않기 위해 캐시하지 않는다(항상 빈 채로
+    /// 시작하며, 바꾸려면 "비밀번호 변경" 체크 후 새로 입력해야 한다).
     /// </summary>
     public class AppSettings
     {
@@ -23,13 +26,31 @@ namespace Stm32WifiConfigTool.Models
         public string WifiCommandChannel { get; set; } = "Usb";
         public int WifiCommandTimeoutMs { get; set; } = 3000;
 
+        /// <summary>WiFi 설정 패널에서 마지막으로 "Read"한 값(비밀번호 제외 - 클래스 주석 참고).</summary>
+        public string WifiSsidCache { get; set; } = string.Empty;
+        public string WifiServerIpCache { get; set; } = string.Empty;
+        public int WifiServerPortCache { get; set; } = 50001;
+        public bool WifiDhcpEnabledCache { get; set; } = true;
+        public string WifiStaticIpCache { get; set; } = string.Empty;
+        public string WifiGatewayCache { get; set; } = string.Empty;
+        public string WifiNetmaskCache { get; set; } = string.Empty;
+
         /// <summary>Measurement 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
         public string MeasConfigCommandChannel { get; set; } = "Usb";
         public int MeasConfigCommandTimeoutMs { get; set; } = 3000;
 
+        /// <summary>Measurement 설정 패널에서 마지막으로 "Read"한 값.</summary>
+        public double MeasReferenceMvCache { get; set; } = 0;
+        public double MeasOffsetMvCache { get; set; } = 0;
+        public double MeasResistanceMOhmCache { get; set; } = 0;
+        public double MeasIntervalSecCache { get; set; } = 1;
+
         /// <summary>RTC(리셋 주기) 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
         public string RtcConfigCommandChannel { get; set; } = "Usb";
         public int RtcConfigCommandTimeoutMs { get; set; } = 3000;
+
+        /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 값.</summary>
+        public int RtcPeriodSecCache { get; set; } = 3600;
 
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart" / "Both".</summary>
         public string MeasurementDisplayChannel { get; set; } = "Both";

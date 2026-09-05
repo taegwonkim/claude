@@ -12,11 +12,10 @@ namespace Stm32WifiConfigTool.Panels
     /// FPGA 측정값("DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN" 프레임, 첫 필드 "DC_" 접두어로 식별,
     /// 샘플 개수는 고정이 아님) 표시 패널. USB/UART 채널을
     /// 선택해 어느 쪽(또는 둘 다) 라인을 화면에 표시할지 고를 수 있다. 화면은 좌/우로 나뉘어
-    /// 있다: 좌측은 측정값 그리드, 우측은 그 외 모든 프레임(위쪽 STATUS 전용 로그 + 아래쪽
-    /// EVENT/RESET_COUNT/커맨드 응답 등 일반 로그)이다 — ESP32 상태는 별도 EspStatusPanel
-    /// 에서도 표시되지만, 여기 우측 상단에서도 수신 이력을 확인할 수 있다. 측정값이 아닌 프레임은
-    /// STX 유무나 태그 형식(콤마 "STATUS,&lt;번호&gt;" 또는 콜론 "STATUS:&lt;번호&gt;" 등)에 관계없이
-    /// 전부 표시된다(<see cref="Stm32Protocol.DisplayText"/>/<see cref="Stm32Protocol.TryParseStatusText"/> 참고).
+    /// 있다: 좌측은 측정값 그리드, 우측은 그 외 모든 프레임(EVENT/RESET_COUNT/커맨드 응답/STATUS
+    /// 등)을 한 로그에 원본 그대로 모아 보여준다 — ESP32 상태(STATUS)는 별도 EspStatusPanel의
+    /// "현재 ESP32 상태"에 이미 크게 표시되므로 여기서는 별도 칸을 두지 않는다. 측정값이 아닌
+    /// 프레임은 STX 유무에 관계없이 전부 표시된다(<see cref="Stm32Protocol.DisplayText"/> 참고).
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -174,18 +173,10 @@ namespace Stm32WifiConfigTool.Panels
                     _grid.FirstDisplayedScrollingRowIndex = _grid.Rows.Count - 1;
                 }
             }
-            else if (Stm32Protocol.TryParseStatusText(payload, out int statusNumber))
-            {
-                /* 측정값이 아닌 것 중 STATUS(콤마 "STATUS,<번호>" 또는 콜론 "STATUS:<번호>" 둘 다
-                 * 인식)는 우측 상단 전용 로그에 "STATUS:<번호>" 형태로 표시한다(다른 EVENT/응답
-                 * 등과는 별도 - ESP32 상태를 한눈에 훑어보기 위함). */
-                _statusLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) +
-                    "] STATUS:" + statusNumber + Environment.NewLine);
-            }
             else
             {
-                /* 측정값도 STATUS도 아닌 나머지 전부(EVENT/RESET_COUNT/커맨드 응답 및 STX 없이 오는
-                 * 값 포함)는 우측 하단 일반 로그에 원본 그대로 표시한다. */
+                /* 측정값이 아닌 나머지 전부(STATUS/EVENT/RESET_COUNT/커맨드 응답 및 STX 없이 오는
+                 * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다. */
                 _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] " + payload + Environment.NewLine);
             }
         }
@@ -194,7 +185,6 @@ namespace Stm32WifiConfigTool.Panels
         {
             _records.Clear();
             _countLabel.Text = "0건";
-            _statusLogBox.Clear();
             _eventLogBox.Clear();
         }
 

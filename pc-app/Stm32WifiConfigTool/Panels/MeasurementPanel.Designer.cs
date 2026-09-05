@@ -24,8 +24,6 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.DataGridViewTextBoxColumn _colSamples;
         private System.Windows.Forms.Label _countLabel;
         private System.Windows.Forms.TableLayoutPanel _rightLayout;
-        private System.Windows.Forms.Label _statusCaptionLabel;
-        private System.Windows.Forms.TextBox _statusLogBox;
         private System.Windows.Forms.Label _eventLabel;
         private System.Windows.Forms.TextBox _eventLogBox;
 
@@ -56,8 +54,6 @@ namespace Stm32WifiConfigTool.Panels
             this._colSamples = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._countLabel = new System.Windows.Forms.Label();
             this._rightLayout = new System.Windows.Forms.TableLayoutPanel();
-            this._statusCaptionLabel = new System.Windows.Forms.Label();
-            this._statusLogBox = new System.Windows.Forms.TextBox();
             this._eventLabel = new System.Windows.Forms.Label();
             this._eventLogBox = new System.Windows.Forms.TextBox();
             this._root.SuspendLayout();
@@ -287,72 +283,45 @@ namespace Stm32WifiConfigTool.Panels
             this._countLabel.Text = "0건";
             this._countLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             //
-            // _rightLayout (STATUS 표시 + 그 외 수신값 로그 - 측정값(TryParseMeasurementRecord로
-            // 인식되는 8필드 프레임)이 아닌 나머지 프레임은 모두 여기 표시된다: STATUS,&lt;번호&gt;는
-            // 위쪽 _statusLogBox에 "STATUS:&lt;번호&gt;" 형태로, 그 외(EVENT/RESET_COUNT/커맨드
-            // 응답 등)는 아래쪽 _eventLogBox에 원본 필드를 콤마로 이어붙인 텍스트로 표시된다.)
+            // _rightLayout (그 외 수신값 로그 - 측정값(TryParseMeasurementRecord로 인식되는
+            // "DC_" 접두어 프레임)이 아닌 나머지 프레임은 모두 여기 표시된다: STATUS는 이미
+            // EspStatusPanel의 "현재 ESP32 상태"에 크게 표시되므로 여기서는 별도 칸을 두지 않고,
+            // EVENT/RESET_COUNT/커맨드 응답/STATUS 등을 원본 그대로 한 로그에 모아 보여준다.)
             //
             this._rightLayout.ColumnCount = 1;
             this._rightLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._rightLayout.Controls.Add(this._statusCaptionLabel, 0, 0);
-            this._rightLayout.Controls.Add(this._statusLogBox, 0, 1);
-            this._rightLayout.Controls.Add(this._eventLabel, 0, 2);
-            this._rightLayout.Controls.Add(this._eventLogBox, 0, 3);
+            this._rightLayout.Controls.Add(this._eventLabel, 0, 0);
+            this._rightLayout.Controls.Add(this._eventLogBox, 0, 1);
             this._rightLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this._rightLayout.Location = new System.Drawing.Point(0, 0);
             this._rightLayout.Name = "_rightLayout";
-            this._rightLayout.RowCount = 4;
-            this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 140F));
+            this._rightLayout.RowCount = 2;
             this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._rightLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._rightLayout.Size = new System.Drawing.Size(326, 323);
             this._rightLayout.TabIndex = 0;
             //
-            // _statusCaptionLabel
-            //
-            this._statusCaptionLabel.Dock = System.Windows.Forms.DockStyle.Top;
-            this._statusCaptionLabel.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this._statusCaptionLabel.Location = new System.Drawing.Point(3, 0);
-            this._statusCaptionLabel.Name = "_statusCaptionLabel";
-            this._statusCaptionLabel.Padding = new System.Windows.Forms.Padding(0, 4, 0, 2);
-            this._statusCaptionLabel.Size = new System.Drawing.Size(320, 23);
-            this._statusCaptionLabel.TabIndex = 0;
-            this._statusCaptionLabel.Text = "STATUS";
-            //
-            // _statusLogBox
-            //
-            this._statusLogBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._statusLogBox.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8.5F);
-            this._statusLogBox.Location = new System.Drawing.Point(3, 26);
-            this._statusLogBox.Multiline = true;
-            this._statusLogBox.Name = "_statusLogBox";
-            this._statusLogBox.ReadOnly = true;
-            this._statusLogBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this._statusLogBox.Size = new System.Drawing.Size(320, 134);
-            this._statusLogBox.TabIndex = 1;
-            //
             // _eventLabel
             //
             this._eventLabel.Dock = System.Windows.Forms.DockStyle.Top;
-            this._eventLabel.Location = new System.Drawing.Point(3, 163);
+            this._eventLabel.Location = new System.Drawing.Point(3, 0);
             this._eventLabel.Name = "_eventLabel";
-            this._eventLabel.Padding = new System.Windows.Forms.Padding(0, 6, 0, 2);
+            this._eventLabel.Padding = new System.Windows.Forms.Padding(0, 4, 0, 2);
             this._eventLabel.Size = new System.Drawing.Size(320, 23);
-            this._eventLabel.TabIndex = 2;
-            this._eventLabel.Text = "그 외 수신값 (EVENT/RESET_COUNT/커맨드 응답 등)";
+            this._eventLabel.TabIndex = 0;
+            this._eventLabel.Text = "그 외 수신값 (STATUS/EVENT/RESET_COUNT/커맨드 응답 등)";
             //
             // _eventLogBox
             //
             this._eventLogBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._eventLogBox.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8.5F);
-            this._eventLogBox.Location = new System.Drawing.Point(3, 189);
+            this._eventLogBox.Location = new System.Drawing.Point(3, 26);
             this._eventLogBox.Multiline = true;
             this._eventLogBox.Name = "_eventLogBox";
             this._eventLogBox.ReadOnly = true;
             this._eventLogBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this._eventLogBox.Size = new System.Drawing.Size(320, 131);
-            this._eventLogBox.TabIndex = 3;
+            this._eventLogBox.Size = new System.Drawing.Size(320, 294);
+            this._eventLogBox.TabIndex = 1;
             //
             // MeasurementPanel
             //

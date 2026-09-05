@@ -8,7 +8,9 @@ namespace Stm32WifiConfigTool.Panels
     /// <summary>
     /// 측정 모듈 설정(Reference/Offset/Resistance/Interval Time) 패널.
     /// "Read"로 MCU에 MEAS_R_ALL을 보내 현재값을 화면에 채우고, "Write"로 입력값 전체를
-    /// MEAS_W_ALL 한 프레임에 담아 MCU에 전달한다.
+    /// MEAS_W_ALL 한 프레임에 담아 MCU에 전달한다. "Read" 성공 시 값을 <see cref="AppSettings"/>에
+    /// 캐시해두고, 다음 실행 시 <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전
+    /// 참고용).
     /// UI 레이아웃은 <c>MeasurementConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
     /// 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -34,6 +36,16 @@ namespace Stm32WifiConfigTool.Panels
             _channelUart.Checked = useUart;
 
             _cmdTimeoutBox.Value = ClampDecimal(settings.MeasConfigCommandTimeoutMs, _cmdTimeoutBox.Minimum, _cmdTimeoutBox.Maximum);
+
+            /* 마지막으로 "Read"에 성공했던 값을 화면에 미리 채운다 - MCU를 다시 조회하기 전까지
+             * 참고용이며, 실제 값의 원본은 항상 MCU다. */
+            ApplyConfigToUi(new MeasurementConfig
+            {
+                ReferenceMv = settings.MeasReferenceMvCache,
+                OffsetMv = settings.MeasOffsetMvCache,
+                ResistanceMOhm = settings.MeasResistanceMOhmCache,
+                IntervalSec = settings.MeasIntervalSecCache
+            });
         }
 
         private static decimal ClampDecimal(int value, decimal min, decimal max)
@@ -75,6 +87,24 @@ namespace Stm32WifiConfigTool.Panels
             if (d < min) return min;
             if (d > max) return max;
             return d;
+        }
+
+        /// <summary>"Read"로 받은 값을 로컬 캐시에 저장하고 즉시 파일에 반영한다(다음 실행 시
+        /// <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
+        private void SaveConfigCache(MeasurementConfig cfg)
+        {
+            _settings.MeasReferenceMvCache = cfg.ReferenceMv;
+            _settings.MeasOffsetMvCache = cfg.OffsetMv;
+            _settings.MeasResistanceMOhmCache = cfg.ResistanceMOhm;
+            _settings.MeasIntervalSecCache = cfg.IntervalSec;
+            try
+            {
+                AppSettingsStore.Save(_settings);
+            }
+            catch (Exception)
+            {
+                /* 설정 저장 실패(권한/디스크 문제 등)로 UI 동작 자체가 막히면 안 되므로 무시 */
+            }
         }
 
         private MeasurementConfig ReadConfigFromUi()
@@ -123,6 +153,7 @@ namespace Stm32WifiConfigTool.Panels
                 Log("MEAS_R_ALL 요청...");
                 MeasurementConfig cfg = await Stm32Commands.GetMeasAllAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
                 ApplyConfigToUi(cfg);
+                SaveConfigCache(cfg);
                 Log("MEAS_R_ALL 완료");
             }
             catch (Exception ex)
