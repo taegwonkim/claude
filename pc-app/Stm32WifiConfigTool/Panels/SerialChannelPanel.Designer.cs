@@ -29,6 +29,7 @@ namespace Stm32WifiConfigTool.Panels
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this._groupBox = new System.Windows.Forms.GroupBox();
             this._portLabel = new System.Windows.Forms.Label();
             this._portRow = new System.Windows.Forms.Panel();
