@@ -30,6 +30,17 @@ namespace Stm32WifiConfigTool.Panels
         /// <summary>포트 콤보박스와 그 오른쪽의 "새로고침" 버튼 사이의 간격(px).</summary>
         private const int RefreshButtonGap = 6;
 
+        /// <summary>왼쪽 라벨(포트/Baud Rate/타임아웃/상태)이 시작되는 x좌표(px).</summary>
+        private const int LabelLeft = 15;
+
+        /// <summary>왼쪽 라벨의 폭(px) - 이 값 하나만 바꾸면 모든 라벨의 폭이 함께 바뀐다
+        /// (<see cref="ApplyLabelLayout"/> 참고).</summary>
+        private const int LabelWidth = 100;
+
+        /// <summary>라벨 오른쪽 끝과 그 옆 입력란(포트 콤보박스/Baud Rate/타임아웃/연결 버튼/상태
+        /// 등) 사이의 간격(px).</summary>
+        private const int LabelFieldGap = 10;
+
         /// <summary>Segoe Fluent Icons(Windows 11)/Segoe MDL2 Assets(Windows 10)의 "Refresh"
         /// 글리프 코드포인트. 두 폰트 모두 이 값에 같은 모양(새로고침 화살표)을 매핑해두었다.</summary>
         private const string RefreshGlyph = "";
@@ -43,7 +54,34 @@ namespace Stm32WifiConfigTool.Panels
         {
             InitializeComponent();
             ApplyRefreshButtonIcon();
+            ApplyLabelLayout();
             ApplyFieldRightMargins();
+        }
+
+        /// <summary>디자이너가 잡아둔 라벨 폭/입력란 시작 위치 대신, <see cref="LabelWidth"/>/
+        /// <see cref="LabelFieldGap"/>으로 계산해 적용한다. <see cref="ApplyFieldRightMargins"/>가
+        /// 이 메서드가 정한 입력란 Left를 기준으로 Width를 다시 계산하므로, 반드시 그보다 먼저
+        /// 호출해야 한다.</summary>
+        private void ApplyLabelLayout()
+        {
+            _portLabel.Left = LabelLeft;
+            _portLabel.Width = LabelWidth;
+            _baudLabel.Left = LabelLeft;
+            _baudLabel.Width = LabelWidth;
+            _readTimeoutLabel.Left = LabelLeft;
+            _readTimeoutLabel.Width = LabelWidth;
+            _writeTimeoutLabel.Left = LabelLeft;
+            _writeTimeoutLabel.Width = LabelWidth;
+            _statusCaptionLabel.Left = LabelLeft;
+            _statusCaptionLabel.Width = LabelWidth;
+
+            int fieldLeft = LabelLeft + LabelWidth + LabelFieldGap;
+            _portRow.Left = fieldLeft;
+            _baudCombo.Left = fieldLeft;
+            _readTimeout.Left = fieldLeft;
+            _writeTimeout.Left = fieldLeft;
+            _connectButton.Left = fieldLeft;
+            _statusLabel.Left = fieldLeft;
         }
 
         /// <summary>설치된 폰트 중에 <see cref="IconFontCandidates"/>가 있으면 "새로고침" 텍스트
@@ -72,7 +110,8 @@ namespace Stm32WifiConfigTool.Panels
         /// <summary>디자이너가 잡아둔 각 행의 고정 Width/Location 대신, <see cref="FieldRightMargin"/>/
         /// <see cref="RefreshButtonGap"/> 하나로 우측 여백을 계산해 적용한다 - Anchor가 이 초기
         /// 배치를 기준으로 거리를 고정하므로, 이 메서드가 실제로 적용되는 여백을 결정한다(디자이너의
-        /// 고정 Size는 디자인 타임 미리보기용).</summary>
+        /// 고정 Size는 디자인 타임 미리보기용). <see cref="ApplyLabelLayout"/>이 먼저 옮겨둔 각 행의
+        /// Left를 기준으로 Width를 계산하므로 반드시 그 다음에 호출해야 한다.</summary>
         private void ApplyFieldRightMargins()
         {
             int right = _groupBox.Width - FieldRightMargin;

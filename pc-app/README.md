@@ -93,6 +93,11 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      오른쪽 끝에 고정되어 따라갑니다(WiFi 설정 패널의 비밀번호 입력란/"비밀번호 변경" 체크박스와
      같은 방식). USB/UART 패널은 이 `SerialChannelPanel`을 그대로 재사용하므로 두 패널 모두에
      동일하게 적용됩니다.
+   - **왼쪽 라벨(포트/Baud Rate/타임아웃/상태) 폭과 그 옆 입력란 시작 위치를 조절하려면**:
+     `SerialChannelPanel.cs`의 `LabelWidth`(라벨 폭)와 `LabelFieldGap`(라벨과 입력란 사이 간격)
+     상수를 바꾸면 됩니다 - `ApplyLabelLayout()`이 이 두 값으로 각 라벨의 폭과 입력란(포트
+     콤보박스/Baud Rate/타임아웃/연결 버튼/상태 텍스트)의 시작 x좌표를 함께 계산해 적용하므로,
+     라벨 폭을 늘리거나 줄이면 입력란 시작 위치도 자동으로 따라 옮겨집니다.
 
 2. **WiFi 설정** (중앙상단, `Panels/WifiConfigPanel.cs`)
    SSID/비밀번호, 서버 IP·Port, DHCP on/off, DHCP off일 때의 정적 IP/Gateway/Netmask를 설정합니다.
