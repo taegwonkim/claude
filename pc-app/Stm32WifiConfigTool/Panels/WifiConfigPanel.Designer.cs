@@ -40,6 +40,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.FlowLayoutPanel _buttonRow;
         private System.Windows.Forms.Button _readButton;
         private System.Windows.Forms.Button _writeButton;
+        private System.Windows.Forms.FlowLayoutPanel _timeoutRow;
         private System.Windows.Forms.Label _cmdTimeoutCaptionLabel;
         private System.Windows.Forms.NumericUpDown _cmdTimeoutBox;
         private System.Windows.Forms.TextBox _logBox;
@@ -77,6 +78,7 @@ namespace Stm32WifiConfigTool.Panels
             this._buttonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._readButton = new System.Windows.Forms.Button();
             this._writeButton = new System.Windows.Forms.Button();
+            this._timeoutRow = new System.Windows.Forms.FlowLayoutPanel();
             this._cmdTimeoutCaptionLabel = new System.Windows.Forms.Label();
             this._cmdTimeoutBox = new System.Windows.Forms.NumericUpDown();
             this._logBox = new System.Windows.Forms.TextBox();
@@ -86,6 +88,7 @@ namespace Stm32WifiConfigTool.Panels
             ((System.ComponentModel.ISupportInitialize)(this._serverPortBox)).BeginInit();
             this._bottomLayout.SuspendLayout();
             this._buttonRow.SuspendLayout();
+            this._timeoutRow.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._cmdTimeoutBox)).BeginInit();
             this.SuspendLayout();
             //
@@ -323,11 +326,13 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.ColumnCount = 1;
             this._bottomLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._bottomLayout.Controls.Add(this._buttonRow, 0, 0);
-            this._bottomLayout.Controls.Add(this._logBox, 0, 1);
+            this._bottomLayout.Controls.Add(this._timeoutRow, 0, 1);
+            this._bottomLayout.Controls.Add(this._logBox, 0, 2);
             this._bottomLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this._bottomLayout.Location = new System.Drawing.Point(9, 397);
             this._bottomLayout.Name = "_bottomLayout";
-            this._bottomLayout.RowCount = 2;
+            this._bottomLayout.RowCount = 3;
+            this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._bottomLayout.Size = new System.Drawing.Size(622, 114);
@@ -338,8 +343,6 @@ namespace Stm32WifiConfigTool.Panels
             this._buttonRow.AutoSize = true;
             this._buttonRow.Controls.Add(this._readButton);
             this._buttonRow.Controls.Add(this._writeButton);
-            this._buttonRow.Controls.Add(this._cmdTimeoutCaptionLabel);
-            this._buttonRow.Controls.Add(this._cmdTimeoutBox);
             this._buttonRow.Dock = System.Windows.Forms.DockStyle.Top;
             this._buttonRow.Location = new System.Drawing.Point(0, 0);
             this._buttonRow.Margin = new System.Windows.Forms.Padding(0);
@@ -370,20 +373,33 @@ namespace Stm32WifiConfigTool.Panels
             this._writeButton.UseVisualStyleBackColor = true;
             this._writeButton.Click += new System.EventHandler(this.WriteButton_Click);
             //
+            // _timeoutRow (Read/Write 버튼 아래 별도 행 - 폭이 좁아져도 겹치지 않도록)
+            //
+            this._timeoutRow.AutoSize = true;
+            this._timeoutRow.Controls.Add(this._cmdTimeoutCaptionLabel);
+            this._timeoutRow.Controls.Add(this._cmdTimeoutBox);
+            this._timeoutRow.Dock = System.Windows.Forms.DockStyle.Top;
+            this._timeoutRow.Location = new System.Drawing.Point(0, 31);
+            this._timeoutRow.Margin = new System.Windows.Forms.Padding(0);
+            this._timeoutRow.Name = "_timeoutRow";
+            this._timeoutRow.Size = new System.Drawing.Size(622, 29);
+            this._timeoutRow.TabIndex = 4;
+            this._timeoutRow.WrapContents = false;
+            //
             // _cmdTimeoutCaptionLabel
             //
             this._cmdTimeoutCaptionLabel.AutoSize = true;
-            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(195, 11);
+            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(3, 8);
+            this._cmdTimeoutCaptionLabel.Margin = new System.Windows.Forms.Padding(3, 8, 3, 0);
             this._cmdTimeoutCaptionLabel.Name = "_cmdTimeoutCaptionLabel";
-            this._cmdTimeoutCaptionLabel.Padding = new System.Windows.Forms.Padding(0, 8, 0, 0);
-            this._cmdTimeoutCaptionLabel.Size = new System.Drawing.Size(120, 21);
+            this._cmdTimeoutCaptionLabel.Size = new System.Drawing.Size(120, 15);
             this._cmdTimeoutCaptionLabel.TabIndex = 2;
-            this._cmdTimeoutCaptionLabel.Text = "  커맨드 타임아웃(ms)";
+            this._cmdTimeoutCaptionLabel.Text = "커맨드 타임아웃(ms)";
             //
             // _cmdTimeoutBox
             //
             this._cmdTimeoutBox.Increment = new decimal(new int[] { 100, 0, 0, 0 });
-            this._cmdTimeoutBox.Location = new System.Drawing.Point(321, 3);
+            this._cmdTimeoutBox.Location = new System.Drawing.Point(129, 3);
             this._cmdTimeoutBox.Maximum = new decimal(new int[] { 30000, 0, 0, 0 });
             this._cmdTimeoutBox.Minimum = new decimal(new int[] { 200, 0, 0, 0 });
             this._cmdTimeoutBox.Name = "_cmdTimeoutBox";
@@ -396,12 +412,12 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._logBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this._logBox.Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8.5F);
-            this._logBox.Location = new System.Drawing.Point(3, 34);
+            this._logBox.Location = new System.Drawing.Point(3, 63);
             this._logBox.Multiline = true;
             this._logBox.Name = "_logBox";
             this._logBox.ReadOnly = true;
             this._logBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this._logBox.Size = new System.Drawing.Size(616, 77);
+            this._logBox.Size = new System.Drawing.Size(616, 48);
             this._logBox.TabIndex = 1;
             //
             // WifiConfigPanel
@@ -419,6 +435,8 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.PerformLayout();
             this._buttonRow.ResumeLayout(false);
             this._buttonRow.PerformLayout();
+            this._timeoutRow.ResumeLayout(false);
+            this._timeoutRow.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._cmdTimeoutBox)).EndInit();
             this.ResumeLayout(false);
         }

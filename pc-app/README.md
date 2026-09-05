@@ -36,6 +36,17 @@ MCU는 **USB(CDC 가상 COM)** 와 **UART(USART3, 보통 USB-시리얼 변환기
 > 자동으로 재계산되어 덮어써졌습니다. 다른 3개 스플리터처럼 `FixedPanel = Panel1`로 바꿔서
 > WiFi 폭 자체가 불변으로 유지되고 나머지(Measurement/RTC/ESP32 상태 쪽)가 창 크기 변화를
 > 흡수하도록 고쳤습니다.
+>
+> 위 수정과 별개로, 창/패널을 **줄이는** 방향으로는 잘 안 움직이던 문제도 있었습니다(늘리는
+> 건 되는데 줄이는 게 안 됨). 각 `SplitContainer`의 `Panel1MinSize`/`Panel2MinSize`가 필요
+> 이상으로 크게 잡혀 있었던 데다, 중첩된 스플리터의 실제 최소 폭 합계보다 바깥쪽 스플리터의
+> `Panel2MinSize`가 더 작게 선언되어 있어(예: `_splitWifiMeas.Panel2MinSize`가 460인데 그
+> 안에 중첩된 `_splitMeasStatus` 계열이 실제로 필요로 하는 최소 폭은 632였음) 서로 앞뒤가
+> 안 맞았습니다. 각 패널의 실제 최소 폭을 다시 계산해 필요한 만큼만 요구하도록 줄이고
+> (Port 280 / WiFi 300 / Measurement 200 / RTC 180 / ESP32 상태 200), 중첩된 스플리터를
+> 감싸는 바깥쪽 스플리터의 `Panel2MinSize`는 안쪽 스플리터가 실제로 필요로 하는 최소 폭
+> 합계와 정확히 일치하도록 다시 계산했습니다. `MainForm.MinimumSize`도 (1816, 780)에서
+> (1220, 700)으로 낮춰서 창 자체도 더 작게 줄일 수 있습니다.
 
 **패널을 좁힐 때 입력란도 함께 줄어듭니다**: 각 패널 안의 텍스트박스/콤보박스/NumericUpDown
 입력 필드(SSID, 서버 IP, Reference/Offset/Resistance/Interval, 리셋 주기, 포트/Baud Rate/
@@ -56,7 +67,7 @@ Visual Studio 디자이너의 드래그 크기 조절 핸들을 막지 않으므
 완전히 다시 빌드한 뒤 테스트하세요.
 
 하단 **측정값 보기** 패널(6번, 전체 폭) 내부에도 별도의 좌/우 스플리터가 하나 더 있습니다(좌:
-측정값 그리드, 우: STATUS + 그 외 값 로그, `Panels/MeasurementPanel.cs`의 `_splitDisplay`) — 위
+측정값 그리드, 우: 그 외 값 로그, `Panels/MeasurementPanel.cs`의 `_splitDisplay`) — 위
 5개 패널과 같은 드래그·즉시 저장 방식이며 `AppSettings.MeasurementGridWidth`로 저장됩니다.
 
 MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 프레임을 구분해서 각각 다른 패널에
@@ -85,6 +96,9 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      채워집니다**(`AppSettings.WifiSsidCache` 등, `WifiConfigPanel.Initialize()`/
      `SaveConfigCache()` 참고 — MCU 재조회 전 참고용일 뿐 원본은 항상 MCU이며, 비밀번호만
      예외적으로 캐시하지 않고 항상 빈 채로 시작합니다).
+   - "커맨드 타임아웃(ms)"은 Read/Write 버튼 옆이 아니라 그 **아래 별도 줄**에 있습니다(패널
+     폭이 좁아졌을 때 버튼과 겹치지 않도록 `_timeoutRow`라는 별도 `FlowLayoutPanel` 행으로
+     분리했습니다).
 
 3. **Measurement 설정** (WiFi 설정 오른쪽, `Panels/MeasurementConfigPanel.cs`, 신규)
    측정 모듈의 Reference(mV, 측정 상한치) / Offset(mV, 상한치 초과 시 노이즈 여유값) /
