@@ -40,7 +40,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.FlowLayoutPanel _buttonRow;
         private System.Windows.Forms.Button _readButton;
         private System.Windows.Forms.Button _writeButton;
-        private System.Windows.Forms.FlowLayoutPanel _timeoutRow;
+        private System.Windows.Forms.Panel _timeoutRow;
         private System.Windows.Forms.Label _cmdTimeoutCaptionLabel;
         private System.Windows.Forms.NumericUpDown _cmdTimeoutBox;
         private System.Windows.Forms.TextBox _logBox;
@@ -78,7 +78,7 @@ namespace Stm32WifiConfigTool.Panels
             this._buttonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._readButton = new System.Windows.Forms.Button();
             this._writeButton = new System.Windows.Forms.Button();
-            this._timeoutRow = new System.Windows.Forms.FlowLayoutPanel();
+            this._timeoutRow = new System.Windows.Forms.Panel();
             this._cmdTimeoutCaptionLabel = new System.Windows.Forms.Label();
             this._cmdTimeoutBox = new System.Windows.Forms.NumericUpDown();
             this._logBox = new System.Windows.Forms.TextBox();
@@ -373,24 +373,22 @@ namespace Stm32WifiConfigTool.Panels
             this._writeButton.UseVisualStyleBackColor = true;
             this._writeButton.Click += new System.EventHandler(this.WriteButton_Click);
             //
-            // _timeoutRow (Read/Write 버튼 아래 별도 행 - 폭이 좁아져도 겹치지 않도록)
+            // _timeoutRow (Read/Write 버튼 아래 별도 행 - _fieldsGroup과 같은 라벨(x=15)/입력란(x=150)
+            // 열에 맞춰 자유 배치한다 - 위 채널 선택 그룹(_channelUsb도 x=15에서 시작)과도 열이
+            // 일치해, 패널 전체에서 라벨/입력란 시작 위치가 한 줄로 정렬된다.)
             //
-            this._timeoutRow.AutoSize = true;
             this._timeoutRow.Controls.Add(this._cmdTimeoutCaptionLabel);
             this._timeoutRow.Controls.Add(this._cmdTimeoutBox);
             this._timeoutRow.Dock = System.Windows.Forms.DockStyle.Top;
             this._timeoutRow.Location = new System.Drawing.Point(0, 31);
-            this._timeoutRow.Margin = new System.Windows.Forms.Padding(0);
             this._timeoutRow.Name = "_timeoutRow";
             this._timeoutRow.Size = new System.Drawing.Size(622, 29);
             this._timeoutRow.TabIndex = 4;
-            this._timeoutRow.WrapContents = false;
             //
             // _cmdTimeoutCaptionLabel
             //
             this._cmdTimeoutCaptionLabel.AutoSize = true;
-            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(3, 8);
-            this._cmdTimeoutCaptionLabel.Margin = new System.Windows.Forms.Padding(3, 8, 3, 0);
+            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(15, 6);
             this._cmdTimeoutCaptionLabel.Name = "_cmdTimeoutCaptionLabel";
             this._cmdTimeoutCaptionLabel.Size = new System.Drawing.Size(120, 15);
             this._cmdTimeoutCaptionLabel.TabIndex = 2;
@@ -399,7 +397,7 @@ namespace Stm32WifiConfigTool.Panels
             // _cmdTimeoutBox
             //
             this._cmdTimeoutBox.Increment = new decimal(new int[] { 100, 0, 0, 0 });
-            this._cmdTimeoutBox.Location = new System.Drawing.Point(129, 3);
+            this._cmdTimeoutBox.Location = new System.Drawing.Point(150, 3);
             this._cmdTimeoutBox.Maximum = new decimal(new int[] { 30000, 0, 0, 0 });
             this._cmdTimeoutBox.Minimum = new decimal(new int[] { 200, 0, 0, 0 });
             this._cmdTimeoutBox.Name = "_cmdTimeoutBox";

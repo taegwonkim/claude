@@ -106,8 +106,17 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      `SaveConfigCache()` 참고 — MCU 재조회 전 참고용일 뿐 원본은 항상 MCU이며, 비밀번호만
      예외적으로 캐시하지 않고 항상 빈 채로 시작합니다).
    - "커맨드 타임아웃(ms)"은 Read/Write 버튼 옆이 아니라 그 **아래 별도 줄**에 있습니다(패널
-     폭이 좁아졌을 때 버튼과 겹치지 않도록 `_timeoutRow`라는 별도 `FlowLayoutPanel` 행으로
-     분리했습니다).
+     폭이 좁아졌을 때 버튼과 겹치지 않도록 `_timeoutRow`라는 별도 행으로 분리했습니다). 이 행은
+     `_fieldsGroup`과 같은 자유 배치(Location+Size) 방식으로 바꿔, 라벨은 x=15, 입력란은
+     x=150에 위치시켜 위쪽 "설정값" 그룹의 라벨/입력란 열, 그리고 맨 위 "명령 전송 채널"
+     그룹(라디오 버튼도 x=15에서 시작)과 세로로 한 줄에 맞춰지도록 했습니다.
+   - **각 입력란 오른쪽 여백을 조절하려면**: `WifiConfigPanel.cs`의 `FieldRightMargin`
+     상수(px) 하나만 바꾸면 됩니다. `ApplyFieldRightMargins()`가 이 값으로 SSID/서버 IP/서버
+     Port/정적 IP/Gateway/Netmask 입력란과 "비밀번호 변경" 체크박스의 우측 여백을 한 번에
+     다시 계산해 적용합니다(생성자에서 `InitializeComponent()` 직후 1회 호출). 디자이너
+     (`WifiConfigPanel.Designer.cs`)의 고정 `Size`/`Location` 값은 디자인 타임 미리보기용일
+     뿐이며, 실제 실행 시 여백은 이 상수가 결정합니다. 비밀번호 입력란과 그 오른쪽 "비밀번호
+     변경" 체크박스 사이의 간격은 별도의 `PasswordCheckboxGap` 상수로 조절합니다.
 
 3. **Measurement 설정** (WiFi 설정 오른쪽, `Panels/MeasurementConfigPanel.cs`, 신규)
    측정 모듈의 Reference(mV, 측정 상한치) / Offset(mV, 상한치 초과 시 노이즈 여유값) /

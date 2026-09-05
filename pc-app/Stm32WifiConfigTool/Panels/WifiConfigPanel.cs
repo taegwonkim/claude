@@ -24,9 +24,38 @@ namespace Stm32WifiConfigTool.Panels
         private ConnectionManager _conn;
         private AppSettings _settings;
 
+        /// <summary>설정값 그룹(<c>_fieldsGroup</c>) 각 입력란의 우측 여백(px) - 그룹 박스 오른쪽
+        /// 테두리에서 입력란 오른쪽 끝까지의 거리. 이 값 하나만 바꾸면 SSID/서버 IP/서버 Port/
+        /// 정적 IP/Gateway/Netmask 입력란과 "비밀번호 변경" 체크박스의 우측 여백이 모두 함께
+        /// 바뀐다(<see cref="ApplyFieldRightMargins"/> 참고). 각 입력란은 Anchor=Top|Left|Right이므로
+        /// 패널 크기가 바뀌어도 이 여백은 항상 유지된다.</summary>
+        private const int FieldRightMargin = 18;
+
+        /// <summary>비밀번호 입력란과 그 오른쪽의 "비밀번호 변경" 체크박스 사이의 간격(px).</summary>
+        private const int PasswordCheckboxGap = 10;
+
         public WifiConfigPanel()
         {
             InitializeComponent();
+            ApplyFieldRightMargins();
+        }
+
+        /// <summary>디자이너가 잡아둔 각 입력란의 고정 Width/Location 대신, <see cref="FieldRightMargin"/>
+        /// 하나로 우측 여백을 계산해 적용한다 - Anchor가 이 초기 배치를 기준으로 거리를 고정하므로,
+        /// 이 메서드가 실제로 적용되는 여백을 결정한다(디자이너의 고정 Size는 디자인 타임 미리보기용).</summary>
+        private void ApplyFieldRightMargins()
+        {
+            int right = _fieldsGroup.Width - FieldRightMargin;
+
+            _ssidBox.Width = right - _ssidBox.Left;
+            _serverIpBox.Width = right - _serverIpBox.Left;
+            _serverPortBox.Width = right - _serverPortBox.Left;
+            _staticIpBox.Width = right - _staticIpBox.Left;
+            _gatewayBox.Width = right - _gatewayBox.Left;
+            _maskBox.Width = right - _maskBox.Left;
+
+            _changePasswordCheck.Left = right - _changePasswordCheck.Width;
+            _passwordBox.Width = _changePasswordCheck.Left - PasswordCheckboxGap - _passwordBox.Left;
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.</summary>
