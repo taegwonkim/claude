@@ -78,7 +78,13 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 1. **포트 설정** (좌상단, `Panels/PortSettingsPanel.cs`)
    USB/UART 각각 COM 포트, Baud Rate, 읽기/쓰기 타임아웃(ms)을 설정하고 연결/해제합니다.
    다른 패널에서 명령을 보내거나 데이터를 받으려면 먼저 여기서 연결해야 합니다.
-   - "새로고침": OS에 연결된 COM 포트 목록을 다시 읽어옵니다.
+   - "새로고침": OS에 연결된 COM 포트 목록을 다시 읽어옵니다. 실행 중인 PC에 Windows 11의
+     "Segoe Fluent Icons" 폰트(또는 Windows 10의 "Segoe MDL2 Assets")가 설치되어 있으면
+     `SerialChannelPanel.ApplyRefreshButtonIcon()`이 텍스트 "새로고침" 대신 그 폰트의 새로고침
+     글리프(U+E72C)로 자동 교체합니다 - 두 폰트 모두 같은 코드포인트에 같은 모양을 매핑해두었기
+     때문에 코드 하나로 두 버전 모두 지원됩니다. 아이콘 폰트가 없는 환경(일부 서버 코어 등)에서는
+     디자이너가 잡아둔 "새로고침" 텍스트가 그대로 표시되며, 아이콘으로 바뀐 뒤에도 마우스를 올리면
+     "새로고침" 툴팁이 뜹니다.
    - "연결"/"연결 해제": 포트를 열고 닫습니다.
    - **각 행(포트/Baud Rate/타임아웃/연결/상태) 오른쪽 여백을 조절하려면**: `SerialChannelPanel.cs`의
      `FieldRightMargin` 상수(px) 하나만 바꾸면 됩니다(WiFi 설정 패널의 `FieldRightMargin`과 같은

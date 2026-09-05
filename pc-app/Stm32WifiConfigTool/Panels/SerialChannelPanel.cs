@@ -1,4 +1,6 @@
 using System;
+using System.Drawing;
+using System.Drawing.Text;
 using System.IO.Ports;
 using System.Windows.Forms;
 using Stm32WifiConfigTool.Models;
@@ -28,10 +30,43 @@ namespace Stm32WifiConfigTool.Panels
         /// <summary>포트 콤보박스와 그 오른쪽의 "새로고침" 버튼 사이의 간격(px).</summary>
         private const int RefreshButtonGap = 6;
 
+        /// <summary>Segoe Fluent Icons(Windows 11)/Segoe MDL2 Assets(Windows 10)의 "Refresh"
+        /// 글리프 코드포인트. 두 폰트 모두 이 값에 같은 모양(새로고침 화살표)을 매핑해두었다.</summary>
+        private const string RefreshGlyph = "";
+
+        /// <summary>이 순서대로 설치 여부를 확인해 먼저 찾은 아이콘 폰트를 쓴다 - Windows 11에는
+        /// "Segoe Fluent Icons"가, 그보다 오래된 Windows 10에는 "Segoe MDL2 Assets"가 기본
+        /// 포함되어 있다.</summary>
+        private static readonly string[] IconFontCandidates = { "Segoe Fluent Icons", "Segoe MDL2 Assets" };
+
         public SerialChannelPanel()
         {
             InitializeComponent();
+            ApplyRefreshButtonIcon();
             ApplyFieldRightMargins();
+        }
+
+        /// <summary>설치된 폰트 중에 <see cref="IconFontCandidates"/>가 있으면 "새로고침" 텍스트
+        /// 대신 그 폰트로 렌더링한 새로고침 글리프(<see cref="RefreshGlyph"/>)를 버튼에 표시한다
+        /// (툴팁으로 "새로고침"을 계속 알려주므로 뜻은 그대로 전달된다). 아이콘 폰트가 없는
+        /// 환경(예: 일부 서버 코어)에서는 디자이너가 잡아둔 "새로고침" 텍스트를 그대로 둔다.</summary>
+        private void ApplyRefreshButtonIcon()
+        {
+            using (var installed = new InstalledFontCollection())
+            {
+                foreach (string candidate in IconFontCandidates)
+                {
+                    bool found = Array.Exists(installed.Families,
+                        f => string.Equals(f.Name, candidate, StringComparison.OrdinalIgnoreCase));
+                    if (!found)
+                    {
+                        continue;
+                    }
+                    _refreshButton.Font = new Font(candidate, 12F, FontStyle.Regular);
+                    _refreshButton.Text = RefreshGlyph;
+                    return;
+                }
+            }
         }
 
         /// <summary>디자이너가 잡아둔 각 행의 고정 Width/Location 대신, <see cref="FieldRightMargin"/>/

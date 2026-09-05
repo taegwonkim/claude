@@ -19,6 +19,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Button _connectButton;
         private System.Windows.Forms.Label _statusCaptionLabel;
         private System.Windows.Forms.Label _statusLabel;
+        private System.Windows.Forms.ToolTip _refreshButtonTip;
 
         #region Component Designer generated code
 
@@ -42,6 +43,7 @@ namespace Stm32WifiConfigTool.Panels
             this._connectButton = new System.Windows.Forms.Button();
             this._statusCaptionLabel = new System.Windows.Forms.Label();
             this._statusLabel = new System.Windows.Forms.Label();
+            this._refreshButtonTip = new System.Windows.Forms.ToolTip(this.components);
             this._groupBox.SuspendLayout();
             this._portRow.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).BeginInit();
@@ -101,16 +103,21 @@ namespace Stm32WifiConfigTool.Panels
             this._portCombo.Size = new System.Drawing.Size(130, 23);
             this._portCombo.TabIndex = 0;
             //
-            // _refreshButton
+            // _refreshButton (기본은 텍스트 "새로고침" - Windows 11 아이콘 폰트(Segoe Fluent
+            // Icons/Segoe MDL2 Assets)가 설치되어 있으면 실행 시 ApplyRefreshButtonIcon()이
+            // 새로고침 글리프로 바꿔치기한다. 아이콘만 남아도 뜻을 알 수 있도록 툴팁을 단다.)
             //
             this._refreshButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this._refreshButton.AccessibleName = "새로고침";
             this._refreshButton.AutoSize = true;
             this._refreshButton.Location = new System.Drawing.Point(136, 3);
             this._refreshButton.Name = "_refreshButton";
+            this._refreshButton.Padding = new System.Windows.Forms.Padding(6, 3, 6, 3);
             this._refreshButton.Size = new System.Drawing.Size(90, 25);
             this._refreshButton.TabIndex = 1;
             this._refreshButton.Text = "새로고침";
             this._refreshButton.UseVisualStyleBackColor = true;
+            this._refreshButtonTip.SetToolTip(this._refreshButton, "새로고침");
             this._refreshButton.Click += new System.EventHandler(this.RefreshButton_Click);
             //
             // _baudLabel
