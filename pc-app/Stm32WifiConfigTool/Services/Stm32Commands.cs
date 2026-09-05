@@ -80,11 +80,12 @@ namespace Stm32WifiConfigTool.Services
         }
 
         /// <summary>WIFI_R_ALL을 보내고 응답(태그 있으면 "WIFI_R_ALL,..." 없으면 값만)을 NetConfig로
-        /// 변환한다. 실측된 필드 순서는 "ssid,pass_masked,server_ip,server_port,dhcp"(5개, dhcp는
-        /// "1"=사용/"0"=미사용)이며, 정적 IP/Gateway/Netmask는 여기 포함되지 않는다. 다만 이
-        /// 저장소가 만든 firmware 스타일(8필드, dhcp 뒤에 ip,gateway,mask가 더 있는 경우)도 함께
-        /// 허용한다 - 응답이 5개뿐이면 StaticIp/Gateway/Netmask는 null로 두어 호출자가 기존 값을
-        /// 그대로 유지할 수 있게 한다(<see cref="Panels.WifiConfigPanel.ApplyConfigToUi"/> 참고).</summary>
+        /// 변환한다. 실측된 필드 순서는 "ssid,pass_masked,server_ip,server_port,dhcp[,ip,gateway,mask]"
+        /// 이며, dhcp는 "1"=사용/"0"=미사용이다. 정적 IP/Gateway/Netmask 3개 필드는 **dhcp="0"일
+        /// 때만** dhcp 뒤에 이어서 온다 - dhcp="1"이면 이 3개 필드 자체가 없으므로(사용 안 하는
+        /// 값이니 당연히 안 보내는 것), 이 경우 StaticIp/Gateway/Netmask는 null로 두어 호출자가
+        /// 화면의 기존 값을 그대로 유지할 수 있게 한다(<see cref="Panels.WifiConfigPanel.ApplyConfigToUi"/>
+        /// 참고). dhcp="0"인데 정적 IP 필드가 없으면(프로토콜 위반) 예외를 던진다.</summary>
         public static async Task<NetConfig> GetWifiAllAsync(SerialLinkService link, int timeoutMs)
         {
             string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdWifiReadAll, timeoutMs);
@@ -97,7 +98,21 @@ namespace Stm32WifiConfigTool.Services
 
             int.TryParse(v[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int port);
             bool dhcpOn = v[4] == "1" || string.Equals(v[4], "ON", StringComparison.OrdinalIgnoreCase);
-            bool hasStaticIpFields = v.Length >= 8;
+
+            string staticIp = null;
+            string gateway = null;
+            string netmask = null;
+            if (!dhcpOn)
+            {
+                if (v.Length < 8)
+                {
+                    throw new InvalidOperationException(
+                        "WIFI_R_ALL 응답 필드 부족 (DHCP 미사용인데 정적 IP/Gateway/Netmask 없음, " + v.Length + "/8): " + string.Join(",", fields));
+                }
+                staticIp = v[5];
+                gateway = v[6];
+                netmask = v[7];
+            }
 
             return new NetConfig
             {
@@ -106,9 +121,9 @@ namespace Stm32WifiConfigTool.Services
                 ServerIp = v[2],
                 ServerPort = port,
                 DhcpEnabled = dhcpOn,
-                StaticIp = hasStaticIpFields ? v[5] : null,
-                Gateway = hasStaticIpFields ? v[6] : null,
-                Netmask = hasStaticIpFields ? v[7] : null
+                StaticIp = staticIp,
+                Gateway = gateway,
+                Netmask = netmask
             };
         }
 
