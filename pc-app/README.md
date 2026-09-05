@@ -85,12 +85,17 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    SSID/비밀번호, 서버 IP·Port, DHCP on/off, DHCP off일 때의 정적 IP/Gateway/Netmask를 설정합니다.
    - "Read": `WIFI_R_ALL` 프레임을 보내 MCU에 저장된 값을 한 번에 읽어와 화면에 채웁니다
      (비밀번호는 MCU가 `****`로 마스킹해서 돌려주므로 표시되지 않습니다 — 바꾸려면
-     "비밀번호 변경" 체크 후 새로 입력).
-   - "Write": 화면의 입력값 전체(SSID/Password/서버 IP·Port/DHCP/IP/Gateway/Mask)를
-     `WIFI_W_ALL` 한 프레임에 담아 MCU에 전달합니다. "비밀번호 변경"을 체크하지 않았으면
-     빈 문자열로 전송되며, 이 경우 MCU는 기존 저장된 비밀번호를 유지해야 합니다
-     (`Models/NetConfig.cs`의 `Password` 필드 설명 참고). 저장되면 MCU가 자동으로
-     WiFi/서버 재접속을 시도합니다.
+     "비밀번호 변경" 체크 후 새로 입력). **실측된 필드 순서는 `SSID,Password,Server IP,
+     Server Port,DHCP`(5개)이며, DHCP는 `1`=사용/`0`=미사용으로 인코딩됩니다**(문서가
+     처음 가정했던 `ON`/`OFF` 텍스트가 아닙니다 — `Stm32Commands.GetWifiAllAsync` 참고).
+     정적 IP/Gateway/Netmask는 이 5개 필드에 포함되지 않는 것으로 보이므로, 응답이 5개
+     필드뿐이면 그 세 입력란은 건드리지 않고 화면에 있던 값(직전 캐시 또는 사용자가 입력한
+     값)을 그대로 둡니다.
+   - "Write": 화면의 입력값 전체(SSID/Password/서버 IP·Port/DHCP/IP/Gateway/Mask, DHCP는
+     동일하게 `1`/`0`으로 인코딩)를 `WIFI_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
+     "비밀번호 변경"을 체크하지 않았으면 빈 문자열로 전송되며, 이 경우 MCU는 기존 저장된
+     비밀번호를 유지해야 합니다(`Models/NetConfig.cs`의 `Password` 필드 설명 참고). 저장되면
+     MCU가 자동으로 WiFi/서버 재접속을 시도합니다.
    - 상단 "명령 전송 채널"에서 USB/UART 중 커맨드를 보낼 채널을 고릅니다.
    - **"Read"에 성공한 값(비밀번호 제외)은 로컬에 캐시되어 다음 실행 시 화면에 미리
      채워집니다**(`AppSettings.WifiSsidCache` 등, `WifiConfigPanel.Initialize()`/

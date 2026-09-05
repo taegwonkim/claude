@@ -8,9 +8,12 @@ namespace Stm32WifiConfigTool.Panels
     /// <summary>
     /// WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 설정 패널.
     /// "Read"로 MCU에 WIFI_R_ALL을 보내 현재값을 화면에 채우고, "Write"로 입력값 전체를
-    /// WIFI_W_ALL 한 프레임에 담아 MCU에 전달한다. "Read" 성공 시 값(비밀번호 제외)을
-    /// <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시 <see cref="Initialize"/>가 이를 화면에
-    /// 미리 채운다(MCU 재조회 전 참고용).
+    /// WIFI_W_ALL 한 프레임에 담아 MCU에 전달한다. 실측된 필드 순서는 SSID,Password,Server IP,
+    /// Server Port,DHCP(5개, DHCP는 "1"=사용/"0"=미사용)이며 정적 IP/Gateway/Netmask는 여기
+    /// 포함되지 않으므로, "Read" 응답에 이 필드들이 없으면 화면의 기존 값을 그대로 둔다
+    /// (<see cref="ApplyConfigToUi"/>, <see cref="Services.Stm32Commands.GetWifiAllAsync"/> 참고).
+    /// "Read" 성공 시 값(비밀번호 제외)을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
+    /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
     /// UI 레이아웃은 <c>WifiConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
     /// 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -77,6 +80,9 @@ namespace Stm32WifiConfigTool.Panels
             return false;
         }
 
+        /// <summary>cfg를 화면에 채운다. cfg.StaticIp/Gateway/Netmask가 null이면(실측된 5필드
+        /// 응답처럼 MCU가 이 값들을 아예 보내지 않은 경우) 해당 입력란은 건드리지 않고 화면에
+        /// 이미 있던 값(직전 캐시 또는 사용자가 입력한 값)을 그대로 둔다.</summary>
         private void ApplyConfigToUi(NetConfig cfg)
         {
             _ssidBox.Text = cfg.Ssid;
@@ -85,22 +91,24 @@ namespace Stm32WifiConfigTool.Panels
             _serverIpBox.Text = cfg.ServerIp;
             _serverPortBox.Value = Math.Max(_serverPortBox.Minimum, Math.Min(_serverPortBox.Maximum, (decimal)cfg.ServerPort));
             _dhcpCheck.Checked = cfg.DhcpEnabled;
-            _staticIpBox.Text = cfg.StaticIp;
-            _gatewayBox.Text = cfg.Gateway;
-            _maskBox.Text = cfg.Netmask;
+            if (cfg.StaticIp != null) _staticIpBox.Text = cfg.StaticIp;
+            if (cfg.Gateway != null) _gatewayBox.Text = cfg.Gateway;
+            if (cfg.Netmask != null) _maskBox.Text = cfg.Netmask;
         }
 
         /// <summary>"Read"로 받은 값(비밀번호 제외)을 로컬 캐시에 저장하고 즉시 파일에 반영한다
-        /// (다음 실행 시 <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
+        /// (다음 실행 시 <see cref="Initialize"/>가 이 값을 화면에 미리 채운다). cfg.StaticIp/
+        /// Gateway/Netmask가 null이면(MCU가 이 값들을 보내지 않은 경우) 기존 캐시값을 그대로
+        /// 유지한다.</summary>
         private void SaveConfigCache(NetConfig cfg)
         {
             _settings.WifiSsidCache = cfg.Ssid;
             _settings.WifiServerIpCache = cfg.ServerIp;
             _settings.WifiServerPortCache = cfg.ServerPort;
             _settings.WifiDhcpEnabledCache = cfg.DhcpEnabled;
-            _settings.WifiStaticIpCache = cfg.StaticIp;
-            _settings.WifiGatewayCache = cfg.Gateway;
-            _settings.WifiNetmaskCache = cfg.Netmask;
+            if (cfg.StaticIp != null) _settings.WifiStaticIpCache = cfg.StaticIp;
+            if (cfg.Gateway != null) _settings.WifiGatewayCache = cfg.Gateway;
+            if (cfg.Netmask != null) _settings.WifiNetmaskCache = cfg.Netmask;
             try
             {
                 AppSettingsStore.Save(_settings);

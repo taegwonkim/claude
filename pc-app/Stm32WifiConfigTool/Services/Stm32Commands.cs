@@ -79,19 +79,25 @@ namespace Stm32WifiConfigTool.Services
             return fields;
         }
 
-        /// <summary>WIFI_R_ALL을 보내고 응답(태그 있으면 "WIFI_R_ALL,..." 없으면 값만)
-        /// "ssid,pass_masked,server_ip,server_port,dhcp,ip,gateway,mask"을 NetConfig로 변환한다.</summary>
+        /// <summary>WIFI_R_ALL을 보내고 응답(태그 있으면 "WIFI_R_ALL,..." 없으면 값만)을 NetConfig로
+        /// 변환한다. 실측된 필드 순서는 "ssid,pass_masked,server_ip,server_port,dhcp"(5개, dhcp는
+        /// "1"=사용/"0"=미사용)이며, 정적 IP/Gateway/Netmask는 여기 포함되지 않는다. 다만 이
+        /// 저장소가 만든 firmware 스타일(8필드, dhcp 뒤에 ip,gateway,mask가 더 있는 경우)도 함께
+        /// 허용한다 - 응답이 5개뿐이면 StaticIp/Gateway/Netmask는 null로 두어 호출자가 기존 값을
+        /// 그대로 유지할 수 있게 한다(<see cref="Panels.WifiConfigPanel.ApplyConfigToUi"/> 참고).</summary>
         public static async Task<NetConfig> GetWifiAllAsync(SerialLinkService link, int timeoutMs)
         {
             string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdWifiReadAll, timeoutMs);
             string[] v = StripTag(fields, "WIFI_R_ALL");
 
-            if (v.Length < 8)
+            if (v.Length < 5)
             {
-                throw new InvalidOperationException("WIFI_R_ALL 응답 필드 부족 (" + v.Length + "/8): " + string.Join(",", fields));
+                throw new InvalidOperationException("WIFI_R_ALL 응답 필드 부족 (" + v.Length + "/5): " + string.Join(",", fields));
             }
 
             int.TryParse(v[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int port);
+            bool dhcpOn = v[4] == "1" || string.Equals(v[4], "ON", StringComparison.OrdinalIgnoreCase);
+            bool hasStaticIpFields = v.Length >= 8;
 
             return new NetConfig
             {
@@ -99,10 +105,10 @@ namespace Stm32WifiConfigTool.Services
                 /* v[1] = MCU가 마스킹해서 보낸 "****" - 실제 비밀번호는 절대 돌려주지 않음 */
                 ServerIp = v[2],
                 ServerPort = port,
-                DhcpEnabled = string.Equals(v[4], "ON", StringComparison.OrdinalIgnoreCase),
-                StaticIp = v[5],
-                Gateway = v[6],
-                Netmask = v[7]
+                DhcpEnabled = dhcpOn,
+                StaticIp = hasStaticIpFields ? v[5] : null,
+                Gateway = hasStaticIpFields ? v[6] : null,
+                Netmask = hasStaticIpFields ? v[7] : null
             };
         }
 

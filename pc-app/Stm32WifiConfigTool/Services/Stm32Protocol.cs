@@ -35,18 +35,23 @@ namespace Stm32WifiConfigTool.Services
 
         private const string MeasurementTagPrefix = "DC_";
 
-        /// <summary>WiFi(AP SSID/Password), 서버 IP/Port, DHCP/정적 IP 전체를 한 번에 조회한다.
-        /// 응답: WIFI_R_ALL,ssid,pass_masked,server_ip,server_port,ON|OFF,ip,gateway,mask</summary>
+        /// <summary>WiFi(AP SSID/Password), 서버 IP/Port, DHCP 사용유무를 한 번에 조회한다.
+        /// 응답: WIFI_R_ALL,ssid,pass_masked,server_ip,server_port,dhcp(실측 결과 "1"=사용/"0"=
+        /// 미사용 — 문서가 가정했던 "ON"/"OFF" 텍스트가 아니다). 정적 IP/Gateway/Netmask는 실측된
+        /// 필드 순서(SSID,Password,Server IP,Server Port,DHCP)에 포함되지 않는 것으로 보이므로,
+        /// 응답에 6번째 이후 필드가 더 있을 때만(이 저장소가 만든 firmware 스타일) 추가로 읽는다
+        /// (<see cref="Stm32Commands.GetWifiAllAsync"/> 참고).</summary>
         public static readonly string CmdWifiReadAll = Stx + "WIFI_R_ALL";
 
         /// <summary>WiFi 설정 전체를 한 프레임으로 MCU에 전달한다. 응답: WIFI_W_ALL,OK 또는 WIFI_W_ALL,ERR,&lt;reason&gt;
         /// pass가 빈 문자열이면(사용자가 "비밀번호 변경"을 체크하지 않은 경우) 필드 자체는 빈 채로
-        /// 전송된다 - MCU는 이 경우 기존 저장된 비밀번호를 유지해야 한다(<see cref="Models.NetConfig.Password"/> 참고).</summary>
+        /// 전송된다 - MCU는 이 경우 기존 저장된 비밀번호를 유지해야 한다(<see cref="Models.NetConfig.Password"/> 참고).
+        /// dhcpOn은 실측된 형식대로 "1"/"0"으로 인코딩한다(문서가 가정했던 "ON"/"OFF"가 아님).</summary>
         public static string BuildWifiWriteAll(string ssid, string pass, string serverIp, int serverPort,
             bool dhcpOn, string ip, string gateway, string mask)
         {
             return Stx + "WIFI_W_ALL," + ssid + "," + pass + "," + serverIp + "," +
-                   serverPort.ToString(CultureInfo.InvariantCulture) + "," + (dhcpOn ? "ON" : "OFF") + "," +
+                   serverPort.ToString(CultureInfo.InvariantCulture) + "," + (dhcpOn ? "1" : "0") + "," +
                    ip + "," + gateway + "," + mask;
         }
 
