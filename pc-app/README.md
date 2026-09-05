@@ -108,18 +108,19 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      > Write하면 Password 필드가 빈 문자열로 전송되었는데, MCU가 이 빈 값을 "기존 값 유지"가
      > 아니라 그대로 저장해버려 저장된 비밀번호가 지워지는 문제가 있었습니다(문서가 처음
      > 가정했던 "PASS가 비어 있으면 기존 저장값 유지" 동작과 실제 MCU가 다릅니다). 이제
-     > `WifiConfigPanel`이 이번 실행에서 마지막으로 MCU에 성공적으로 전달한 비밀번호를
-     > `_lastKnownPassword`에 메모리로만 기억해두었다가, "비밀번호 변경"을 체크하지 않은
-     > Write에서는 빈 문자열 대신 이 값을 다시 실어 보냅니다(디스크에는 여전히 저장하지
-     > 않습니다 — 앱을 새로 시작한 뒤 아직 비밀번호를 한 번도 입력/전송하지 않았다면 여전히
-     > 빈 문자열이 전송되는 것은 불가피합니다). `Models/NetConfig.cs`의 `Password` 필드 설명과
+     > `WifiConfigPanel`이 마지막으로 MCU에 성공적으로 전달한 비밀번호를 `_lastKnownPassword`에
+     > 기억해두었다가, "비밀번호 변경"을 체크하지 않은 Write에서는 빈 문자열 대신 이 값을 다시
+     > 실어 보냅니다. `Models/NetConfig.cs`의 `Password` 필드 설명과
      > `WifiConfigPanel.ReadConfigFromUi()` 참고. 저장되면 MCU가 자동으로 WiFi/서버 재접속을
      > 시도합니다.
    - 상단 "명령 전송 채널"에서 USB/UART 중 커맨드를 보낼 채널을 고릅니다.
-   - **"Read"에 성공한 값(비밀번호 제외)은 로컬에 캐시되어 다음 실행 시 화면에 미리
-     채워집니다**(`AppSettings.WifiSsidCache` 등, `WifiConfigPanel.Initialize()`/
-     `SaveConfigCache()` 참고 — MCU 재조회 전 참고용일 뿐 원본은 항상 MCU이며, 비밀번호만
-     예외적으로 캐시하지 않고 항상 빈 채로 시작합니다).
+   - **"Read"에 성공한 값은 로컬에 캐시되어 다음 실행 시 화면에 미리 채워집니다**
+     (`AppSettings.WifiSsidCache` 등, `WifiConfigPanel.Initialize()`/`SaveConfigCache()` 참고 —
+     MCU 재조회 전 참고용일 뿐 원본은 항상 MCU입니다). **비밀번호도 `AppSettings.WifiPasswordCache`에
+     평문으로 캐시되어 다음 실행 시 화면에 미리 채워집니다** — 내부망 전용 환경이라는 전제로,
+     매번 재입력해야 하는 불편보다 편의를 우선한 의도적인 선택입니다(공유 PC 등 다수가
+     `%AppData%\Stm32WifiConfigTool\settings.ini`에 접근 가능한 환경에서는 주의하세요). MCU는
+     비밀번호를 마스킹해 돌려주므로 "Read"로는 갱신되지 않고, "Write" 성공 시에만 갱신됩니다.
    - "커맨드 타임아웃(ms)"은 Read/Write 버튼 옆이 아니라 그 **아래 별도 줄**에 있습니다(패널
      폭이 좁아졌을 때 버튼과 겹치지 않도록 `_timeoutRow`라는 별도 행으로 분리했습니다). 이 행은
      `_fieldsGroup`과 같은 자유 배치(Location+Size) 방식으로 바꿔, 라벨은 x=15, 입력란은
@@ -232,9 +233,12 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 `Services/AppSettingsStore.cs`가 담당하며, 외부 패키지 없이 단순 `key=value` 텍스트 형식이라
 필요하면 직접 열어 수정해도 됩니다. 파일이 없거나 손상된 경우 기본값으로 안전하게 대체합니다.
 
-**SSID/비밀번호/서버 IP 등 WiFi 접속 정보는 이 파일에 저장하지 않습니다** — 그 값들의 원본은
-MCU의 W25Q40 플래시이므로, WiFi 설정 패널의 "Read"(`WIFI_R_ALL`)로 항상 MCU에서 다시 조회합니다.
-특히 비밀번호를 PC에 평문으로 남기지 않기 위한 의도적인 설계입니다.
+**WiFi 접속 정보(SSID/비밀번호/서버 IP 등, 비밀번호 포함)도 편의를 위해 이 파일에 캐시됩니다**
+(`AppSettings.WifiSsidCache`/`WifiPasswordCache` 등) — 내부망 전용 환경이라는 전제로, 앱을 다시
+실행할 때마다 값을 처음부터 다시 입력하지 않아도 되도록 한 의도적인 선택입니다. 다만 이 캐시는
+어디까지나 참고용이며 값의 원본은 항상 MCU의 W25Q40 플래시이므로, WiFi 설정 패널의
+"Read"(`WIFI_R_ALL`)로 언제든 MCU에서 다시 조회해 확인할 수 있습니다. 공유 PC 등 여러 사람이
+이 파일에 접근할 수 있는 환경에서 사용한다면 비밀번호가 평문으로 남는다는 점에 유의하세요.
 
 ## 프로젝트 구조
 

@@ -42,6 +42,7 @@ namespace Stm32WifiConfigTool.Services
                 settings.WifiStaticIpCache = GetString(map, "WifiStaticIpCache", settings.WifiStaticIpCache);
                 settings.WifiGatewayCache = GetString(map, "WifiGatewayCache", settings.WifiGatewayCache);
                 settings.WifiNetmaskCache = GetString(map, "WifiNetmaskCache", settings.WifiNetmaskCache);
+                settings.WifiPasswordCache = GetString(map, "WifiPasswordCache", settings.WifiPasswordCache);
                 settings.MeasConfigCommandChannel = GetString(map, "MeasConfigCommandChannel", settings.MeasConfigCommandChannel);
                 settings.MeasConfigCommandTimeoutMs = GetInt(map, "MeasConfigCommandTimeoutMs", settings.MeasConfigCommandTimeoutMs);
                 settings.MeasReferenceMvCache = GetDouble(map, "MeasReferenceMvCache", settings.MeasReferenceMvCache);
@@ -100,6 +101,7 @@ namespace Stm32WifiConfigTool.Services
                 "WifiStaticIpCache=" + settings.WifiStaticIpCache,
                 "WifiGatewayCache=" + settings.WifiGatewayCache,
                 "WifiNetmaskCache=" + settings.WifiNetmaskCache,
+                "WifiPasswordCache=" + settings.WifiPasswordCache,
                 "MeasConfigCommandChannel=" + settings.MeasConfigCommandChannel,
                 "MeasConfigCommandTimeoutMs=" + settings.MeasConfigCommandTimeoutMs,
                 "MeasReferenceMvCache=" + settings.MeasReferenceMvCache.ToString(CultureInfo.InvariantCulture),
