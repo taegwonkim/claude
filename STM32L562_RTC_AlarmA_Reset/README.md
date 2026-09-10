@@ -94,6 +94,111 @@ LED 하트비트(500ms 토글)와 함께, MCU 가 잠들지 않고 도는지 육
 
 ---
 
+## 1-3. 백업 전원(VBAT) 구성 — 이 프로젝트의 전제
+
+**이 프로젝트는 VBAT 에 별도 배터리/슈퍼캡이 없고, VBAT 가 MCU 전원(VDD)에
+연결되어 있다고 가정합니다.** 즉 백업 도메인(RTC, TAMP 백업 레지스터)은
+MCU 전원이 살아있는 동안에만 유지됩니다.
+
+| 이벤트 | RTC 달력 | 백업 레지스터 | RTC 트리거 설정 |
+|---|---|---|---|
+| **소프트웨어 리셋** (`HAL_NVIC_SystemReset()`) | ✅ 유지 | ✅ 유지 | ✅ 유지 |
+| **NRST 핀 리셋 / 디버거 리셋** | ✅ 유지 | ✅ 유지 | ✅ 유지 |
+| **전원 off → on** | ❌ 초기화 | ❌ 초기화 | ❌ 초기화 |
+
+**핵심은 소프트웨어 리셋으로는 백업 도메인이 지워지지 않는다는 것이고,
+이건 VBAT 배선과 무관합니다.** 리셋 직후에도 RTC 는 멈추지 않고 계속 돌기
+때문에, 이 프로젝트의 주기 리셋 동작 자체는 배터리 유무와 상관없이 그대로입니다.
+
+전원을 내렸다 올리면 콜드 부트가 되고, 코드는 이를 백업 레지스터의 매직 값으로
+판별해 부팅 로그에 표시합니다.
+
+```
+ Boot type   : COLD  (power-on, backup domain cleared)   <- 전원 인가
+ Boot type   : WARM  (reset only, backup domain kept)    <- 소프트/NRST 리셋
+ Soft resets since power-on : 3
+```
+
+> 리셋 횟수는 **"이번 전원 인가 이후"** 의 누적값입니다.
+> 전원을 내리면 0 으로 돌아갑니다.
+
+### LSE 기동 실패 시 LSI 폴백
+
+배터리 백업이 없으므로 **전원을 넣을 때마다 저속 발진기를 새로 기동**해야
+합니다. LSE 는 기동에 수백 ms ~ 수 초가 걸리고 크리스탈이 없으면 실패하는데,
+그때 `Error_Handler()` 에서 멈춰버리면 전원을 넣을 때마다 보드가 죽습니다.
+그래서 **LSE 기동에 실패하면 LSI 로 폴백해서 계속 동작**하도록 했습니다.
+
+```c
+#if (RTC_CLOCK_LSE == 1U)
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) == HAL_OK)
+  {
+    g_rtc_clk_is_lse = 1U;      /* LSE 기동 성공 */
+  }
+#endif
+  if (g_rtc_clk_is_lse == 0U)
+  {
+    /* LSI 로 폴백 (프리스케일러도 32000Hz 기준으로 자동 전환) */
+  }
+```
+
+RTC 프리스케일러(`SynchPrediv` 255 ↔ 249)도 실제로 기동된 클럭에 맞춰
+런타임에 결정되며, 어느 쪽이 쓰였는지는 부팅 로그에 찍힙니다.
+
+```
+ RTC clock   : LSE 32.768kHz
+ RTC clock   : LSI ~32kHz (+/-5%)     <- 폴백된 경우
+```
+
+### ⚠ 이 프로젝트(Alarm A)가 받는 영향 : 큽니다
+
+Alarm 은 **벽시계 시각** 기준이므로, 전원을 내렸다 올릴 때마다 달력이 지워지는
+것이 곧바로 문제가 됩니다.
+
+`RTC_INIT_FROM_BUILD_TIME` 로 채우는 **빌드 시각은 플래싱 직후에만 맞습니다.**
+예를 들어 오후 2시 30분에 빌드한 펌웨어를 두 달 뒤 오전 9시에 전원 인가하면,
+RTC 는 자신이 14:30 이라고 믿습니다. 그 상태에서 "매일 03:00" 알람은
+**실제로는 매일 21:30 에** 발생합니다.
+
+주기가 24시간이라는 사실 자체는 유지되지만(시:분:초만 비교하므로),
+**시각은 전원을 넣은 시점에 따라 달라집니다.** 선택지는 세 가지입니다.
+
+| 선택지 | 방법 | 비고 |
+|---|---|---|
+| ① 전원 인가 때마다 시각 동기화 | `USE_UART_TIME_SYNC` (아래) 또는 GPS/NTP/호스트 통신 | 유일하게 정확 |
+| ② 배터리/슈퍼캡을 VBAT 에 연결 | 하드웨어 변경 | 근본 해결 |
+| ③ 벽시계 시각을 포기 | **[WakeUp Timer 프로젝트](../STM32L562_RTC_WakeUp_Reset)** 사용 | 전원 인가 후 N시간마다 |
+
+> **전원이 자주 내려가는 장비이고 시각 동기화 수단이 없다면,
+> 이 프로젝트보다 WakeUp Timer 프로젝트가 맞습니다.**
+
+### USE_UART_TIME_SYNC — 부팅 시 UART 로 시각 받기
+
+①을 위한 옵션을 넣어두었습니다. **기본값은 `0`(사용 안 함)** 입니다.
+
+```c
+#define USE_UART_TIME_SYNC     0U      /* 1 이면 사용 */
+#define TIME_SYNC_TIMEOUT_MS   5000U   /* 입력 대기 시간 */
+```
+
+`1` 로 두면 **콜드 부트일 때만** 아래처럼 시각을 받습니다.
+(소프트 리셋 후에는 달력이 살아있으므로 건너뜁니다)
+
+```
+[TIME] Send "YYYY-MM-DD HH:MM:SS" within 5000 ms to set the RTC...
+2026-09-10 14:30:00
+[TIME] RTC set to 2026-09-10 14:30:00
+```
+
+- 타임아웃 안에 입력이 없거나 형식/범위가 틀리면 **아무것도 바꾸지 않고** 진행합니다.
+- 시각을 설정하면 알람을 다시 걸기 때문에 `ALARM_MODE_RELATIVE` 에서도 정확합니다.
+- 실제 장비에서는 이 자리에 GPS/NTP/호스트 프로토콜을 연결하는 것이 맞습니다.
+  `SyncTimeFromUart()` 를 그대로 대체하면 됩니다.
+
+---
+
 ## 2. 파일 구성
 
 ```
@@ -299,7 +404,9 @@ if (g_reset_request)
  STM32L562 RTC Alarm A Reset (daily)
 ==========================================
  Reset cause : NRST-PIN (CSR=0x0C000000)
- Soft reset count : 0
+ Boot type   : COLD  (power-on, backup domain cleared)
+ RTC clock   : LSE 32.768kHz
+ Soft resets since power-on : 0
  RTC time    : 2026-09-01 14:20:11
  Trigger     : RTC Alarm A (daily fixed)
  Next reset at 03:00:00 every day
@@ -316,7 +423,9 @@ if (g_reset_request)
  STM32L562 RTC Alarm A Reset (daily)
 ==========================================
  Reset cause : SOFTWARE (CSR=0x18000000)
- Soft reset count : 1
+ Boot type   : WARM  (reset only, backup domain kept)
+ RTC clock   : LSE 32.768kHz
+ Soft resets since power-on : 1
  RTC time    : 2026-09-02 03:00:00
  Trigger     : RTC Alarm A (daily fixed)
  Next reset at 03:00:00 every day

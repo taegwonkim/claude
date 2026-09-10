@@ -79,6 +79,75 @@ LED 하트비트(500ms 토글)와 함께, MCU 가 잠들지 않고 도는지 육
 
 ---
 
+## 1-3. 백업 전원(VBAT) 구성 — 이 프로젝트의 전제
+
+**이 프로젝트는 VBAT 에 별도 배터리/슈퍼캡이 없고, VBAT 가 MCU 전원(VDD)에
+연결되어 있다고 가정합니다.** 즉 백업 도메인(RTC, TAMP 백업 레지스터)은
+MCU 전원이 살아있는 동안에만 유지됩니다.
+
+| 이벤트 | RTC 달력 | 백업 레지스터 | RTC 트리거 설정 |
+|---|---|---|---|
+| **소프트웨어 리셋** (`HAL_NVIC_SystemReset()`) | ✅ 유지 | ✅ 유지 | ✅ 유지 |
+| **NRST 핀 리셋 / 디버거 리셋** | ✅ 유지 | ✅ 유지 | ✅ 유지 |
+| **전원 off → on** | ❌ 초기화 | ❌ 초기화 | ❌ 초기화 |
+
+**핵심은 소프트웨어 리셋으로는 백업 도메인이 지워지지 않는다는 것이고,
+이건 VBAT 배선과 무관합니다.** 리셋 직후에도 RTC 는 멈추지 않고 계속 돌기
+때문에, 이 프로젝트의 주기 리셋 동작 자체는 배터리 유무와 상관없이 그대로입니다.
+
+전원을 내렸다 올리면 콜드 부트가 되고, 코드는 이를 백업 레지스터의 매직 값으로
+판별해 부팅 로그에 표시합니다.
+
+```
+ Boot type   : COLD  (power-on, backup domain cleared)   <- 전원 인가
+ Boot type   : WARM  (reset only, backup domain kept)    <- 소프트/NRST 리셋
+ Soft resets since power-on : 3
+```
+
+> 리셋 횟수는 **"이번 전원 인가 이후"** 의 누적값입니다.
+> 전원을 내리면 0 으로 돌아갑니다.
+
+### LSE 기동 실패 시 LSI 폴백
+
+배터리 백업이 없으므로 **전원을 넣을 때마다 저속 발진기를 새로 기동**해야
+합니다. LSE 는 기동에 수백 ms ~ 수 초가 걸리고 크리스탈이 없으면 실패하는데,
+그때 `Error_Handler()` 에서 멈춰버리면 전원을 넣을 때마다 보드가 죽습니다.
+그래서 **LSE 기동에 실패하면 LSI 로 폴백해서 계속 동작**하도록 했습니다.
+
+```c
+#if (RTC_CLOCK_LSE == 1U)
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) == HAL_OK)
+  {
+    g_rtc_clk_is_lse = 1U;      /* LSE 기동 성공 */
+  }
+#endif
+  if (g_rtc_clk_is_lse == 0U)
+  {
+    /* LSI 로 폴백 (프리스케일러도 32000Hz 기준으로 자동 전환) */
+  }
+```
+
+RTC 프리스케일러(`SynchPrediv` 255 ↔ 249)도 실제로 기동된 클럭에 맞춰
+런타임에 결정되며, 어느 쪽이 쓰였는지는 부팅 로그에 찍힙니다.
+
+```
+ RTC clock   : LSE 32.768kHz
+ RTC clock   : LSI ~32kHz (+/-5%)     <- 폴백된 경우
+```
+
+### 이 프로젝트(Wakeup Timer)가 받는 영향 : 거의 없음
+
+Wakeup Timer 는 **부팅 시점부터** 카운트하므로 달력 시각이 지워져도 무관합니다.
+전원을 넣으면 그 시점부터 다시 24시간을 세기 시작합니다 — 원래 의도대로입니다.
+
+RTC 달력도 콜드 부트마다 `2000-01-01 00:00:00` 으로 초기화되는데,
+오히려 이게 리셋 주기를 검증하기 편합니다. 부팅 로그의 `RTC time` 이
+정확히 `2000-01-02 00:00:00` 이면 24시간이 맞게 흐른 것입니다.
+
+---
+
 ## 2. 파일 구성
 
 ```
@@ -263,7 +332,9 @@ if (g_reset_request)
  STM32L562 RTC WakeUp Timer Reset (24h)
 ==========================================
  Reset cause : NRST-PIN (CSR=0x0C000000)
- Soft reset count : 0
+ Boot type   : COLD  (power-on, backup domain cleared)
+ RTC clock   : LSI ~32kHz (+/-5%)
+ Soft resets since power-on : 0
  RTC time    : 2000-01-01 00:00:00
  Trigger     : RTC WakeUp Timer
  Next reset in 86400 s (24h 00m)
@@ -280,7 +351,9 @@ if (g_reset_request)
  STM32L562 RTC WakeUp Timer Reset (24h)
 ==========================================
  Reset cause : SOFTWARE (CSR=0x18000000)
- Soft reset count : 1
+ Boot type   : WARM  (reset only, backup domain kept)
+ RTC clock   : LSI ~32kHz (+/-5%)
+ Soft resets since power-on : 1
  RTC time    : 2000-01-02 00:00:00
  Trigger     : RTC WakeUp Timer
  Next reset in 86400 s (24h 00m)

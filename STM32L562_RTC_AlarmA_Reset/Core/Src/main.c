@@ -11,7 +11,9 @@
   *     비교에서 제외되어, 지정한 시:분:초마다(= 하루에 한 번) 알람이 발생한다.
   *     즉 마스크만으로 24시간 주기가 만들어지고 재장전이 필요 없다.
   *  3) 인터럽트 콜백에서 플래그만 세우고, main 루프에서 HAL_NVIC_SystemReset() 호출.
-  *  4) 리셋 후에도 RTC/백업도메인은 유지되므로 리셋 횟수를 백업 레지스터에 누적한다.
+  *  4) 소프트 리셋으로는 RTC/백업도메인이 지워지지 않으므로 리셋 횟수를
+  *     백업 레지스터에 누적한다. 단 이 보드는 VBAT 가 MCU 전원(VDD)에 물려
+  *     있어, 전원을 내렸다 올리면 백업 도메인도 함께 초기화된다(콜드 부트).
   *  5) RCC 리셋 플래그로 "소프트웨어 리셋"이었는지 부팅 시 확인/출력한다.
   ******************************************************************************
   */
@@ -50,6 +52,13 @@ static volatile uint8_t g_reset_request = 0U;
 /* 부팅 직후 캡처한 RCC 리셋 원인 플래그 */
 static uint32_t g_reset_flags = 0U;
 static uint32_t g_reset_count = 0U;
+
+/* 백업 도메인이 초기화된 채로 부팅했는가 = 전원이 새로 인가된 콜드 부트.
+   이 보드는 VBAT 가 MCU 전원(VDD)에 연결되어 있어 전원 off/on 시 항상 1 이 된다. */
+static uint8_t g_cold_boot = 1U;
+
+/* 실제로 RTC 에 물린 저속 클럭 (LSE 기동 실패 시 LSI 로 폴백) */
+static uint8_t g_rtc_clk_is_lse = 0U;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -68,6 +77,9 @@ static void PrintHeartbeat(void);
 #endif
 static void SetInitialDateTime(void);
 static void RTC_SetResetAlarm(void);
+#if (USE_DEBUG_UART == 1U) && (USE_UART_TIME_SYNC == 1U)
+static uint8_t SyncTimeFromUart(void);
+#endif
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -82,7 +94,7 @@ int __io_putchar(int ch)
 }
 #endif
 
-#if (RTC_INIT_FROM_BUILD_TIME == 1U)
+#if (RTC_INIT_FROM_BUILD_TIME == 1U) || (USE_UART_TIME_SYNC == 1U)
 /**
   * @brief  Sakamoto 알고리즘으로 요일을 계산한다.
   * @param  year : 4자리 연도, month : 1~12, day : 1~31
@@ -103,7 +115,7 @@ static uint8_t CalcWeekDay(uint16_t year, uint8_t month, uint8_t day)
   /* Sakamoto : 0=일요일 ... 6=토요일 / RTC : 1=월요일 ... 7=일요일 */
   return (w == 0U) ? (uint8_t)RTC_WEEKDAY_SUNDAY : (uint8_t)w;
 }
-#endif /* RTC_INIT_FROM_BUILD_TIME */
+#endif /* RTC_INIT_FROM_BUILD_TIME || USE_UART_TIME_SYNC */
 
 /**
   * @brief  콜드 부트 시 RTC 달력의 초기 시각을 설정한다.
@@ -176,6 +188,114 @@ static void SetInitialDateTime(void)
   }
 }
 
+#if (USE_DEBUG_UART == 1U) && (USE_UART_TIME_SYNC == 1U)
+/**
+  * @brief  콜드 부트 시 UART 로 현재 시각을 받아 RTC 달력에 설정한다.
+  * @note   입력 형식 : "YYYY-MM-DD HH:MM:SS" + 개행 (예: 2026-09-10 14:30:00)
+  *         TIME_SYNC_TIMEOUT_MS 안에 유효한 입력이 없으면 아무것도 바꾸지 않는다.
+  * @retval 1 = 시각을 설정함, 0 = 설정하지 않음
+  */
+static uint8_t SyncTimeFromUart(void)
+{
+  char     buf[32];
+  uint8_t  idx = 0U;
+  uint8_t  ch;
+  uint32_t start = HAL_GetTick();
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+  uint16_t year;
+  uint8_t  month;
+  uint8_t  day;
+  uint8_t  i;
+
+  printf("[TIME] Send \"YYYY-MM-DD HH:MM:SS\" within %lu ms to set the RTC...\r\n",
+         (unsigned long)TIME_SYNC_TIMEOUT_MS);
+
+  /* 개행이 올 때까지, 또는 타임아웃까지 한 글자씩 받는다 */
+  while ((HAL_GetTick() - start) < TIME_SYNC_TIMEOUT_MS)
+  {
+    if (HAL_UART_Receive(&huart_dbg, &ch, 1U, 50U) != HAL_OK)
+    {
+      continue;
+    }
+    if ((ch == (uint8_t)'\r') || (ch == (uint8_t)'\n'))
+    {
+      if (idx > 0U)
+      {
+        break;
+      }
+      continue;
+    }
+    if (idx < (uint8_t)(sizeof(buf) - 1U))
+    {
+      buf[idx] = (char)ch;
+      idx++;
+    }
+  }
+  buf[idx] = '\0';
+
+  if (idx < 19U)
+  {
+    printf("[TIME] no input - keeping the default calendar\r\n");
+    return 0U;
+  }
+
+  /* 자리별 숫자 검증 : "YYYY-MM-DD HH:MM:SS" */
+  for (i = 0U; i < 19U; i++)
+  {
+    uint8_t is_digit_pos = ((i != 4U) && (i != 7U) && (i != 10U)
+                            && (i != 13U) && (i != 16U)) ? 1U : 0U;
+    if (is_digit_pos != 0U)
+    {
+      if ((buf[i] < '0') || (buf[i] > '9'))
+      {
+        printf("[TIME] bad format - keeping the default calendar\r\n");
+        return 0U;
+      }
+    }
+  }
+
+  year  = (uint16_t)(((buf[0] - '0') * 1000) + ((buf[1] - '0') * 100)
+                     + ((buf[2] - '0') * 10) + (buf[3] - '0'));
+  month = (uint8_t)(((buf[5] - '0') * 10) + (buf[6] - '0'));
+  day   = (uint8_t)(((buf[8] - '0') * 10) + (buf[9] - '0'));
+  sTime.Hours   = (uint8_t)(((buf[11] - '0') * 10) + (buf[12] - '0'));
+  sTime.Minutes = (uint8_t)(((buf[14] - '0') * 10) + (buf[15] - '0'));
+  sTime.Seconds = (uint8_t)(((buf[17] - '0') * 10) + (buf[18] - '0'));
+
+  if ((year < 2000U) || (year > 2099U) || (month < 1U) || (month > 12U)
+      || (day < 1U) || (day > 31U) || (sTime.Hours > 23U)
+      || (sTime.Minutes > 59U) || (sTime.Seconds > 59U))
+  {
+    printf("[TIME] out of range - keeping the default calendar\r\n");
+    return 0U;
+  }
+
+  sTime.SubSeconds     = 0U;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  sDate.Month   = month;
+  sDate.Date    = day;
+  sDate.Year    = (uint8_t)(year % 100U);      /* RTC 는 2자리 연도 */
+  sDate.WeekDay = CalcWeekDay(year, month, day);
+
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  printf("[TIME] RTC set to %04u-%02u-%02u %02u:%02u:%02u\r\n",
+         (unsigned int)year, (unsigned int)month, (unsigned int)day,
+         (unsigned int)sTime.Hours, (unsigned int)sTime.Minutes,
+         (unsigned int)sTime.Seconds);
+  return 1U;
+}
+#endif /* USE_UART_TIME_SYNC */
+
 /**
   * @brief  RCC 리셋 플래그를 읽어 저장하고 클리어한다.
   *         반드시 부팅 직후 한 번만 호출할 것(클리어되면 다음 부팅까지 알 수 없음).
@@ -207,7 +327,12 @@ static void PrintBanner(void)
   if (g_reset_flags & RCC_CSR_WWDGRSTF) { printf("WWDG "); }
   if (g_reset_flags & RCC_CSR_LPWRRSTF) { printf("LOW-POWER "); }
   printf("(CSR=0x%08lX)\r\n", (unsigned long)g_reset_flags);
-  printf(" Soft reset count : %lu\r\n", (unsigned long)g_reset_count);
+  printf(" Boot type   : %s\r\n",
+         (g_cold_boot != 0U) ? "COLD  (power-on, backup domain cleared)"
+                             : "WARM  (reset only, backup domain kept)");
+  printf(" RTC clock   : %s\r\n",
+         (g_rtc_clk_is_lse != 0U) ? "LSE 32.768kHz" : "LSI ~32kHz (+/-5%)");
+  printf(" Soft resets since power-on : %lu\r\n", (unsigned long)g_reset_count);
   printf(" RTC time    : 20%02d-%02d-%02d %02d:%02d:%02d\r\n",
          sDate.Year, sDate.Month, sDate.Date,
          sTime.Hours, sTime.Minutes, sTime.Seconds);
@@ -317,14 +442,20 @@ int main(void)
   /* 백업 도메인(RTC/TAMP 백업 레지스터) 쓰기 허용 */
   HAL_PWR_EnableBkUpAccess();
 
-  /* 리셋 횟수 누적 : 콜드부트면 0 으로 시작, 소프트 리셋이면 +1 */
+  /* 백업 도메인 보존 여부로 콜드/웜 부트를 구분한다.
+     - 매직 값이 없음  = 백업 도메인이 지워짐 = 전원 off/on (콜드 부트)
+     - 매직 값이 있음  = 소프트 리셋 또는 NRST (웜 부트, RTC 계속 동작 중)
+     VBAT 가 VDD 와 공유되므로 전원을 내렸다 올리면 항상 콜드 부트가 된다.
+     따라서 리셋 횟수는 "이번 전원 인가 이후"의 누적값이다. */
   if (HAL_RTCEx_BKUPRead(&hrtc, BKP_REG_MAGIC) != BKP_MAGIC_VALUE)
   {
+    g_cold_boot = 1U;
     HAL_RTCEx_BKUPWrite(&hrtc, BKP_REG_MAGIC, BKP_MAGIC_VALUE);
     g_reset_count = 0U;
   }
   else
   {
+    g_cold_boot = 0U;
     g_reset_count = HAL_RTCEx_BKUPRead(&hrtc, BKP_REG_RESET_COUNT);
     if (g_reset_flags & RCC_CSR_SFTRSTF)
     {
@@ -332,6 +463,19 @@ int main(void)
     }
   }
   HAL_RTCEx_BKUPWrite(&hrtc, BKP_REG_RESET_COUNT, g_reset_count);
+
+#if (USE_DEBUG_UART == 1U) && (USE_UART_TIME_SYNC == 1U)
+  /* 전원을 내리면 RTC 달력이 지워지므로, 콜드 부트 때만 실제 시각을 받는다.
+     (소프트 리셋 후에는 달력이 살아있으므로 건너뛴다) */
+  if (g_cold_boot != 0U)
+  {
+    if (SyncTimeFromUart() != 0U)
+    {
+      /* 달력이 바뀌었으니 알람을 다시 건다 */
+      RTC_SetResetAlarm();
+    }
+  }
+#endif
 
   PrintBanner();
   /* USER CODE END 2 */
@@ -411,18 +555,8 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /** Initializes the RCC Oscillators */
+  /** Initializes the RCC Oscillators : MSI (시스템 클럭) */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-#if (RTC_CLOCK_LSE == 1U)
-  RCC_OscInitStruct.OscillatorType |= RCC_OSCILLATORTYPE_LSE;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-#else
-  RCC_OscInitStruct.OscillatorType |= RCC_OSCILLATORTYPE_LSI;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-#ifdef RCC_LSI_DIV1
-  RCC_OscInitStruct.LSIDiv   = RCC_LSI_DIV1;   /* LSI = 32 kHz (분주 없음) */
-#endif
-#endif
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;   /* 4 MHz */
@@ -430,6 +564,34 @@ void SystemClock_Config(void)
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
+  }
+
+  /** RTC 용 저속 클럭
+    * 이 보드는 VBAT 가 MCU 전원(VDD)에 연결되어 있어 백업 도메인이 상시
+    * 전원을 받지 못한다. 즉 전원을 넣을 때마다 저속 발진기를 새로 기동해야
+    * 한다. LSE 는 기동에 수백 ms ~ 수 초가 걸리고 크리스탈이 없으면 실패하는데,
+    * 그때 Error_Handler() 로 멈춰버리면 전원을 넣을 때마다 보드가 죽는다.
+    * 따라서 LSE 기동 실패 시 LSI 로 폴백해서 계속 동작시킨다.
+    */
+#if (RTC_CLOCK_LSE == 1U)
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) == HAL_OK)
+  {
+    g_rtc_clk_is_lse = 1U;
+  }
+#endif
+  if (g_rtc_clk_is_lse == 0U)
+  {
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI;
+    RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+#ifdef RCC_LSI_DIV1
+    RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;   /* LSI = 32 kHz (분주 없음) */
+#endif
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
   }
 
   /** Initializes the CPU, AHB and APB buses clocks */
@@ -446,11 +608,8 @@ void SystemClock_Config(void)
 
   /** Initializes the peripherals clocks (RTC / USART1) */
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-#if (RTC_CLOCK_LSE == 1U)
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
-#else
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
-#endif
+  PeriphClkInit.RTCClockSelection = (g_rtc_clk_is_lse != 0U)
+                                    ? RCC_RTCCLKSOURCE_LSE : RCC_RTCCLKSOURCE_LSI;
 #if (USE_DEBUG_UART == 1U)
   PeriphClkInit.PeriphClockSelection |= RCC_PERIPHCLK_USART1;
   PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
@@ -472,15 +631,19 @@ static void MX_RTC_Init(void)
   /** Initialize RTC Only */
   hrtc.Instance = RTC;
   hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
-#if (RTC_CLOCK_LSE == 1U)
-  /* LSE 32768 Hz : (127+1) * (255+1) = 32768 -> ck_spre = 1 Hz */
-  hrtc.Init.AsynchPrediv = 127;
-  hrtc.Init.SynchPrediv  = 255;
-#else
-  /* LSI 32000 Hz : (127+1) * (249+1) = 32000 -> ck_spre = 1 Hz */
-  hrtc.Init.AsynchPrediv = 127;
-  hrtc.Init.SynchPrediv  = 249;
-#endif
+  /* 프리스케일러는 실제로 기동된 클럭에 맞춰야 한다 (LSE 폴백 대응) */
+  if (g_rtc_clk_is_lse != 0U)
+  {
+    /* LSE 32768 Hz : (127+1) * (255+1) = 32768 -> ck_spre = 1 Hz */
+    hrtc.Init.AsynchPrediv = 127;
+    hrtc.Init.SynchPrediv  = 255;
+  }
+  else
+  {
+    /* LSI 32000 Hz : (127+1) * (249+1) = 32000 -> ck_spre = 1 Hz */
+    hrtc.Init.AsynchPrediv = 127;
+    hrtc.Init.SynchPrediv  = 249;
+  }
   hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
   hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
   hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
