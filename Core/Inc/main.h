@@ -4,7 +4,8 @@
   * @file           : main.h
   * @brief          : Header for main.c file.
   *                   STM32L562 - RTC Wakeup Timer 기반 주기적 소프트웨어 리셋
-  *                   ("부팅 시점"으로부터 N초마다 리셋. 기본 24시간)
+  *                   ("부팅 시점"으로부터 N초마다 리셋)
+  *                   RTC 클럭 : 내부 LSI(~32kHz) 전용
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -48,11 +49,13 @@ void Error_Handler(void);
 /* ===== 보드 설정 ===========================================================
  *  - USE_DEBUG_UART : 0 이면 UART 로그 없이 동작 (핀/보드 상관없이 동작)
  *  - USE_STATUS_LED : 0 이면 LED 하트비트 사용 안 함
- *  - RTC_CLOCK_LSE  : 1 이면 32.768kHz 외부 크리스탈(LSE) 사용
+ *
+ * RTC 클럭은 내부 LSI(~32kHz) 고정이다. 외부 크리스탈(LSE)을 쓰지 않으므로
+ * 추가 부품 없이 어떤 보드에서도 동작하지만, LSI 오차(±5%)만큼 리셋 주기가
+ * 흔들린다는 점을 전제로 한다. (README 1-3절 참고)
  * ========================================================================= */
 #define USE_DEBUG_UART        1U
 #define USE_STATUS_LED        1U
-#define RTC_CLOCK_LSE         0U   /* 0 = LSI(내부 32kHz), 1 = LSE(외부 32.768kHz) */
 
 /* 디버그 UART : USART1 (PA9 = TX, PA10 = RX) — 보드에 맞게 수정 */
 #define DBG_UART_INSTANCE     USART1
@@ -66,11 +69,25 @@ void Error_Handler(void);
 #define LED_PIN               GPIO_PIN_5
 
 /* ===== 소프트웨어 리셋 주기 =============================================
- * 초 단위로 지정. 24시간 = 24 * 3600 = 86400초
- * (예: 60U=1분, 600U=10분, 3600U=1시간, 86400U=24시간)
  * 부팅(리셋) 시점부터 이 시간이 지나면 다시 리셋된다.
+ *
+ * 지원 범위 : 60초(1분) ~ 108000초(30시간)
+ *   1분   =        60U
+ *   5분   = ( 5U * 60U)
+ *   30분  = (30U * 60U)
+ *   1시간 = ( 1U * 3600U)
+ *   12시간= (12U * 3600U)
+ *   24시간= (24U * 3600U)
+ *   30시간= (30U * 3600U)   <- 현재 설정
  * ===================================================================== */
-#define RESET_PERIOD_SEC      (24U * 3600U)   /* 86400초 = 24시간 */
+#define RESET_PERIOD_SEC      (30U * 3600U)   /* 108000초 = 30시간 */
+
+/* 지원 범위 검사 */
+#if   (RESET_PERIOD_SEC < 60U)
+  #error "RESET_PERIOD_SEC 는 60초(1분) 이상이어야 합니다."
+#elif (RESET_PERIOD_SEC > 108000U)
+  #error "RESET_PERIOD_SEC 는 108000초(30시간) 이하여야 합니다."
+#endif
 
 /* --- Wakeup Timer 파라미터 자동 계산 (수정 불필요) -----------------------
  * RTC WUT 카운터는 16bit 이므로 ck_spre(1Hz) 기준 최대 65536초(약 18.2h).
@@ -79,23 +96,14 @@ void Error_Handler(void);
  *   - 16BITS 모드 : 주기 = (WUT + 1) 초
  *   - 17BITS 모드 : 주기 = (WUT + 1 + 65536) 초
  * ---------------------------------------------------------------------- */
-#if   (RESET_PERIOD_SEC == 0U)
-  #error "RESET_PERIOD_SEC 는 1 이상이어야 합니다."
-#elif (RESET_PERIOD_SEC <= 65536U)
+#if   (RESET_PERIOD_SEC <= 65536U)
   #define WUT_CLOCK_SEL       RTC_WAKEUPCLOCK_CK_SPRE_16BITS
   #define WUT_COUNTER         (RESET_PERIOD_SEC - 1U)
 #elif (RESET_PERIOD_SEC <= 131072U)
   #define WUT_CLOCK_SEL       RTC_WAKEUPCLOCK_CK_SPRE_17BITS
   #define WUT_COUNTER         (RESET_PERIOD_SEC - 65536U - 1U)
-#else
-  #error "RESET_PERIOD_SEC 가 너무 큽니다(최대 131072초). 더 긴 주기는 Alarm A 프로젝트를 사용하세요."
 #endif
-
-/* LSI 는 오차가 ±5% 수준이라 장주기에서는 편차가 커진다(24h -> 최대 ±72분).
-   장주기 사용 시 LSE(외부 32.768kHz 크리스탈) 를 강력히 권장한다. */
-#if (RTC_CLOCK_LSE == 0U) && (RESET_PERIOD_SEC > 3600U)
-  #warning "Long reset period with internal LSI (+/-5%). Set RTC_CLOCK_LSE to 1 for accuracy."
-#endif
+/* 하드웨어 한계는 131072초(약 36.4h)이지만, 위에서 30시간으로 제한해 두었다. */
 
 /* 살아있음(heartbeat) 로그 : HEARTBEAT_PERIOD_SEC 마다 uptime 과 리셋까지 남은
    시간을 UART 로 출력한다. USE_DEBUG_UART 가 1 일 때만 동작한다.
