@@ -1,12 +1,15 @@
-# STM32L562RCT6 — RTC WakeUp Timer 주기적 Software Reset + RS485 보고
+# STM32L562RCT6 — RTC WakeUp Timer 주기적 Software Reset + RS485 / USB CDC 보고
 
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
-스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485)로
-PC 에 전송**합니다.
+스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
+USB CDC(가상 COM 포트) 양쪽으로 PC 에 전송**합니다.
 
 - 대상 : **STM32L562RCT6 (LQFP64)**, TrustZone Disabled
 - 리셋 주기 : **분 단위 / 시간 단위** 중 선택 (기본 **5분**)
-- 보고 : **USART3 RS485** (PB10 TX / PB11 RX / PB14 DE), 115200-8-N-1
+- 보고 채널 (**같은 내용이 동시에 나갑니다**)
+  - **USART3 RS485** — PB10 TX / PB11 RX / PB14 DE, 115200-8-N-1
+  - **USB CDC** — PA11 D−/ PA12 D+, 가상 COM 포트 (보레이트 무관)
+  - `USE_RS485` / `USE_USB_CDC` 로 각각 켜고 끕니다. 명령 수신도 양쪽에서 받습니다
 - RTC 클럭 : 내부 **LSI(~32 kHz)** 기본, 크리스탈이 있으면 LSE 로 전환 가능
 - **VBAT 가 MCU 전원과 함께 on/off 되는 보드**를 전제로 설계 ([1-3절](#1-3-백업-전원vbat-이-vdd-와-함께-꺼진다-이-프로젝트의-전제))
 - 저전력 모드에 진입하지 않고 **계속 동작**하다가 시간이 되면 리셋
@@ -22,13 +25,13 @@ PC 에 전송**합니다.
 | 카운트 클럭 | `ck_spre` = 1 Hz |
 | 인터럽트 | `RTC_IRQn` → `HAL_RTCEx_WakeUpTimerEventCallback()` |
 | 리셋 방법 | `HAL_NVIC_SystemReset()` (Cortex-M33 `AIRCR.SYSRESETREQ`) |
-| 보고 | `USART3` RS485 Driver Enable 모드 |
+| 보고 | `USART3` RS485 Driver Enable 모드 + `USB_OTG_FS` CDC |
 
 ```
 전원 ON
   └─ COLD BOOT  : 백업 레지스터에 매직값 없음
                   → 카운터 0 으로 시작, Flash 의 "전원 인가 횟수" +1
-                  → RS485 로 배너 전송 → WakeUp Timer 장전
+                  → RS485 / USB CDC 로 배너 전송 → WakeUp Timer 장전
        │
        │  MCU 는 계속 풀스피드로 동작 (저전력 모드 미사용)
        │  LED 500ms 토글 + 30초마다 [ALIVE] 로그
@@ -39,8 +42,9 @@ PC 에 전송**합니다.
   main 루프
        ├─ 백업 레지스터에 "내가 거는 리셋" 표식 기록
        ├─ Flash 의 "총 리셋 횟수" +1 기록
-       ├─ RS485 로 "*** SOFTWARE RESET ... ***" 전송
-       ├─ 마지막 바이트 송신 완료(TC) 대기   ← 없으면 메시지 꼬리가 잘린다
+       ├─ 두 채널로 "*** SOFTWARE RESET ... ***" 전송
+       ├─ RS485 송신 완료(TC) 대기 + USB 마지막 패킷 전송 후 정상 분리
+       │                              ← 없으면 메시지 꼬리가 잘린다
        └─ HAL_NVIC_SystemReset()
        │
        ▼
@@ -48,7 +52,11 @@ PC 에 전송**합니다.
 ```
 
 인터럽트 콜백에서는 **플래그만 세우고** `main()` 루프에서 리셋합니다.
-ISR 안에서 바로 리셋하면 RS485 로그가 중간에서 끊깁니다.
+ISR 안에서 바로 리셋하면 로그가 중간에서 끊깁니다.
+
+애플리케이션은 `comm.c` 의 `COMM_Printf()` 하나만 호출하고, 그 안에서
+RS485 와 USB CDC 양쪽으로 같은 바이트열을 내보냅니다. 채널을 늘리거나 빼도
+`app_reset.c` 는 건드릴 필요가 없습니다.
 
 ### 1-0. 18.2시간을 넘는 주기는 소프트웨어로 나눠 장전합니다
 
@@ -235,6 +243,8 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 | **PB10** | USART3_TX (AF7) | 트랜시버 **DI** |
 | **PB11** | USART3_RX (AF7) | 트랜시버 **RO** |
 | **PB14** | USART3_DE (AF7) | 트랜시버 **DE** (+ `/RE`) |
+| **PA11** | USB_OTG_FS_DM | USB D− (`USE_USB_CDC 1` 일 때) |
+| **PA12** | USB_OTG_FS_DP | USB D+ (`USE_USB_CDC 1` 일 때) |
 | PA5 | 상태 LED (GPIO_Output) | 500ms 토글. 안 쓰면 `USE_STATUS_LED 0` |
 | PA13/PA14 | SWDIO / SWCLK | 디버거 |
 
@@ -281,6 +291,85 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 `0` 이면 소프트웨어 토글 모드이고, `HAL_UART_Transmit()` 후 `TC` 플래그를
 기다린 뒤 DE 를 내립니다.
 
+### 2-4. USB CDC — 배선과 "주기 리셋"과의 궁합
+
+#### 배선
+
+```
+  STM32L562                         USB 커넥터 (Type-C / micro-B)
+  PA11 ─────────────────────────────► D−
+  PA12 ─────────────────────────────► D+
+  GND  ─────────────────────────────► GND
+  (VBUS 는 감지용으로만 쓰거나 미연결)
+```
+
+- **32 MHz 크리스탈이 필요 없습니다.** 내부 **HSI48 + CRS** 를 씁니다.
+  CRS 가 호스트의 SOF(1 ms)를 기준으로 HSI48 을 계속 보정해 USB 규격
+  (±0.25%)을 만족시킵니다. 설정은 `MX_USB_Clock_Init()` 에 있습니다.
+- **`HAL_PWREx_EnableVddUSB()` 가 필수**입니다. 이걸 빠뜨리면 USB 트랜시버가
+  아예 동작하지 않아 PC 가 장치를 인식조차 못 합니다. L4/L5 에서 "USB 가
+  무반응"인 경우 대부분 이것입니다.
+- D+/D− 는 90Ω 차동 임피던스로 짧고 나란히 배선하세요.
+
+#### USB 를 켜면 시스템 클럭이 48 MHz 로 올라갑니다
+
+USB FS 는 인터럽트를 제때 처리해야 열거(enumeration)가 되는데 MSI 4 MHz 로는
+빠듯합니다. `USE_USB_CDC = 1` 이면 `main.c` 가 자동으로 MSI 를 48 MHz
+(`RCC_MSIRANGE_11`)로 올립니다. USART3 는 그대로 HSI16 을 쓰므로 보레이트는
+영향받지 않습니다.
+
+#### ⚠ 리셋마다 COM 포트가 끊깁니다
+
+이게 USB CDC 의 본질적인 제약입니다. 소프트웨어 리셋이 걸리면 USB 장치가
+사라졌다가 다시 나타나므로, **PC 의 COM 포트도 매번 사라졌다 다시 생깁니다.**
+PuTTY / TeraTerm 같은 터미널은 그 시점에 포트를 닫아버립니다.
+
+코드에서 할 수 있는 만큼은 해 두었습니다.
+
+| 문제 | 대응 |
+|---|---|
+| 리셋 직후 배너가 열거 전에 나가서 사라짐 | `COMM_Init()` 이 `USBD_STATE_CONFIGURED` 가 될 때까지 대기 (`USB_CDC_READY_TIMEOUT_MS`, 기본 2초) |
+| 열거 직후 호스트가 아직 포트를 못 염 | 추가 대기 `USB_CDC_READY_EXTRA_MS` (기본 300 ms) |
+| 리셋 시 호스트가 장치 제거를 늦게 인식 | 리셋 직전 `USBD_Stop()` 으로 정상 분리 |
+| 케이블 미연결 시 송신에서 멈춤 | 열거 안 됐으면 즉시 버림, 호스트가 안 읽어가면 `USB_CDC_TX_TIMEOUT_MS` 후 포기 |
+
+그래도 **터미널 쪽이 포트를 다시 열어줘야** 합니다. 끊김 없는 로그가 필요하면
+**RS485 를 기준 채널로 쓰고 USB 는 현장 점검용으로 쓰는 것**을 권합니다.
+
+자동 재접속이 필요하면 PC 에서 이 정도 스크립트면 충분합니다.
+
+```python
+# pip install pyserial
+import serial, serial.tools.list_ports, time
+
+VID_PID = (0x0483, 0x5740)          # ST 기본 CDC VID/PID
+
+def find_port():
+    for p in serial.tools.list_ports.comports():
+        if (p.vid, p.pid) == VID_PID:
+            return p.device
+    return None
+
+while True:
+    port = find_port()
+    if port is None:
+        time.sleep(0.2); continue
+    try:
+        with serial.Serial(port, 115200, timeout=0.2) as ser:
+            print(f"--- connected: {port} ---", flush=True)
+            while True:
+                data = ser.read(256)
+                if data:
+                    print(data.decode("utf-8", "replace"), end="", flush=True)
+    except serial.SerialException:
+        print("--- disconnected, waiting ---", flush=True)
+        time.sleep(0.3)
+```
+
+> `USB_CDC_READY_TIMEOUT_MS` 는 **케이블을 안 꽂았을 때 매 부팅마다 그만큼
+> 기다린다**는 뜻이기도 합니다. USB 를 가끔만 쓴다면 값을 줄이거나
+> `USE_USB_CDC` 를 `0` 으로 두세요.
+
 ---
 
 ## 3. 파일 구성
@@ -292,22 +381,35 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 │   ├── Inc/
 │   │   ├── main.h                   # ★ 모든 사용자 설정이 여기 있음
 │   │   ├── app_reset.h
+│   │   ├── comm.h                   # 보고 채널 분배
 │   │   ├── rs485.h
+│   │   ├── usb_cdc.h
 │   │   ├── flash_counter.h
 │   │   └── stm32l5xx_it.h
 │   └── Src/
 │       ├── main.c                   # 클럭/주변장치 초기화, main 루프
 │       ├── app_reset.c              # 콜드·웜 판별, 카운터, WUT 장전, 리셋, 배너
+│       ├── comm.c                   # COMM_Printf() → RS485 + USB CDC 동시 출력
 │       ├── rs485.c                  # USART3 RS485(DE) 송수신
+│       ├── usb_cdc.c                # USB CDC 송수신 래퍼 + OTG_FS_IRQHandler
 │       ├── flash_counter.c          # Flash 기반 비휘발성 카운터
 │       ├── stm32l5xx_hal_msp.c      # RTC/USART3 클럭·GPIO·NVIC
 │       └── stm32l5xx_it.c           # RTC_IRQHandler, USART3_IRQHandler
 └── README.md
 ```
 
-> HAL 드라이버(`Drivers/`), 링커 스크립트, `startup_stm32l562xx.s`, `syscalls.c` 는
-> 용량이 커서 포함하지 않았습니다. 4장대로 CubeMX/CubeIDE 에서 프로젝트를 만든 뒤
+> HAL 드라이버(`Drivers/`), 링커 스크립트, `startup_stm32l562xx.s`, `syscalls.c`,
+> 그리고 **USB 미들웨어(`USB_DEVICE/`, `Middlewares/ST/STM32_USB_Device_Library/`)**
+> 는 용량이 커서 포함하지 않았습니다. 4장대로 CubeMX/CubeIDE 에서 프로젝트를 만든 뒤
 > 위 소스를 덮어쓰고 추가하면 바로 빌드됩니다.
+
+### 채널 구조
+
+```
+  app_reset.c  ──► COMM_Printf() ─┬─► rs485.c   ──► USART3 (DE = PB14)
+                                  └─► usb_cdc.c ──► CDC_Transmit_FS()
+                                                    └─ ST USB Device Library
+```
 
 ---
 
@@ -356,29 +458,80 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
     다만 CubeMX 로 재생성할 때 핀이 겹치지 않도록 PB14 는 비워 두세요.
 - Parameter Settings : 115200 / 8bit / None / 1stop
 - **NVIC Settings** → `USART3 global interrupt` 체크, Preemption Priority `6`
-  (PC 명령 수신용. `USE_RS485_CMD 0` 이면 불필요)
+  (PC 명령 수신용. `USE_COMM_CMD 0` 이면 불필요)
 - 핀아웃에서 **PB10 = USART3_TX, PB11 = USART3_RX** 확인
 
-### 4-5. GPIO
+### 4-5. USB (USB_OTG_FS + USB_DEVICE CDC)
+
+`USE_USB_CDC = 0` 으로 쓸 거면 이 절은 건너뛰어도 됩니다.
+
+1. **Connectivity ▸ USB_OTG_FS**
+   - Mode : **`Device_Only`**
+   - 핀아웃에서 **PA11 = USB_OTG_FS_DM, PA12 = USB_OTG_FS_DP** 확인
+   - **NVIC Settings** → `USB OTG FS global interrupt` 체크, Preemption Priority `4`
+     (RTC `5` / USART3 `6` 보다 높게 — USB 는 응답이 늦으면 열거에 실패합니다)
+2. **Middleware and Software Packs ▸ USB_DEVICE**
+   - Class For FS IP : **`Communication Device Class (Virtual Port Com)`**
+   - Parameter Settings 의 제품명/VID/PID 는 기본값 그대로 두면 됩니다
+     (ST 기본 VID `0x0483` / PID `0x5740`)
+3. **RCC** → `HSI48` 을 활성화할 수 있으면 켜 둡니다.
+   (CubeMX 에서 안 보여도 됩니다 — `MX_USB_Clock_Init()` 이 코드에서 켭니다)
+
+### 4-6. GPIO
 
 - **PA5** 클릭 → `GPIO_Output` → User Label `STATUS_LED`
 
-### 4-6. Clock Configuration
+### 4-7. Clock Configuration
 
 | 항목 | 값 | 이유 |
 |---|---|---|
-| System Clock Mux | **MSI** (4 MHz) | PLL 불필요, Flash 0 wait, 단순/저전력 |
+| System Clock Mux | **MSI** — USB 사용 시 **48 MHz**, 미사용 시 4 MHz | USB FS 인터럽트를 제때 처리하려면 4 MHz 로는 빠듯 |
 | **USART3 Clock Mux** | **HSI16** | 시스템 클럭과 분리해 보레이트 정확도 확보 |
+| **USB Clock Mux** | **HSI48** | CRS 로 SOF 동기 → 크리스탈 불필요 |
 | RTC Clock Mux | **LSI** (또는 LSE) | |
 
 > USART3 를 HSI16 으로 쓰는 이유: 16 MHz ÷ 115200 = 138.9 → 오차 **−0.08%**.
-> MSI 4 MHz 를 그대로 쓰면 −0.79% 라 장거리 RS485 에서 마진이 줄어듭니다.
+> MSI 를 그대로 쓰면 −0.79% 라 장거리 RS485 에서 마진이 줄어듭니다.
+>
+> 클럭/Flash wait state 는 `main.c` 의 `SystemClock_Config()` 가 `USE_USB_CDC`
+> 값에 따라 알아서 고릅니다. CubeMX 화면과 숫자가 달라도 코드가 기준입니다.
 
-### 4-7. 코드 생성 & 소스 반영
+### 4-8. 코드 생성 & 소스 반영
 
 - Project Manager → Toolchain `STM32CubeIDE` → **GENERATE CODE**
 - 생성된 프로젝트에 이 저장소의 `Core/Inc/*.h`, `Core/Src/*.c` 를 덮어쓰기/추가
-- 빌드 → 다운로드 → RS485 터미널(115200-8-N-1) 열기
+- **USB 를 쓰면 생성된 `USB_DEVICE/App/usbd_cdc_if.c` 에 두 군데를 추가**합니다.
+  (CubeMX 로 재생성해도 USER CODE 구간이라 보존됩니다)
+
+  ```c
+  /* USER CODE BEGIN INCLUDE */
+  #include "usb_cdc.h"
+  /* USER CODE END INCLUDE */
+  ```
+
+  ```c
+  static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
+  {
+    /* USER CODE BEGIN 6 */
+    USB_CDC_RxHandler(Buf, *Len);          /* ← 이 한 줄 추가 */
+    USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+    USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+    return (USBD_OK);
+    /* USER CODE END 6 */
+  }
+  ```
+
+  이 한 줄이 없으면 **USB 로 보낸 명령만** 동작하지 않습니다(출력은 정상).
+
+- 생성된 `Core/Src/stm32l5xx_it.c` 에 `OTG_FS_IRQHandler` 가 들어 있으면
+  **지우세요.** 이 프로젝트는 같은 핸들러를 `usb_cdc.c` 에 두고 있어서 그대로
+  두면 중복 정의로 링크 에러가 납니다. (반대로 CubeMX 가 만든 이름이
+  `OTG_FS_IRQHandler` 가 아니면 `main.h` 의 `USB_CDC_IRQ_HANDLER` 를 그 이름으로
+  고치면 됩니다.)
+
+- 빌드 → 다운로드 → 터미널 열기
+  - RS485 : USB-RS485 컨버터, **115200-8-N-1**
+  - USB CDC : 새로 생긴 COM 포트 (보레이트는 아무 값이나 무관)
 
 ---
 
@@ -408,7 +561,7 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 
 `VALUE` 는 1~1000 이며, 벗어나면 `#error` 로 빌드가 막힙니다.
 
-### 실행 중 변경 — RS485 로 문자 하나 보내기
+### 실행 중 변경 — RS485 **또는 USB CDC** 로 문자 하나 보내기
 
 | 명령 | 동작 |
 |---|---|
@@ -420,13 +573,22 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 | `t` | **10초 주기 테스트 모드** (동작 확인용) |
 | `c` | 모든 카운터 초기화 (백업 레지스터 + Flash) |
 
+명령은 **두 채널 중 아무 쪽으로 보내도** 됩니다. 응답(배너/로그)은 항상
+양쪽으로 나갑니다.
+
 실행 중 바꾼 값은 백업 레지스터에 저장되어 **소프트 리셋을 넘어 유지**되지만,
 **전원을 껐다 켜면 `main.h` 의 컴파일 타임 기본값으로 돌아갑니다**
-(VBAT 가 같이 꺼지기 때문). 필요 없으면 `USE_RS485_CMD` 를 `0` 으로 두세요.
+(VBAT 가 같이 꺼지기 때문). 필요 없으면 `USE_COMM_CMD` 를 `0` 으로 두세요.
+
+> USB 로 보낸 명령이 안 먹으면 4-8 의 `USB_CDC_RxHandler()` 한 줄을 빠뜨린
+> 것입니다. 출력은 정상인데 입력만 안 되는 게 이 경우의 증상입니다.
 
 ---
 
-## 6. 실행 결과 예시 (115200 8N1)
+## 6. 실행 결과 예시
+
+아래 내용이 **RS485 와 USB CDC 양쪽에 똑같이** 나옵니다.
+전원을 넣고 5분 주기로 한 번 리셋된 상황입니다.
 
 ```
 ========================================================
@@ -485,10 +647,21 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 3. 보드 전원을 껐다 켜기 → `Boot type : COLD`, `RTC resets : 0` 으로 돌아가지만
    `TOTAL resets` 는 유지되고 `Power cycles` 가 1 증가하는지 확인.
    **VBAT 공용 보드에서 의도한 동작이 이것입니다.**
-4. `c` 로 카운터를 모두 0 으로 되돌리고 실사용 주기로 두기.
+4. 두 채널의 출력이 같은지 비교. RS485 는 리셋 중에도 연결이 유지되고,
+   USB 는 매 리셋마다 COM 포트가 끊겼다 다시 붙습니다(2-4 참고).
+5. `c` 로 카운터를 모두 0 으로 되돌리고 실사용 주기로 두기.
 
-글자가 깨지면 보레이트(115200)와 종단 저항을, 아무것도 안 나오면 DE 핀
-동작(오실로스코프로 송신 중 HIGH 인지)을 먼저 확인하세요.
+### 안 될 때
+
+| 증상 | 먼저 볼 것 |
+|---|---|
+| RS485 글자가 깨짐 | 보레이트(115200), 종단 저항 120Ω, GND 공통 |
+| RS485 아무것도 안 나옴 | DE 핀이 송신 중 HIGH 인지 (오실로스코프), A/B 극성 |
+| PC 가 USB 장치를 아예 인식 못 함 | `HAL_PWREx_EnableVddUSB()` 호출 여부, D+/D− 배선, PA11/PA12 를 GPIO 로 잡아두지 않았는지 |
+| USB 장치는 뜨는데 "알 수 없는 장치" | HSI48/CRS 설정, USB 인터럽트 우선순위(RTC 보다 높게) |
+| USB 로 출력은 되는데 명령이 안 먹음 | `usbd_cdc_if.c` 의 `USB_CDC_RxHandler()` 한 줄 (4-8) |
+| 리셋 후 USB 배너가 안 보임 | 터미널이 포트를 다시 열었는지 (2-4 의 스크립트 사용) |
+| 부팅이 매번 2초씩 느림 | USB 케이블 미연결 상태. `USB_CDC_READY_TIMEOUT_MS` 를 줄이거나 `USE_USB_CDC 0` |
 
 ---
 
@@ -527,12 +700,26 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
    됩니다. `flash_counter.c` 가 `HAL_ICACHE_Disable()` / `Invalidate()` /
    `Enable()` 로 감싸서 처리합니다.
 
-8. **IWDG 로는 대체할 수 없습니다.**
+8. **USB 를 쓰려면 `HAL_PWREx_EnableVddUSB()` 가 반드시 필요합니다.**
+   L5 는 USB 전원 도메인(VDDUSB)이 기본적으로 꺼져 있습니다. 이걸 빠뜨리면
+   PC 가 장치를 인식조차 하지 못합니다. `MX_USB_Clock_Init()` 과 CubeMX 가
+   생성하는 `HAL_PCD_MspInit()` 양쪽에 들어 있습니다(중복 호출은 무해).
+
+9. **`CDC_Transmit_FS()` 는 넘긴 버퍼를 복사하지 않습니다.**
+   함수가 리턴한 뒤에도 전송이 끝날 때까지 그 메모리를 건드리면 안 됩니다.
+   `usb_cdc.c` 는 64바이트 버퍼 두 개를 번갈아 써서 이 문제를 피합니다.
+   직접 `CDC_Transmit_FS()` 를 호출하는 코드를 추가한다면 같은 점을 주의하세요.
+
+10. **USB 인터럽트를 RTC 보다 높은 우선순위로 두세요.**
+    USB 는 열거 중 호스트의 요청에 제때 응답하지 못하면 실패합니다.
+    이 프로젝트는 USB `4` / RTC `5` / USART3 `6` 으로 잡았습니다.
+
+11. **IWDG 로는 대체할 수 없습니다.**
    독립 워치독은 최대 타임아웃이 약 32초라 분 단위 이상의 주기 리셋에는
    사용할 수 없습니다.
 
-9. 디버거를 붙인 채로 리셋하면 세션이 끊어질 수 있습니다. 장주기 시험은
-   RS485 로그로 보는 편이 낫습니다.
+12. 디버거를 붙인 채로 리셋하면 세션이 끊어질 수 있습니다. 장주기 시험은
+    RS485 로그로 보는 편이 낫습니다.
 
-10. Flash 카운터는 리셋 **직전에** 기록합니다. 기록과 리셋 사이(수 ms)에
+13. Flash 카운터는 리셋 **직전에** 기록합니다. 기록과 리셋 사이(수 ms)에
     전원이 끊기면 그 1회는 누락될 수 있습니다.

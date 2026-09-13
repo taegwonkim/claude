@@ -100,7 +100,7 @@ void RTC_IRQHandler(void)
   /* USER CODE END RTC_IRQn 1 */
 }
 
-#if (USE_RS485 == 1U) && (USE_RS485_CMD == 1U)
+#if (USE_RS485 == 1U) && (USE_COMM_CMD == 1U)
 /**
   * @brief  This function handles USART3 global interrupt.
   * @note   RS485 수신 명령 처리용. rs485.c 의 HAL_UART_RxCpltCallback()/

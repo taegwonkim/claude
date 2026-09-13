@@ -4,7 +4,8 @@
   * @file           : main.c
   * @brief          : STM32L562RCT6
   *                   RTC WakeUp Timer 로 일정 시간(분/시간 단위)마다 소프트웨어
-  *                   리셋하고, 리셋 사실과 횟수를 USART3(RS485) 로 PC 에 보고.
+  *                   리셋하고, 리셋 사실과 횟수를 USART3(RS485) 와
+  *                   USB CDC(가상 COM 포트) 양쪽으로 PC 에 보고.
   *
   *  동작 요약
   *   1) HAL_Init() 직후 RCC->CSR 로 직전 리셋 원인을 캡처한다(1회성 플래그).
@@ -30,9 +31,31 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app_reset.h"
+#include "comm.h"
 #include "rs485.h"
+#include "usb_cdc.h"
 #include "flash_counter.h"
+#if (USE_USB_CDC == 1U)
+#include "usb_device.h"     /* CubeMX 가 USB_DEVICE/App 에 생성 */
+#endif
 /* USER CODE END Includes */
+
+/* USER CODE BEGIN PD */
+/* USB 를 쓰면 SYSCLK 을 48MHz 로 올린다.
+   USB FS 는 인터럽트를 제때 처리해야 열거가 되는데 MSI 4MHz 로는 빠듯하다.
+   USB 자체 클럭은 SYSCLK 과 무관하게 HSI48(+CRS) 로 따로 공급한다.
+
+   FLASH wait state 는 데이터시트 최소값(48MHz/Range1 기준 2WS)보다 한 단계
+   여유를 줬다. 필요한 값보다 크게 잡는 것은 동작상 안전하며(약간 느려질 뿐)
+   데이터시트 표가 개정돼도 문제가 생기지 않는다. */
+#if (USE_USB_CDC == 1U)
+  #define APP_MSI_RANGE       RCC_MSIRANGE_11   /* 48 MHz */
+  #define APP_FLASH_LATENCY   FLASH_LATENCY_3
+#else
+  #define APP_MSI_RANGE       RCC_MSIRANGE_6    /* 4 MHz  */
+  #define APP_FLASH_LATENCY   FLASH_LATENCY_0
+#endif
+/* USER CODE END PD */
 
 /* Private variables ---------------------------------------------------------*/
 RTC_HandleTypeDef hrtc;
@@ -47,6 +70,9 @@ static void MX_ICACHE_Init(void);
 static void MX_RTC_Init(void);
 #if (USE_RS485 == 1U)
 static void MX_USART3_UART_Init(void);
+#endif
+#if (USE_USB_CDC == 1U)
+static void MX_USB_Clock_Init(void);
 #endif
 
 /* USER CODE BEGIN PFP */
@@ -87,8 +113,12 @@ int main(void)
   MX_USART3_UART_Init();
 #endif
   MX_RTC_Init();
+#if (USE_USB_CDC == 1U)
+  MX_USB_DEVICE_Init();     /* CubeMX 가 USB_DEVICE/App/usb_device.c 에 생성 */
+#endif
 
   /* USER CODE BEGIN 2 */
+  COMM_Init();              /* USB 열거 대기 (RS485 만 쓰면 즉시 리턴)      */
   AppReset_Init();          /* 백업/Flash 카운터 정리 (콜드·웜 부트 판별) */
   AppReset_PrintBanner();   /* PC 로 리셋 보고 전송                        */
   AppReset_StartTimer();    /* WakeUp Timer 기동                           */
@@ -112,9 +142,10 @@ int main(void)
 /**
   * @brief System Clock Configuration
   *
-  *   SYSCLK = MSI 4 MHz   (PLL 미사용, FLASH 0 wait, 저전력·단순 구성)
+  *   SYSCLK = MSI 48 MHz  (USB 사용 시) / MSI 4 MHz (USB 미사용 시)
   *   USART3 = HSI16       (SYSCLK 과 무관하게 정확한 보레이트 확보)
   *                         16MHz/115200 = 138.9 -> 오차 -0.08%
+  *   USB    = HSI48 + CRS (USB SOF 로 동기 -> 크리스탈 없이 규격 만족)
   *   RTC    = LSI 32kHz 또는 LSE 32.768kHz (main.h 의 RTC_CLOCK_LSE)
   * @retval None
   */
@@ -151,9 +182,13 @@ void SystemClock_Config(void)
 #endif
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;        /* 4 MHz */
+  RCC_OscInitStruct.MSIClockRange = APP_MSI_RANGE;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;                 /* USART3 용 16MHz */
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+#if (USE_USB_CDC == 1U)
+  RCC_OscInitStruct.OscillatorType |= RCC_OSCILLATORTYPE_HSI48;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;             /* USB 용 48MHz */
+#endif
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -167,7 +202,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, APP_FLASH_LATENCY) != HAL_OK)
   {
     Error_Handler();
   }
@@ -183,11 +218,48 @@ void SystemClock_Config(void)
   PeriphClkInit.PeriphClockSelection |= RCC_PERIPHCLK_USART3;
   PeriphClkInit.Usart3ClockSelection = RCC_USART3CLKSOURCE_HSI;
 #endif
+#if (USE_USB_CDC == 1U)
+  PeriphClkInit.PeriphClockSelection |= RCC_PERIPHCLK_USB;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
+#endif
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
+
+#if (USE_USB_CDC == 1U)
+  MX_USB_Clock_Init();
+#endif
 }
+
+#if (USE_USB_CDC == 1U)
+/**
+  * @brief  USB 전원 도메인 + HSI48 자동 보정(CRS) 설정
+  *
+  *   - VDDUSB 를 켜지 않으면 USB 트랜시버가 동작하지 않는다. L5/L4 에서
+  *     USB 가 "아무 반응 없음"인 경우 대부분 이것을 빠뜨린 것이다.
+  *   - HSI48 은 RC 발진기라 그대로는 USB 규격(±0.25%)을 만족하지 못한다.
+  *     CRS 가 호스트의 SOF(1ms)를 기준으로 HSI48 을 계속 보정해 주므로
+  *     32MHz 크리스탈 없이도 USB 가 동작한다.
+  * @retval None
+  */
+static void MX_USB_Clock_Init(void)
+{
+  RCC_CRSInitTypeDef CRSInitStruct = {0};
+
+  HAL_PWREx_EnableVddUSB();
+
+  __HAL_RCC_CRS_CLK_ENABLE();
+
+  CRSInitStruct.Prescaler             = RCC_CRS_SYNC_DIV1;
+  CRSInitStruct.Source                = RCC_CRS_SYNC_SOURCE_USB;
+  CRSInitStruct.Polarity              = RCC_CRS_SYNC_POLARITY_RISING;
+  CRSInitStruct.ReloadValue           = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000U, 1000U);
+  CRSInitStruct.ErrorLimitValue       = 34;
+  CRSInitStruct.HSI48CalibrationValue = 32;
+  HAL_RCCEx_CRSConfig(&CRSInitStruct);
+}
+#endif /* USE_USB_CDC */
 
 /**
   * @brief RTC Initialization Function
@@ -328,6 +400,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 /* HAL_RTCEx_WakeUpTimerEventCallback() 은 app_reset.c 에 있다. */
 /* HAL_UART_RxCpltCallback() / HAL_UART_ErrorCallback() 은 rs485.c 에 있다.  */
+/* USB OTG FS 인터럽트 핸들러는 usb_cdc.c 에 있다.                          */
 /* USER CODE END 4 */
 
 /**

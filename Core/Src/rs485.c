@@ -27,8 +27,6 @@
 
 #if (USE_RS485 == 1U)
 
-#include <stdarg.h>
-#include <stdio.h>
 #include <string.h>
 
 UART_HandleTypeDef huart_rs485;
@@ -40,9 +38,6 @@ static volatile uint8_t  s_rx_buf[RS485_RX_BUF_SIZE];
 static volatile uint16_t s_rx_head = 0U;
 static volatile uint16_t s_rx_tail = 0U;
 static uint8_t           s_rx_byte = 0U;
-
-/* 송신 포맷 버퍼 */
-static char s_tx_fmt[256];
 
 /* ---- 내부 함수 ------------------------------------------------------------ */
 #if (RS485_USE_HW_DE == 0U)
@@ -104,7 +99,7 @@ void RS485_Init(void)
     Error_Handler();
   }
 
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
   s_rx_head = 0U;
   s_rx_tail = 0U;
   (void)HAL_UART_Receive_IT(&huart_rs485, &s_rx_byte, 1U);
@@ -147,43 +142,16 @@ void RS485_Write(const uint8_t *data, uint16_t len)
   RS485_DriverDisable();
 #endif
 
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
   /* /RE 를 GND 로 고정한 배선이면 방금 보낸 내용이 그대로 되돌아온다.
      그 에코를 명령으로 오인하지 않도록 수신 버퍼를 비운다. */
   s_rx_head = s_rx_tail;
 #endif
 }
 
-void RS485_Puts(const char *str)
-{
-  if (str != NULL)
-  {
-    RS485_Write((const uint8_t *)str, (uint16_t)strlen(str));
-  }
-}
-
-void RS485_Printf(const char *fmt, ...)
-{
-  va_list args;
-  int len;
-
-  va_start(args, fmt);
-  len = vsnprintf(s_tx_fmt, sizeof(s_tx_fmt), fmt, args);
-  va_end(args);
-
-  if (len > 0)
-  {
-    if ((size_t)len >= sizeof(s_tx_fmt))
-    {
-      len = (int)sizeof(s_tx_fmt) - 1;   /* 잘렸을 때 */
-    }
-    RS485_Write((const uint8_t *)s_tx_fmt, (uint16_t)len);
-  }
-}
-
 bool RS485_GetChar(uint8_t *ch)
 {
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
   if (s_rx_head == s_rx_tail)
   {
     return false;
@@ -197,7 +165,7 @@ bool RS485_GetChar(uint8_t *ch)
 #endif
 }
 
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
 /**
   * @brief  1바이트 수신 완료 콜백 (USART3_IRQHandler -> HAL_UART_IRQHandler 경유)
   */
@@ -239,6 +207,6 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 
   (void)HAL_UART_Receive_IT(&huart_rs485, &s_rx_byte, 1U);
 }
-#endif /* USE_RS485_CMD */
+#endif /* USE_COMM_CMD */
 
 #endif /* USE_RS485 */

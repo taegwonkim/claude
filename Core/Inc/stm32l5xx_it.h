@@ -27,7 +27,7 @@ void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 void RTC_IRQHandler(void);
-#if (USE_RS485 == 1U) && (USE_RS485_CMD == 1U)
+#if (USE_RS485 == 1U) && (USE_COMM_CMD == 1U)
 void USART3_IRQHandler(void);
 #endif
 

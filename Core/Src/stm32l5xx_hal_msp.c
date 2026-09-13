@@ -98,7 +98,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
     GPIO_InitStruct.Alternate = RS485_UART_AF;
     HAL_GPIO_Init(RS485_GPIO_PORT, &GPIO_InitStruct);
 
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
     /* 수신 인터럽트 (PC 에서 보내는 명령 처리용) */
     HAL_NVIC_SetPriority(USART3_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(USART3_IRQn);
@@ -119,7 +119,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
 #if (RS485_USE_HW_DE == 1U)
     HAL_GPIO_DeInit(RS485_GPIO_PORT, RS485_DE_PIN);
 #endif
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
     HAL_NVIC_DisableIRQ(USART3_IRQn);
 #endif
   }

@@ -96,8 +96,49 @@ void Error_Handler(void);
 #define RS485_DE_ASSERT_TIME    8U
 #define RS485_DE_DEASSERT_TIME  8U
 
-/* RS485 수신 명령 사용 여부 (테스트에 매우 유용) */
-#define USE_RS485_CMD           1U
+/* =========================================================================
+ * 2-1. USB CDC (가상 COM 포트) 설정
+ *
+ *    PA11 = USB_OTG_FS_DM, PA12 = USB_OTG_FS_DP
+ *
+ *    RS485 와 "같은 내용"이 동시에 나간다. 둘 중 하나만 켜도 되고 둘 다 켜도
+ *    된다. 명령 수신도 양쪽에서 받는다.
+ *
+ *    !! USE_USB_CDC = 1 로 쓰려면 CubeMX 에서 USB_OTG_FS(Device_Only) +
+ *       USB_DEVICE(Class = CDC) 미들웨어를 생성해야 한다. README 4-5 참고 !!
+ *
+ *    주의 : 소프트웨어 리셋마다 USB 장치가 사라졌다 다시 나타나므로 PC 의
+ *           COM 포트도 매번 끊긴다. 끊김 없는 로그가 필요하면 RS485 를
+ *           기준 채널로 쓸 것. (README 2-4 참고)
+ * ======================================================================= */
+#define USE_USB_CDC             1U
+
+/* 부팅 후 호스트가 장치를 열거할 때까지 기다리는 시간.
+   이 시간을 안 기다리면 부팅 배너가 통째로 사라진다.
+   USB 케이블을 안 꽂고 쓸 일이 많으면 값을 줄일 것(그만큼 부팅이 늦어진다). */
+#define USB_CDC_READY_TIMEOUT_MS  2000U
+/* 열거 완료 후 호스트가 포트를 여는 데 필요한 추가 여유 */
+#define USB_CDC_READY_EXTRA_MS     300U
+/* 호스트가 데이터를 안 읽어갈 때 한 패킷을 포기하기까지의 시간 */
+#define USB_CDC_TX_TIMEOUT_MS       50U
+/* 리셋 직전, 마지막 패킷이 호스트로 넘어갈 시간 / 분리 후 대기 */
+#define USB_CDC_FLUSH_MS            15U
+#define USB_CDC_DETACH_MS           20U
+
+/* CubeMX 가 생성하는 USB 인터럽트 핸들러 이름 (STM32L5 는 보통 이 이름).
+   생성된 stm32l5xx_it.c 의 이름과 다르면 이 줄만 고치면 된다. */
+#define USB_CDC_IRQ_HANDLER     OTG_FS_IRQHandler
+
+/* =========================================================================
+ * 2-2. 수신 명령 (RS485 / USB CDC 공통)
+ *      s=상태  r=즉시리셋  m=분  h=시간  +/-=값  t=10초테스트  c=카운터초기화
+ * ======================================================================= */
+#define USE_COMM_CMD            1U
+
+#if (USE_RS485 == 0U) && (USE_USB_CDC == 0U) && (USE_COMM_CMD == 1U)
+  #undef  USE_COMM_CMD
+  #define USE_COMM_CMD          0U
+#endif
 
 /* =========================================================================
  * 3. 상태 LED / 하트비트 로그

@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    app_reset.c
   * @brief   RTC WakeUp Timer 로 일정 시간마다 소프트웨어 리셋하고,
-  *          리셋 사실과 횟수를 USART3(RS485) 로 PC 에 보고한다.
+  *          리셋 사실과 횟수를 USART3(RS485) 와 USB CDC 로 PC 에 보고한다.
   *
   *  [ VBAT 가 VDD 와 함께 켜지고 꺼지는 보드에서의 동작 ]
   *
@@ -27,7 +27,7 @@
   ******************************************************************************
   */
 #include "app_reset.h"
-#include "rs485.h"
+#include "comm.h"
 #include "flash_counter.h"
 #include <stdio.h>
 #include <string.h>
@@ -214,65 +214,65 @@ void AppReset_PrintBanner(void)
   (void)HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
   (void)HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
-  RS485_Puts("\r\n");
-  RS485_Puts("========================================================\r\n");
-  RS485_Puts(" STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)\r\n");
-  RS485_Puts("========================================================\r\n");
+  COMM_Puts("\r\n");
+  COMM_Puts("========================================================\r\n");
+  COMM_Puts(" STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)\r\n");
+  COMM_Puts("========================================================\r\n");
 
   /* --- 이번 부팅이 어떤 리셋이었는지 --- */
-  RS485_Puts(" Reset cause  : ");
-  if ((s_ctx.csr & RCC_CSR_LPWRRSTF) != 0U) { RS485_Puts("LOW-POWER "); }
-  if ((s_ctx.csr & RCC_CSR_WWDGRSTF) != 0U) { RS485_Puts("WWDG "); }
-  if ((s_ctx.csr & RCC_CSR_IWDGRSTF) != 0U) { RS485_Puts("IWDG "); }
-  if ((s_ctx.csr & RCC_CSR_SFTRSTF)  != 0U) { RS485_Puts("SOFTWARE "); }
-  if ((s_ctx.csr & RCC_CSR_BORRSTF)  != 0U) { RS485_Puts("BOR/POR "); }
-  if ((s_ctx.csr & RCC_CSR_PINRSTF)  != 0U) { RS485_Puts("NRST-PIN "); }
-  if ((s_ctx.csr & RCC_CSR_OBLRSTF)  != 0U) { RS485_Puts("OPTION-BYTE "); }
-  RS485_Printf("(CSR=0x%08lX)\r\n", (unsigned long)s_ctx.csr);
+  COMM_Puts(" Reset cause  : ");
+  if ((s_ctx.csr & RCC_CSR_LPWRRSTF) != 0U) { COMM_Puts("LOW-POWER "); }
+  if ((s_ctx.csr & RCC_CSR_WWDGRSTF) != 0U) { COMM_Puts("WWDG "); }
+  if ((s_ctx.csr & RCC_CSR_IWDGRSTF) != 0U) { COMM_Puts("IWDG "); }
+  if ((s_ctx.csr & RCC_CSR_SFTRSTF)  != 0U) { COMM_Puts("SOFTWARE "); }
+  if ((s_ctx.csr & RCC_CSR_BORRSTF)  != 0U) { COMM_Puts("BOR/POR "); }
+  if ((s_ctx.csr & RCC_CSR_PINRSTF)  != 0U) { COMM_Puts("NRST-PIN "); }
+  if ((s_ctx.csr & RCC_CSR_OBLRSTF)  != 0U) { COMM_Puts("OPTION-BYTE "); }
+  COMM_Printf("(CSR=0x%08lX)\r\n", (unsigned long)s_ctx.csr);
 
   if (s_ctx.cold_boot)
   {
-    RS485_Puts(" Boot type    : COLD  (power ON - VBAT/backup domain cleared)\r\n");
+    COMM_Puts(" Boot type    : COLD  (power ON - VBAT/backup domain cleared)\r\n");
   }
   else if (s_ctx.by_rtc)
   {
-    RS485_Puts(" Boot type    : WARM  *** RESET BY RTC WAKEUP TIMER ***\r\n");
+    COMM_Puts(" Boot type    : WARM  *** RESET BY RTC WAKEUP TIMER ***\r\n");
   }
   else
   {
-    RS485_Puts(" Boot type    : WARM  (software reset, not by RTC)\r\n");
+    COMM_Puts(" Boot type    : WARM  (software reset, not by RTC)\r\n");
   }
 
   /* --- 횟수 --- */
-  RS485_Printf(" RTC resets   : %lu   (since power ON, backup reg)\r\n",
+  COMM_Printf(" RTC resets   : %lu   (since power ON, backup reg)\r\n",
                (unsigned long)s_ctx.reset_count);
-  RS485_Printf(" Boot count   : %lu   (since power ON, backup reg)\r\n",
+  COMM_Printf(" Boot count   : %lu   (since power ON, backup reg)\r\n",
                (unsigned long)s_ctx.boot_count);
 #if (USE_FLASH_COUNTER == 1U)
-  RS485_Printf(" TOTAL resets : %lu   (survives power OFF, flash @0x%08lX)\r\n",
+  COMM_Printf(" TOTAL resets : %lu   (survives power OFF, flash @0x%08lX)\r\n",
                (unsigned long)s_ctx.total_reset,
                (unsigned long)FlashCounter_GetPageAddr());
-  RS485_Printf(" Power cycles : %lu   (survives power OFF)\r\n",
+  COMM_Printf(" Power cycles : %lu   (survives power OFF)\r\n",
                (unsigned long)s_ctx.power_cycle);
 #endif
 
   /* --- 설정 --- */
-  RS485_Printf(" RTC clock    : %s\r\n", RTC_CLOCK_NAME);
-  RS485_Printf(" Reset period : %lu %s  = %lu s (%s)\r\n",
+  COMM_Printf(" RTC clock    : %s\r\n", RTC_CLOCK_NAME);
+  COMM_Printf(" Reset period : %lu %s  = %lu s (%s)\r\n",
                (unsigned long)s_ctx.value, AppReset_UnitStr(),
                (unsigned long)s_ctx.period_sec, period_str);
-  RS485_Printf(" Run time     : %s  (accumulated since power ON)\r\n", run_str);
+  COMM_Printf(" Run time     : %s  (accumulated since power ON)\r\n", run_str);
   /* RTC 달력은 소프트 리셋으로 지워지지 않는다. 부팅할 때마다 이 값이 주기만큼
      늘어나는지로 실제 주기를 검증할 수 있다(전원을 끄면 2000-01-01 로 복귀). */
-  RS485_Printf(" RTC time     : 20%02u-%02u-%02u %02u:%02u:%02u\r\n",
+  COMM_Printf(" RTC time     : 20%02u-%02u-%02u %02u:%02u:%02u\r\n",
                (unsigned)sDate.Year, (unsigned)sDate.Month, (unsigned)sDate.Date,
                (unsigned)sTime.Hours, (unsigned)sTime.Minutes, (unsigned)sTime.Seconds);
-  RS485_Printf(" Next reset in: %lu s\r\n", (unsigned long)s_ctx.period_sec);
-  RS485_Puts("--------------------------------------------------------\r\n");
-#if (USE_RS485_CMD == 1U)
-  RS485_Puts(" CMD: s=status  r=reset now  m=minute  h=hour  +/-=value\r\n");
-  RS485_Puts("      t=test(10s)  c=clear counters\r\n");
-  RS485_Puts("--------------------------------------------------------\r\n");
+  COMM_Printf(" Next reset in: %lu s\r\n", (unsigned long)s_ctx.period_sec);
+  COMM_Puts("--------------------------------------------------------\r\n");
+#if (USE_COMM_CMD == 1U)
+  COMM_Puts(" CMD: s=status  r=reset now  m=minute  h=hour  +/-=value\r\n");
+  COMM_Puts("      t=test(10s)  c=clear counters\r\n");
+  COMM_Puts("--------------------------------------------------------\r\n");
 #endif
 }
 
@@ -336,14 +336,13 @@ void AppReset_DoReset(const char *reason)
   (void)fc;
 #endif
 
-  RS485_Printf("\r\n*** SOFTWARE RESET (%s) : RTC reset #%lu, total #%lu ***\r\n",
+  COMM_Printf("\r\n*** SOFTWARE RESET (%s) : RTC reset #%lu, total #%lu ***\r\n",
                (reason != NULL) ? reason : "-",
                (unsigned long)(s_ctx.reset_count + 1U),
                (unsigned long)(s_ctx.total_reset + 1U));
 
-  /* 마지막 바이트가 선로에 나갈 때까지 기다린 뒤 리셋 */
-  RS485_WaitTxDone();
-  HAL_Delay(5U);
+  /* 마지막 바이트가 나갈 때까지 기다리고 USB 는 정상 분리한 뒤 리셋 */
+  COMM_PrepareReset();
 
   HAL_NVIC_SystemReset();
   /* 여기로는 돌아오지 않는다 */
@@ -361,14 +360,14 @@ static void AppReset_PrintHeartbeat(void)
   AppReset_FormatHMS(AppReset_ElapsedSec(), up,   sizeof(up));
   AppReset_FormatHMS(AppReset_RemainSec(),  left, sizeof(left));
 
-  RS485_Printf("[ALIVE] up %s | next reset in %s | resets %lu (total %lu)\r\n",
+  COMM_Printf("[ALIVE] up %s | next reset in %s | resets %lu (total %lu)\r\n",
                up, left,
                (unsigned long)s_ctx.reset_count,
                (unsigned long)s_ctx.total_reset);
 }
 #endif
 
-#if (USE_RS485_CMD == 1U)
+#if (USE_COMM_CMD == 1U)
 static void AppReset_ApplyPeriodChange(void)
 {
   AppReset_CalcPeriod();
@@ -377,7 +376,7 @@ static void AppReset_ApplyPeriodChange(void)
 
   AppReset_StartTimer();     /* 새 주기로 다시 카운트 시작 */
 
-  RS485_Printf("[CFG ] period = %lu %s (%lu s) - timer restarted\r\n",
+  COMM_Printf("[CFG ] period = %lu %s (%lu s) - timer restarted\r\n",
                (unsigned long)s_ctx.value, AppReset_UnitStr(),
                (unsigned long)s_ctx.period_sec);
 }
@@ -424,7 +423,7 @@ static void AppReset_HandleCommand(uint8_t ch)
       /* 동작 확인용 : 10초 주기 (분/시간 단위와 무관한 임시 값) */
       s_ctx.period_sec = 10U;
       AppReset_StartTimer();
-      RS485_Puts("[CFG ] TEST mode - reset in 10 s\r\n");
+      COMM_Puts("[CFG ] TEST mode - reset in 10 s\r\n");
       break;
 
     case 'c':
@@ -440,14 +439,14 @@ static void AppReset_HandleCommand(uint8_t ch)
 #if (USE_FLASH_COUNTER == 1U)
       (void)FlashCounter_Erase();
 #endif
-      RS485_Puts("[CFG ] all counters cleared\r\n");
+      COMM_Puts("[CFG ] all counters cleared\r\n");
       break;
 
     default:
       break;   /* 개행 등은 무시 */
   }
 }
-#endif /* USE_RS485_CMD */
+#endif /* USE_COMM_CMD */
 
 /* ===========================================================================
  *  7. main 루프에서 계속 호출
@@ -469,11 +468,11 @@ void AppReset_Task(void)
     }
   }
 
-  /* ---- RS485 명령 -------------------------------------------------------- */
-#if (USE_RS485_CMD == 1U)
+  /* ---- RS485 / USB CDC 명령 ---------------------------------------------- */
+#if (USE_COMM_CMD == 1U)
   {
     uint8_t ch;
-    while (RS485_GetChar(&ch))
+    while (COMM_GetChar(&ch))
     {
       AppReset_HandleCommand(ch);
     }
