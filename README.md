@@ -1,10 +1,10 @@
-# STM32L562RCT6 — RTC WakeUp Timer 주기적 Software Reset + RS485 / USB CDC 보고
+# STM32L562RET6 — RTC WakeUp Timer 주기적 Software Reset + RS485 / USB CDC 보고
 
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
 스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
 USB CDC(가상 COM 포트) 양쪽으로 PC 에 전송**합니다.
 
-- 대상 : **STM32L562RCT6 (LQFP64)**, TrustZone Disabled
+- 대상 : **STM32L562RET6 (LQFP64, Flash 512KB)**, TrustZone Disabled
 - 리셋 주기 : **분 단위 / 시간 단위** 중 선택 (기본 **5분**)
 - 보고 채널 (**같은 내용이 동시에 나갑니다**)
   - **USART3 RS485** — PB10 TX / PB11 RX / PB14 DE, 115200-8-N-1
@@ -183,21 +183,22 @@ RTC 리셋으로 셉니다.
 
 ### ③ 전원을 넘어가는 누적 횟수는 내부 Flash 에
 
-`flash_counter.c` 가 내부 Flash **마지막 페이지**(STM32L562RCT6 = `0x0803F800`,
-512KB 품목이면 `0x0807F800`)에 16바이트 레코드를 덧붙여 기록합니다.
+`flash_counter.c` 가 내부 Flash **마지막 페이지**(STM32L562RET6 = `0x0807F800`,
+256KB 품목인 RC 라면 `0x0803F800`)에 16바이트 레코드를 덧붙여 기록합니다.
 
 - 레코드 = `[64bit 데이터][데이터의 보수]` — 쓰다 만 레코드를 걸러냅니다.
 - 페이지가 꽉 차면(128개) 지우고 처음부터 다시 씁니다.
   → **128번 저장마다 erase 1번.** Flash 지우기 수명 10,000회 기준
   1,280,000번 저장 가능. 5분 주기(하루 288회)면 약 12년입니다.
 - 저장 주소는 `FLASHSIZE_BASE` 의 **실제 칩 용량에서 런타임 계산**하므로
-  256KB / 512KB 품목 모두 자동 대응합니다. 듀얼뱅크(출하 기본, 2KB 페이지)와
-  싱글뱅크(4KB 페이지)도 `FLASH_OPTR.DBANK` 를 보고 자동으로 맞춥니다.
+  512KB(RE) / 256KB(RC) 품목 모두 코드 수정 없이 동작합니다.
+  듀얼뱅크(출하 기본, 2KB 페이지)와 싱글뱅크(4KB 페이지)도 `FLASH_OPTR.DBANK`
+  를 보고 자동으로 맞춥니다. 512KB 듀얼뱅크에서는 뱅크2의 127번 페이지입니다.
 
 > **주의** — 마지막 페이지를 데이터로 쓰므로 프로그램이 그 영역까지 커지면
 > 안 됩니다. 이 예제는 수십 KB라 여유가 많지만, 코드가 커질 것 같으면
-> 링커 스크립트(`STM32L562RCTX_FLASH.ld`)의 `FLASH` `LENGTH` 를
-> `256K` → `254K` 로 줄여 두세요.
+> 링커 스크립트(`STM32L562RETX_FLASH.ld`)의 `FLASH` `LENGTH` 를
+> `512K` → `510K` 로 줄여 두세요.
 >
 > Flash 저장이 필요 없으면 `USE_FLASH_COUNTER` 를 `0` 으로 두세요.
 > 그러면 "전원 인가 후 횟수"만 보고합니다.
@@ -236,7 +237,7 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 
 ## 2. 하드웨어 연결
 
-### 2-1. 핀 배치 (STM32L562RCT6, LQFP64)
+### 2-1. 핀 배치 (STM32L562RET6, LQFP64)
 
 | 핀 | 기능 | 비고 |
 |---|---|---|
@@ -417,11 +418,11 @@ while True:
 
 ### 4-1. 프로젝트 생성
 
-1. CubeMX → **File ▸ New Project** → MCU 선택기에서 `STM32L562RCT6` 검색 →
+1. CubeMX → **File ▸ New Project** → MCU 선택기에서 `STM32L562RET6` 검색 →
    LQFP64 패키지 선택.
-   - 선택기에 `STM32L562RCTx` 가 없으면 **`STM32L562RETx`** 를 고르세요.
-     핀 배치와 주변장치가 동일하고 Flash 용량만 다릅니다. Flash 저장 주소를
-     런타임에 계산하므로 코드 수정이 필요 없습니다.
+   - 256KB 품목(`STM32L562RCT6`)으로 바꿔도 그대로 동작합니다. 핀 배치와
+     주변장치가 같고 Flash 용량만 다른데, Flash 저장 주소를 칩에서 읽어
+     런타임에 계산하기 때문입니다.
 2. **TrustZone 활성화 여부를 묻는 창에서 반드시 `Without TrustZone`
    (TZEN Disabled) 을 선택**합니다. 켜면 Secure/Non-secure 두 프로젝트가
    생성되고 RTC 인터럽트도 `RTC_S_IRQn` 으로 바뀝니다.
@@ -592,13 +593,13 @@ while True:
 
 ```
 ========================================================
- STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)
+ STM32L562RET6  RTC WakeUp -> Software Reset (RS485/USB)
 ========================================================
  Reset cause  : BOR/POR NRST-PIN (CSR=0x0C000000)
  Boot type    : COLD  (power ON - VBAT/backup domain cleared)
  RTC resets   : 0   (since power ON, backup reg)
  Boot count   : 1   (since power ON, backup reg)
- TOTAL resets : 41   (survives power OFF, flash @0x0803F800)
+ TOTAL resets : 41   (survives power OFF, flash @0x0807F800)
  Power cycles : 7   (survives power OFF)
  RTC clock    : LSI 32000Hz(+-5%)
  Reset period : 5 min  = 300 s (00:05:00)
@@ -615,13 +616,13 @@ while True:
 *** SOFTWARE RESET (RTC wakeup) : RTC reset #1, total #42 ***
 
 ========================================================
- STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)
+ STM32L562RET6  RTC WakeUp -> Software Reset (RS485/USB)
 ========================================================
  Reset cause  : SOFTWARE (CSR=0x10000000)
  Boot type    : WARM  *** RESET BY RTC WAKEUP TIMER ***
  RTC resets   : 1   (since power ON, backup reg)
  Boot count   : 2   (since power ON, backup reg)
- TOTAL resets : 42   (survives power OFF, flash @0x0803F800)
+ TOTAL resets : 42   (survives power OFF, flash @0x0807F800)
  Power cycles : 7   (survives power OFF)
  RTC clock    : LSI 32000Hz(+-5%)
  Reset period : 5 min  = 300 s (00:05:00)

@@ -216,7 +216,7 @@ void AppReset_PrintBanner(void)
 
   COMM_Puts("\r\n");
   COMM_Puts("========================================================\r\n");
-  COMM_Puts(" STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)\r\n");
+  COMM_Puts(" STM32L562RET6  RTC WakeUp -> Software Reset (RS485/USB)\r\n");
   COMM_Puts("========================================================\r\n");
 
   /* --- 이번 부팅이 어떤 리셋이었는지 --- */
