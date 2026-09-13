@@ -10,6 +10,8 @@
 #ifndef __STM32L5xx_IT_H
 #define __STM32L5xx_IT_H
 
+#include "main.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,6 +27,9 @@ void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 void RTC_IRQHandler(void);
+#if (USE_RS485 == 1U) && (USE_RS485_CMD == 1U)
+void USART3_IRQHandler(void);
+#endif
 
 #ifdef __cplusplus
 }

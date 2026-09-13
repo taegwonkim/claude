@@ -2,21 +2,24 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : STM32L562 - RTC Wakeup Timer 를 이용한 주기적 소프트웨어 리셋
-  *                    "부팅 시점"으로부터 RESET_PERIOD_SEC 마다 리셋한다.
-  *                    설정 범위 : 60초(1분) ~ 108000초(30시간), 기본 30시간
+  * @brief          : STM32L562RCT6
+  *                   RTC WakeUp Timer 로 일정 시간(분/시간 단위)마다 소프트웨어
+  *                   리셋하고, 리셋 사실과 횟수를 USART3(RS485) 로 PC 에 보고.
   *
-  * 동작 개요
-  *  1) RTC 를 내부 LSI(~32kHz)로 구동하고 Wakeup Timer 를 ck_spre(1Hz)로 설정한다.
-  *     (외부 크리스탈 LSE 는 사용하지 않는다)
-  *  2) 18.2시간(65536초)을 넘는 주기는 16bit 카운터로 표현할 수 없으므로
-  *     CK_SPRE_17BITS 모드(2^16 가산)를 쓴다.
-  *     30시간 -> 카운터 42463 + 1 + 65536 = 108000초.
-  *  3) 인터럽트 콜백에서 플래그만 세우고, main 루프에서 HAL_NVIC_SystemReset() 호출.
-  *  4) 소프트 리셋으로는 RTC/백업도메인이 지워지지 않으므로 리셋 횟수를
-  *     백업 레지스터에 누적한다. 단 이 보드는 VBAT 가 MCU 전원(VDD)에 물려
-  *     있어, 전원을 내렸다 올리면 백업 도메인도 함께 초기화된다(콜드 부트).
-  *  5) RCC 리셋 플래그로 "소프트웨어 리셋"이었는지 부팅 시 확인/출력한다.
+  *  동작 요약
+  *   1) HAL_Init() 직후 RCC->CSR 로 직전 리셋 원인을 캡처한다(1회성 플래그).
+  *   2) RTC 를 LSI(또는 LSE) 로 구동하고 WakeUp Timer 를 ck_spre(1Hz)로 건다.
+  *      주기가 65535초를 넘으면 소프트웨어로 나눠서 재장전한다.
+  *   3) 시간이 되면 인터럽트 -> main 루프에서 RS485 로 메시지를 보내고
+  *      마지막 바이트 송신 완료를 기다린 뒤 HAL_NVIC_SystemReset().
+  *   4) 리셋 횟수는 두 군데에 기록한다.
+  *        - TAMP 백업 레지스터 : 전원이 유지되는 동안의 횟수 (빠름)
+  *        - 내부 Flash        : 전원을 껐다 켜도 남는 누적 횟수
+  *      이 보드는 VBAT 가 VDD 와 함께 꺼지므로 백업 레지스터만으로는
+  *      전원 사이클을 넘어선 횟수를 셀 수 없기 때문이다.
+  *
+  *  저전력 모드에 들어가지 않는다 (__WFI / STOP / STANDBY 미사용).
+  *  MCU 는 리셋 시점까지 계속 돌고, RTC 만 백업 도메인에서 시간을 센다.
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -26,148 +29,31 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
+#include "app_reset.h"
+#include "rs485.h"
+#include "flash_counter.h"
 /* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-/* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 RTC_HandleTypeDef hrtc;
-#if (USE_DEBUG_UART == 1U)
-UART_HandleTypeDef huart_dbg;
-#endif
 
 /* USER CODE BEGIN PV */
-/* RTC Wakeup 인터럽트에서 세워지는 리셋 요청 플래그 */
-static volatile uint8_t g_reset_request = 0U;
-
-/* 부팅 직후 캡처한 RCC 리셋 원인 플래그 */
-static uint32_t g_reset_flags = 0U;
-static uint32_t g_reset_count = 0U;
-
-/* 백업 도메인이 초기화된 채로 부팅했는가 = 전원이 새로 인가된 콜드 부트.
-   이 보드는 VBAT 가 MCU 전원(VDD)에 연결되어 있어 전원 off/on 시 항상 1 이 된다. */
-static uint8_t g_cold_boot = 1U;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_ICACHE_Init(void);
 static void MX_RTC_Init(void);
-#if (USE_DEBUG_UART == 1U)
-static void MX_USART1_UART_Init(void);
+#if (USE_RS485 == 1U)
+static void MX_USART3_UART_Init(void);
 #endif
 
 /* USER CODE BEGIN PFP */
-static void CaptureResetCause(void);
-static void PrintBanner(void);
-#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
-static void PrintHeartbeat(void);
-#endif
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-#if (USE_DEBUG_UART == 1U)
-/* printf() 를 디버그 UART 로 연결 (CubeIDE 의 syscalls.c 가 _write -> __io_putchar 호출) */
-int __io_putchar(int ch)
-{
-  HAL_UART_Transmit(&huart_dbg, (uint8_t *)&ch, 1U, HAL_MAX_DELAY);
-  return ch;
-}
-#endif
-
-/**
-  * @brief  RCC 리셋 플래그를 읽어 저장하고 클리어한다.
-  *         반드시 부팅 직후 한 번만 호출할 것(클리어되면 다음 부팅까지 알 수 없음).
-  */
-static void CaptureResetCause(void)
-{
-  g_reset_flags = RCC->CSR;
-  __HAL_RCC_CLEAR_RESET_FLAGS();
-}
-
-static void PrintBanner(void)
-{
-#if (USE_DEBUG_UART == 1U)
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
-
-  /* GetTime 을 먼저 호출해야 shadow register 가 갱신되고 GetDate 가 유효하다 */
-  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-
-  printf("\r\n==========================================\r\n");
-  printf(" STM32L562 RTC WakeUp Timer Reset\r\n");
-  printf("==========================================\r\n");
-  printf(" Reset cause : ");
-  if (g_reset_flags & RCC_CSR_SFTRSTF)  { printf("SOFTWARE "); }
-  if (g_reset_flags & RCC_CSR_PINRSTF)  { printf("NRST-PIN "); }
-  if (g_reset_flags & RCC_CSR_BORRSTF)  { printf("BOR "); }
-  if (g_reset_flags & RCC_CSR_IWDGRSTF) { printf("IWDG "); }
-  if (g_reset_flags & RCC_CSR_WWDGRSTF) { printf("WWDG "); }
-  if (g_reset_flags & RCC_CSR_LPWRRSTF) { printf("LOW-POWER "); }
-  printf("(CSR=0x%08lX)\r\n", (unsigned long)g_reset_flags);
-  printf(" Boot type   : %s\r\n",
-         (g_cold_boot != 0U) ? "COLD  (power-on, backup domain cleared)"
-                             : "WARM  (reset only, backup domain kept)");
-  printf(" RTC clock   : LSI ~32kHz (internal, +/-5%%)\r\n");
-  printf(" Soft resets since power-on : %lu\r\n", (unsigned long)g_reset_count);
-  printf(" RTC time    : 20%02d-%02d-%02d %02d:%02d:%02d\r\n",
-         sDate.Year, sDate.Month, sDate.Date,
-         sTime.Hours, sTime.Minutes, sTime.Seconds);
-  printf(" Trigger     : RTC WakeUp Timer\r\n");
-  printf(" Next reset in %lu s (%luh %02lum)\r\n",
-         (unsigned long)RESET_PERIOD_SEC,
-         (unsigned long)(RESET_PERIOD_SEC / 3600U),
-         (unsigned long)((RESET_PERIOD_SEC % 3600U) / 60U));
-  printf("------------------------------------------\r\n");
-#endif
-}
-
-#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
-/**
-  * @brief  살아있음 로그. HEARTBEAT_PERIOD_SEC 마다 호출된다.
-  * @note   저전력 모드에 진입하지 않고 계속 동작 중임을 확인하는 용도.
-  */
-static void PrintHeartbeat(void)
-{
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
-  uint32_t up_sec = HAL_GetTick() / 1000U;      /* 부팅 후 경과 [초] */
-  uint32_t remain;
-
-  /* Wakeup Timer 는 RTC 초기화 시점부터 카운트하므로 uptime 으로 환산한다 */
-  remain = (up_sec >= RESET_PERIOD_SEC) ? 0U : (RESET_PERIOD_SEC - up_sec);
-
-  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-
-  printf("[ALIVE] uptime %02lu:%02lu:%02lu | RTC 20%02d-%02d-%02d %02d:%02d:%02d"
-         " | reset in %lu s (%luh %02lum)\r\n",
-         (unsigned long)(up_sec / 3600U),
-         (unsigned long)((up_sec % 3600U) / 60U),
-         (unsigned long)(up_sec % 60U),
-         sDate.Year, sDate.Month, sDate.Date,
-         sTime.Hours, sTime.Minutes, sTime.Seconds,
-         (unsigned long)remain,
-         (unsigned long)(remain / 3600U),
-         (unsigned long)((remain % 3600U) / 60U));
-}
-#endif /* USE_HEARTBEAT_LOG */
-
 /* USER CODE END 0 */
 
 /**
@@ -176,10 +62,6 @@ static void PrintHeartbeat(void)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  uint32_t tick_led = 0U;
-#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
-  uint32_t tick_beat = 0U;
-#endif
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -188,7 +70,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  CaptureResetCause();
+  /* 리셋 원인 플래그는 읽고 지우면 사라지므로 가장 먼저 캡처한다 */
+  AppReset_CaptureCause();
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -199,88 +82,25 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-#if (USE_DEBUG_UART == 1U)
-  MX_USART1_UART_Init();
+  MX_ICACHE_Init();
+#if (USE_RS485 == 1U)
+  MX_USART3_UART_Init();
 #endif
   MX_RTC_Init();
 
   /* USER CODE BEGIN 2 */
-
-  /* 백업 도메인(RTC/TAMP 백업 레지스터) 쓰기 허용 */
-  HAL_PWR_EnableBkUpAccess();
-
-  /* 백업 도메인 보존 여부로 콜드/웜 부트를 구분한다.
-     - 매직 값이 없음  = 백업 도메인이 지워짐 = 전원 off/on (콜드 부트)
-     - 매직 값이 있음  = 소프트 리셋 또는 NRST (웜 부트, RTC 계속 동작 중)
-     VBAT 가 VDD 와 공유되므로 전원을 내렸다 올리면 항상 콜드 부트가 된다.
-     따라서 리셋 횟수는 "이번 전원 인가 이후"의 누적값이다. */
-  if (HAL_RTCEx_BKUPRead(&hrtc, BKP_REG_MAGIC) != BKP_MAGIC_VALUE)
-  {
-    g_cold_boot = 1U;
-    HAL_RTCEx_BKUPWrite(&hrtc, BKP_REG_MAGIC, BKP_MAGIC_VALUE);
-    g_reset_count = 0U;
-  }
-  else
-  {
-    g_cold_boot = 0U;
-    g_reset_count = HAL_RTCEx_BKUPRead(&hrtc, BKP_REG_RESET_COUNT);
-    if (g_reset_flags & RCC_CSR_SFTRSTF)
-    {
-      g_reset_count++;
-    }
-  }
-  HAL_RTCEx_BKUPWrite(&hrtc, BKP_REG_RESET_COUNT, g_reset_count);
-
-  PrintBanner();
+  AppReset_Init();          /* 백업/Flash 카운터 정리 (콜드·웜 부트 판별) */
+  AppReset_PrintBanner();   /* PC 로 리셋 보고 전송                        */
+  AppReset_StartTimer();    /* WakeUp Timer 기동                           */
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* 이 루프는 저전력 모드에 진입하지 않는다.
-       (HAL_PWR_EnterSLEEPMode / STOPMode / STANDBYMode, __WFI 를 쓰지 않음)
-       MCU 는 리셋 시점까지 풀스피드로 계속 동작하며, RTC 는 백업 도메인에서
-       독립적으로 카운트하다가 시간이 되면 인터럽트를 발생시킨다. */
-
-    if (g_reset_request != 0U)
-    {
-      g_reset_request = 0U;
-
-#if (USE_DEBUG_UART == 1U)
-      printf("\r\n[RTC] %lu s elapsed -> Software reset now!\r\n",
-             (unsigned long)RESET_PERIOD_SEC);
-      /* UART 송신 완료 대기 (마지막 문자가 잘리지 않도록) */
-      while (__HAL_UART_GET_FLAG(&huart_dbg, UART_FLAG_TC) == RESET) { }
-#endif
-
-      /* 재시작 후 다시 설정하므로 여기서는 정리만 한다 */
-      HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
-
-      /* ===== 소프트웨어 리셋 ===== */
-      HAL_NVIC_SystemReset();
-      /* 여기로는 절대 돌아오지 않는다 */
-    }
-
-#if (USE_DEBUG_UART == 1U) && (USE_HEARTBEAT_LOG == 1U)
-    /* 살아있음 로그 : HEARTBEAT_PERIOD_SEC 마다 uptime / 남은 시간 출력 */
-    if ((HAL_GetTick() - tick_beat) >= (HEARTBEAT_PERIOD_SEC * 1000U))
-    {
-      tick_beat += (HEARTBEAT_PERIOD_SEC * 1000U);
-      PrintHeartbeat();
-    }
-#endif
-
-#if (USE_STATUS_LED == 1U)
-    /* 살아있음 표시 : LED 500ms 토글 */
-    if ((HAL_GetTick() - tick_led) >= 500U)
-    {
-      tick_led = HAL_GetTick();
-      HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
-    }
-#else
-    (void)tick_led;
-#endif
+    /* 저전력 모드에 진입하지 않는다. 시간이 되면 AppReset_Task() 안에서
+       RS485 로 메시지를 보내고 소프트웨어 리셋한다. */
+    AppReset_Task();
 
     /* USER CODE END WHILE */
 
@@ -291,8 +111,11 @@ int main(void)
 
 /**
   * @brief System Clock Configuration
-  *        SYSCLK = MSI 4MHz (기본값, 저전력/단순 구성)
-  *        RTC    = LSI 32kHz (내부 RC 발진기)
+  *
+  *   SYSCLK = MSI 4 MHz   (PLL 미사용, FLASH 0 wait, 저전력·단순 구성)
+  *   USART3 = HSI16       (SYSCLK 과 무관하게 정확한 보레이트 확보)
+  *                         16MHz/115200 = 138.9 -> 오차 -0.08%
+  *   RTC    = LSI 32kHz 또는 LSE 32.768kHz (main.h 의 RTC_CLOCK_LSE)
   * @retval None
   */
 void SystemClock_Config(void)
@@ -301,8 +124,12 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /* 백업 도메인 쓰기 허용 (RTC 클럭 선택에 필요) */
+  /* 백업 도메인 쓰기 허용 (LSE / RTC 클럭 선택에 필요) */
   HAL_PWR_EnableBkUpAccess();
+
+#if (RTC_CLOCK_LSE == 1U)
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+#endif
 
   /** Configure the main internal regulator output voltage */
   if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
@@ -310,27 +137,24 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /** Initializes the RCC Oscillators : MSI (시스템 클럭) */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;   /* 4 MHz */
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** RTC 용 저속 클럭 : 내부 LSI (~32 kHz)
-    * 외부 크리스탈을 쓰지 않으므로 추가 부품 없이 어떤 보드에서도 기동된다.
-    * 백업 전원이 MCU 전원과 공유되므로 전원을 넣을 때마다 새로 기동되지만,
-    * LSI 는 온칩 RC 발진기라 기동이 빠르고 실패하지 않는다.
-    */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI;
+  /** Initializes the RCC Oscillators */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI | RCC_OSCILLATORTYPE_HSI;
+#if (RTC_CLOCK_LSE == 1U)
+  RCC_OscInitStruct.OscillatorType |= RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+#else
+  RCC_OscInitStruct.OscillatorType |= RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
 #ifdef RCC_LSI_DIV1
-  RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;   /* LSI = 32 kHz (분주 없음) */
+  RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;      /* LSI = 32 kHz (분주 없음) */
 #endif
+#endif
+  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+  RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;        /* 4 MHz */
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;                 /* USART3 용 16MHz */
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -348,12 +172,16 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /** Initializes the peripherals clocks (RTC / USART1) */
+  /** Initializes the peripherals clocks (RTC / USART3) */
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+#if (RTC_CLOCK_LSE == 1U)
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+#else
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
-#if (USE_DEBUG_UART == 1U)
-  PeriphClkInit.PeriphClockSelection |= RCC_PERIPHCLK_USART1;
-  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
+#endif
+#if (USE_RS485 == 1U)
+  PeriphClkInit.PeriphClockSelection |= RCC_PERIPHCLK_USART3;
+  PeriphClkInit.Usart3ClockSelection = RCC_USART3CLKSOURCE_HSI;
 #endif
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -363,8 +191,8 @@ void SystemClock_Config(void)
 
 /**
   * @brief RTC Initialization Function
-  *        - 달력(Calendar) 초기화 (콜드부트 시에만)
-  *        - Wakeup Timer 를 1Hz(ck_spre) 기준 600초로 설정
+  * @note  WakeUp Timer 는 AppReset_StartTimer() 에서 장전한다.
+  *        여기서는 ck_spre 가 정확히 1Hz 가 되도록 프리스케일러만 맞춘다.
   * @retval None
   */
 static void MX_RTC_Init(void)
@@ -372,19 +200,17 @@ static void MX_RTC_Init(void)
   RTC_TimeTypeDef sTime = {0};
   RTC_DateTypeDef sDate = {0};
 
-  /** Initialize RTC Only */
   hrtc.Instance = RTC;
-  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
-  /* LSI 32000 Hz : (127+1) * (249+1) = 32000 -> ck_spre = 1 Hz */
-  hrtc.Init.AsynchPrediv = 127;
-  hrtc.Init.SynchPrediv  = 249;
-  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
-  hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
+  hrtc.Init.HourFormat     = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv   = RTC_ASYNC_PREDIV;   /* main.h 에서 클럭별로 계산 */
+  hrtc.Init.SynchPrediv    = RTC_SYNC_PREDIV;
+  hrtc.Init.OutPut         = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutRemap    = RTC_OUTPUT_REMAP_NONE;
   hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
-  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
-  hrtc.Init.OutPutPullUp = RTC_OUTPUT_PULLUP_NONE;
+  hrtc.Init.OutPutType     = RTC_OUTPUT_TYPE_OPENDRAIN;
+  hrtc.Init.OutPutPullUp   = RTC_OUTPUT_PULLUP_NONE;
 #ifdef RTC_BINARY_NONE
-  hrtc.Init.BinMode = RTC_BINARY_NONE;   /* HAL 버전에 따라 없을 수 있음 */
+  hrtc.Init.BinMode        = RTC_BINARY_NONE;    /* HAL 버전에 따라 없을 수 있음 */
 #endif
   if (HAL_RTC_Init(&hrtc) != HAL_OK)
   {
@@ -392,15 +218,16 @@ static void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-  /* 소프트웨어 리셋 후에는 RTC 가 계속 살아있으므로 달력을 다시 쓰지 않는다.
-     INITS 비트(달력이 한 번이라도 설정되었는지)로 판별한다. */
+  /* 소프트웨어 리셋 후에는 RTC 가 계속 살아 있으므로 달력을 다시 쓰지 않는다.
+     ICSR.INITS = "달력이 한 번이라도 설정되었는가" 비트.
+     이 보드는 VBAT 가 VDD 와 함께 꺼지므로, 전원을 껐다 켜면 INITS 도 0 이
+     되어 아래 달력 초기화가 다시 수행된다(= 전원 인가 시점이 0시 0분 0초). */
   if ((hrtc.Instance->ICSR & RTC_ICSR_INITS) != RTC_ICSR_INITS)
   {
     /* USER CODE END Check_RTC_BKUP */
 
     /** Initialize RTC and set the Time and Date
-      * Wakeup Timer 는 달력 시각과 무관하게 동작하므로 기준값만 넣는다.
-      * (로그의 RTC time 이 리셋 간격을 눈으로 확인하는 용도가 된다) */
+      * WakeUp Timer 는 달력과 무관하게 동작하므로 기준값만 넣는다. */
     sTime.Hours = 0x0;
     sTime.Minutes = 0x0;
     sTime.Seconds = 0x0;
@@ -414,7 +241,7 @@ static void MX_RTC_Init(void)
     sDate.WeekDay = RTC_WEEKDAY_SATURDAY;
     sDate.Month = RTC_MONTH_JANUARY;
     sDate.Date = 0x1;
-    sDate.Year = 0x0;                  /* 2000-01-01 */
+    sDate.Year = 0x0;                   /* 2000-01-01 */
     if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
     {
       Error_Handler();
@@ -425,58 +252,40 @@ static void MX_RTC_Init(void)
   /* USER CODE END Check_RTC_Calendar */
 
   /* USER CODE BEGIN RTC_Init 2 */
-  /** Enable the WakeUp
-    * 주기 파라미터(WUT_CLOCK_SEL / WUT_COUNTER)는 main.h 에서
-    * RESET_PERIOD_SEC 값으로부터 자동 계산된다.
-    *   - 65536초 이하 : CK_SPRE_16BITS, 주기 = (WUT + 1) 초
-    *   - 그 이상      : CK_SPRE_17BITS, 주기 = (WUT + 1 + 65536) 초
-    * 30시간(108000초) -> CK_SPRE_17BITS, WUT = 42463
-    *   (42463 + 1 + 65536 = 108000)
-    */
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, WUT_COUNTER,
-                                  WUT_CLOCK_SEL, 0U) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  /* WakeUp Timer 장전은 AppReset_StartTimer() 에서 한다
+     (주기를 실행 중에도 바꿀 수 있어야 하므로). */
   /* USER CODE END RTC_Init 2 */
 }
 
-#if (USE_DEBUG_UART == 1U)
+#if (USE_RS485 == 1U)
 /**
-  * @brief USART1 Initialization Function (디버그 로그용, 115200-8-N-1)
+  * @brief USART3 Initialization Function (RS485 Driver Enable 모드)
+  * @note  실제 설정은 rs485.c 의 RS485_Init() 안에 있다.
   * @retval None
   */
-static void MX_USART1_UART_Init(void)
+static void MX_USART3_UART_Init(void)
 {
-  huart_dbg.Instance = DBG_UART_INSTANCE;
-  huart_dbg.Init.BaudRate = 115200;
-  huart_dbg.Init.WordLength = UART_WORDLENGTH_8B;
-  huart_dbg.Init.StopBits = UART_STOPBITS_1;
-  huart_dbg.Init.Parity = UART_PARITY_NONE;
-  huart_dbg.Init.Mode = UART_MODE_TX_RX;
-  huart_dbg.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart_dbg.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart_dbg.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart_dbg.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart_dbg.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart_dbg) != HAL_OK)
+  /* USER CODE BEGIN USART3_Init 2 */
+  RS485_Init();
+  /* USER CODE END USART3_Init 2 */
+}
+#endif
+
+/**
+  * @brief ICACHE Initialization Function
+  * @retval None
+  */
+static void MX_ICACHE_Init(void)
+{
+  if (HAL_ICACHE_ConfigAssociativityMode(ICACHE_1WAY) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart_dbg, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart_dbg, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart_dbg) != HAL_OK)
+  if (HAL_ICACHE_Enable() != HAL_OK)
   {
     Error_Handler();
   }
 }
-#endif /* USE_DEBUG_UART */
 
 /**
   * @brief GPIO Initialization Function
@@ -484,7 +293,6 @@ static void MX_USART1_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-#if (USE_STATUS_LED == 1U)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
@@ -492,6 +300,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
+#if (USE_STATUS_LED == 1U)
   HAL_GPIO_WritePin(LED_GPIO_PORT, LED_PIN, GPIO_PIN_RESET);
 
   GPIO_InitStruct.Pin = LED_PIN;
@@ -499,29 +308,32 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_PORT, &GPIO_InitStruct);
-#else
-  __HAL_RCC_GPIOA_CLK_ENABLE();
 #endif
+
+#if (USE_RS485 == 1U) && (RS485_USE_HW_DE == 0U)
+  /* 소프트웨어 DE 제어 모드일 때만 DE 핀을 일반 출력으로 잡는다.
+     (하드웨어 DE 모드에서는 HAL_UART_MspInit 에서 AF7 로 설정된다) */
+  HAL_GPIO_WritePin(RS485_DE_GPIO_PORT, RS485_DE_PIN, GPIO_PIN_RESET);
+
+  GPIO_InitStruct.Pin = RS485_DE_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(RS485_DE_GPIO_PORT, &GPIO_InitStruct);
+#endif
+
+  (void)GPIO_InitStruct;
 }
 
 /* USER CODE BEGIN 4 */
-
-/**
-  * @brief  RTC Wakeup Timer 인터럽트 콜백 (RESET_PERIOD_SEC 마다 호출, 기본 24시간)
-  * @note   ISR 컨텍스트이므로 여기서 바로 리셋하지 않고 플래그만 세운다.
-  *         (즉시 리셋을 원하면 여기서 HAL_NVIC_SystemReset() 을 호출해도 된다.)
-  */
-void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc_handle)
-{
-  UNUSED(hrtc_handle);
-  g_reset_request = 1U;
-}
-
-
+/* HAL_RTCEx_WakeUpTimerEventCallback() 은 app_reset.c 에 있다. */
+/* HAL_UART_RxCpltCallback() / HAL_UART_ErrorCallback() 은 rs485.c 에 있다.  */
 /* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
+  * @note   LSE 를 선택했는데 크리스탈이 없으면 여기서 멈춘다.
+  *         그 경우 main.h 의 RTC_CLOCK_LSE 를 0 으로 바꿀 것.
   * @retval None
   */
 void Error_Handler(void)
@@ -530,6 +342,12 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+#if (USE_STATUS_LED == 1U)
+    /* 에러 표시 : LED 빠르게 깜빡임 (HAL_Delay 는 IRQ 정지 상태라 못 씀) */
+    volatile uint32_t i;
+    HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
+    for (i = 0U; i < 100000U; i++) { __NOP(); }
+#endif
   }
   /* USER CODE END Error_Handler_Debug */
 }
@@ -542,6 +360,8 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
+  UNUSED(file);
+  UNUSED(line);
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

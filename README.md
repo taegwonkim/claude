@@ -1,10 +1,14 @@
-# STM32L562 — RTC Wakeup Timer 로 주기적 Software Reset
+# STM32L562RCT6 — RTC WakeUp Timer 주기적 Software Reset + RS485 보고
 
-STM32CubeMX / STM32CubeIDE 기반, **STM32L562** 에서 RTC Wakeup Timer 를 사용해
-**부팅 시점으로부터 일정 시간마다 소프트웨어 리셋**을 거는 프로젝트입니다.
+STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
+스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485)로
+PC 에 전송**합니다.
 
-- RTC 클럭 : **내부 LSI(~32 kHz)** — 외부 크리스탈 불필요
-- 리셋 주기 : **1분 ~ 30시간** 설정 가능 (기본값 **30시간**)
+- 대상 : **STM32L562RCT6 (LQFP64)**, TrustZone Disabled
+- 리셋 주기 : **분 단위 / 시간 단위** 중 선택 (기본 **5분**)
+- 보고 : **USART3 RS485** (PB10 TX / PB11 RX / PB14 DE), 115200-8-N-1
+- RTC 클럭 : 내부 **LSI(~32 kHz)** 기본, 크리스탈이 있으면 LSE 로 전환 가능
+- **VBAT 가 MCU 전원과 함께 on/off 되는 보드**를 전제로 설계 ([1-3절](#1-3-백업-전원vbat-이-vdd-와-함께-꺼진다-이-프로젝트의-전제))
 - 저전력 모드에 진입하지 않고 **계속 동작**하다가 시간이 되면 리셋
 
 ---
@@ -16,29 +20,59 @@ STM32CubeMX / STM32CubeIDE 기반, **STM32L562** 에서 RTC Wakeup Timer 를 사
 | 타이머 | RTC Wakeup Timer (WUT) |
 | RTC 클럭 | 내부 **LSI ~32 kHz** (`AsynchPrediv=127`, `SynchPrediv=249`) |
 | 카운트 클럭 | `ck_spre` = 1 Hz |
-| 기본 설정 | `RTC_WAKEUPCLOCK_CK_SPRE_17BITS`, 카운터 `42463` → **108000 s = 30시간** |
 | 인터럽트 | `RTC_IRQn` → `HAL_RTCEx_WakeUpTimerEventCallback()` |
 | 리셋 방법 | `HAL_NVIC_SystemReset()` (Cortex-M33 `AIRCR.SYSRESETREQ`) |
+| 보고 | `USART3` RS485 Driver Enable 모드 |
 
-Wakeup Timer 는 **자동 재장전(auto-reload)** 방식이라 한 번만 설정하면 계속
-반복되고, **달력 시각과 무관하게** 동작하므로 시각 동기화가 필요 없습니다.
+```
+전원 ON
+  └─ COLD BOOT  : 백업 레지스터에 매직값 없음
+                  → 카운터 0 으로 시작, Flash 의 "전원 인가 횟수" +1
+                  → RS485 로 배너 전송 → WakeUp Timer 장전
+       │
+       │  MCU 는 계속 풀스피드로 동작 (저전력 모드 미사용)
+       │  LED 500ms 토글 + 30초마다 [ALIVE] 로그
+       ▼
+  시간 만료 → RTC_IRQHandler → 콜백에서 플래그만 set
+       │
+       ▼
+  main 루프
+       ├─ 백업 레지스터에 "내가 거는 리셋" 표식 기록
+       ├─ Flash 의 "총 리셋 횟수" +1 기록
+       ├─ RS485 로 "*** SOFTWARE RESET ... ***" 전송
+       ├─ 마지막 바이트 송신 완료(TC) 대기   ← 없으면 메시지 꼬리가 잘린다
+       └─ HAL_NVIC_SystemReset()
+       │
+       ▼
+  WARM BOOT : 매직값 있음 + 표식 있음 → 횟수 +1 → 배너 전송 → 다시 장전 ... 반복
+```
 
-인터럽트 콜백에서는 플래그만 세우고 `main()` 루프에서 리셋합니다.
-(ISR 안에서 바로 리셋해도 되지만, UART 로그를 끝까지 내보내기 위함)
+인터럽트 콜백에서는 **플래그만 세우고** `main()` 루프에서 리셋합니다.
+ISR 안에서 바로 리셋하면 RS485 로그가 중간에서 끊깁니다.
 
-### 18.2시간을 넘는 주기는 17비트 모드가 필요합니다
+### 1-0. 18.2시간을 넘는 주기는 소프트웨어로 나눠 장전합니다
 
-WUT 카운터는 16비트라서 `ck_spre`(1 Hz) 기준 **최대 65536초 ≈ 18.2시간**입니다.
-그보다 긴 주기는 `WUCKSEL[2:1] = 11` (**CK_SPRE_17BITS**) 모드로 카운터에
-**2¹⁶(65536)을 더해야** 합니다.
+WUT 카운터는 16비트라서 `ck_spre`(1 Hz) 기준 **한 번에 최대 65535초 ≈ 18.2시간**
+입니다. 이 프로젝트는 주기가 그보다 길면 **여러 조각으로 나눠 이어서 장전**합니다.
 
-| 모드 | 주기 계산 | 범위 |
-|---|---|---|
-| `CK_SPRE_16BITS` | `(WUT + 1)` 초 | 1 s ~ 65536 s (~18.2 h) |
-| `CK_SPRE_17BITS` | `(WUT + 1 + 65536)` 초 | 65537 s ~ 131072 s (~36.4 h) |
+```c
+/* app_reset.c */
+static void AppReset_ArmChunk(void)
+{
+  uint32_t chunk = (s_remain_sec > WUT_MAX_CHUNK_SEC) ? WUT_MAX_CHUNK_SEC : s_remain_sec;
+  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, chunk - 1U, RTC_WAKEUPCLOCK_CK_SPRE_16BITS, 0U);
+  s_remain_sec -= chunk;
+}
+```
 
-`main.h` 가 `RESET_PERIOD_SEC` 값을 보고 **모드와 카운터를 컴파일 타임에 자동
-계산**하므로, 주기를 바꿀 때 이 계산을 신경 쓸 필요는 없습니다.
+24시간 = 65535 + 20865 (2조각), 48시간 = 65535 + 65535 + 41730 (3조각).
+마지막 조각이 끝났을 때만 리셋합니다.
+
+> 하드웨어에는 `CK_SPRE_17BITS` 모드(카운터에 2¹⁶을 더해 최대 약 36.4시간)도
+> 있지만, 이 프로젝트는 **한 가지 모드(16BITS)만 쓰는 대신 범위 제한을 없애는**
+> 쪽을 택했습니다. 재장전에 드는 시간은 18.2시간당 수 ms 수준이라 LSI 오차
+> (±5%)에 비하면 무시할 수 있습니다.
 
 ---
 
@@ -58,12 +92,12 @@ WUT 카운터는 16비트라서 `ck_spre`(1 Hz) 기준 **최대 65536초 ≈ 18.
 | `HAL_PWR_EnterSTANDBYMode()` / `HAL_PWREx_EnterSHUTDOWNMode()` | ❌ 없음 |
 | `__WFI()` / `__WFE()` | ❌ 없음 |
 
-`main()` 의 `while(1)` 은 `HAL_GetTick()` 을 폴링하며 LED 를 토글하는
-**완전 활성 상태의 busy loop** 입니다. MCU 는 리셋 시점까지 계속 동작하고,
-애플리케이션 코드는 `/* USER CODE BEGIN 3 */` 에 넣으면 됩니다.
+`main()` 의 `while(1)` 은 `AppReset_Task()` 를 폴링하는 **완전 활성 상태의
+busy loop** 입니다. 애플리케이션 코드는 `/* USER CODE BEGIN 3 */` 에 넣으면 됩니다.
 
 > 반대로 저전력이 필요해지면 이 루프 안에 `HAL_PWREx_EnterSTOP2Mode()` 한 줄만
 > 넣으면 됩니다. RTC 는 STOP 모드에서도 계속 돌기 때문에 나머지는 그대로입니다.
+> (단, STOP 에서는 RS485 수신 명령이 동작하지 않습니다)
 
 ---
 
@@ -76,67 +110,115 @@ LSI 는 온칩 RC 발진기라 **외부 부품이 필요 없고 기동이 빠르
 | 설정 주기 | LSI ±5% 기준 실제 리셋 시점 |
 |---|---|
 | 1분 | 57초 ~ 63초 |
+| **5분** (기본) | **4분 45초 ~ 5분 15초** |
 | 30분 | 28.5분 ~ 31.5분 |
 | 1시간 | 57분 ~ 63분 |
-| 24시간 | 22.8시간 ~ 25.2시간 |
-| **30시간** | **28.5시간 ~ 31.5시간 (±1.5시간)** |
+| 24시간 | 22.8시간 ~ 25.2시간 (±1.2시간) |
 
-"대략 하루에 한 번 리프레시" 같은 용도라면 문제없지만, **분 단위 정확도가
-필요하다면 LSI 로는 불가능**합니다. 그 경우 32.768 kHz 외부 크리스탈(LSE)이
-필요하고, 회로가 바뀌므로 별도 검토가 필요합니다.
+"대략 N분/N시간마다 리프레시" 용도라면 문제없지만, **정확도가 중요하면
+32.768 kHz 외부 크리스탈(LSE)** 이 필요합니다. 크리스탈이 실제로 달려 있다면
+`main.h` 한 줄로 전환됩니다.
 
-> 실제 오차는 개체·온도마다 다르므로, 정확도가 중요하면 보드에서 한 번
-> 실측해 보고 `RESET_PERIOD_SEC` 를 보정하는 방법도 있습니다.
+```c
+#define RTC_CLOCK_LSE   1U    /* 크리스탈이 실제로 있을 때만 1 로! */
+```
+
+> **크리스탈이 없는데 `1` 로 두면 부팅이 멈춥니다.** `HAL_RCC_OscConfig()` 가
+> LSE 기동 타임아웃 후 `Error_Handler()` 로 빠지고, 상태 LED 가 빠르게
+> 깜빡입니다. 그럴 땐 `0` 으로 되돌리세요.
+>
+> 실측 보정도 가능합니다. 로그의 `RTC time` 이 설정 주기보다 일정 비율로
+> 빠르거나 느리면 `RESET_PERIOD_VALUE` 를 그만큼 보정하면 됩니다.
 
 ---
 
-## 1-3. 백업 전원(VBAT) 구성 — 이 프로젝트의 전제
+## 1-3. 백업 전원(VBAT)이 VDD 와 함께 꺼진다 — 이 프로젝트의 전제
 
-**VBAT 에 별도 배터리/슈퍼캡이 없고, VBAT 가 MCU 전원(VDD)에 연결되어 있다고
-가정합니다.** 즉 백업 도메인(RTC, TAMP 백업 레지스터)은 MCU 전원이 살아있는
-동안에만 유지됩니다.
+**VBAT 에 별도 배터리/슈퍼캡이 없고 VBAT 가 MCU 전원(VDD)에 연결되어 있습니다.**
+즉 백업 도메인(RTC, TAMP 백업 레지스터)은 MCU 전원이 살아있는 동안에만 유지됩니다.
 
-| 이벤트 | RTC 달력 | 백업 레지스터 | WUT 설정 |
-|---|---|---|---|
-| **소프트웨어 리셋** (`HAL_NVIC_SystemReset()`) | ✅ 유지 | ✅ 유지 | ✅ 유지 |
-| **NRST 핀 리셋 / 디버거 리셋** | ✅ 유지 | ✅ 유지 | ✅ 유지 |
-| **전원 off → on** | ❌ 초기화 | ❌ 초기화 | ❌ 초기화 |
+| 이벤트 | RTC 달력 | 백업 레지스터 | WUT 설정 | 내부 Flash |
+|---|---|---|---|---|
+| **소프트웨어 리셋** (`HAL_NVIC_SystemReset()`) | ✅ 유지 | ✅ 유지 | ✅ 유지 | ✅ 유지 |
+| **NRST 핀 리셋 / 디버거 리셋** | ✅ 유지 | ✅ 유지 | ✅ 유지 | ✅ 유지 |
+| **전원 off → on** | ❌ 초기화 | ❌ 초기화 | ❌ 초기화 | ✅ 유지 |
 
 **소프트웨어 리셋으로는 백업 도메인이 지워지지 않고, 이건 VBAT 배선과
 무관합니다.** 리셋 직후에도 RTC 는 멈추지 않고 계속 돌기 때문에 주기 리셋
-동작은 배터리 유무와 상관없이 그대로입니다.
+동작 자체는 배터리 유무와 상관없이 그대로입니다.
 
-또한 이 프로젝트는 **부팅 시점 기준**으로 카운트하므로, 전원을 껐다 켜면
-그 시점부터 다시 세기 시작하는 것이 정상 동작입니다. 달력 시각이 지워지는
-것도 문제가 되지 않습니다.
+문제가 되는 건 **"리셋 횟수"** 입니다. 전원을 내리면 백업 레지스터가 0 이 되므로
+백업 레지스터만으로는 전원 사이클을 넘어선 횟수를 셀 수 없습니다.
+그래서 횟수를 두 군데에 나눠서 관리합니다.
 
-콜드/웜 부트는 백업 레지스터의 매직 값으로 판별해 로그에 표시합니다.
+| 저장 위치 | 내용 | 소프트 리셋 | 전원 OFF→ON |
+|---|---|---|---|
+| TAMP 백업 레지스터 | 전원 인가 후 리셋/부팅 횟수, 누적 동작 시간, 실행 중 바뀐 주기 | **유지** | **소실** |
+| 내부 Flash 마지막 페이지 | 총 리셋 횟수, 전원 인가 횟수 | 유지 | **유지** |
 
+### ① 콜드 부트 판별 — 백업 레지스터 매직값
+
+```c
+if (BKP_Read(BKP_REG_MAGIC) != BKP_MAGIC_VALUE)  /* COLD : 전원을 새로 넣었다 */
 ```
- Boot type   : COLD  (power-on, backup domain cleared)   <- 전원 인가
- Boot type   : WARM  (reset only, backup domain kept)    <- 소프트/NRST 리셋
- Soft resets since power-on : 3
-```
 
-> 리셋 횟수는 **"이번 전원 인가 이후"** 의 누적값이며, 전원을 내리면 0 이 됩니다.
-> RTC 달력도 콜드 부트마다 `2000-01-01 00:00:00` 으로 초기화되는데, 오히려
-> 이게 주기 검증에 편합니다 (30시간 뒤 로그가 `2000-01-02 06:00:00` 이면 정확).
+`RCC->CSR` 의 리셋 플래그만으로는 구분이 애매합니다. NRST 핀 리셋과 전원
+인가(BOR)가 둘 다 `PINRSTF` 를 세우는 경우가 있는데, 전자는 백업 도메인이
+살아있고 후자는 지워집니다. 매직값 방식은 이 차이를 정확히 잡아냅니다.
+
+### ② "내가 건 리셋" 표식 — 디버거 리셋과 구분
+
+`SFTRSTF` 플래그만 보면 디버거가 건 리셋이나 다른 코드가 부른
+`NVIC_SystemReset()` 까지 카운트에 섞입니다. 그래서 리셋 **직전에**
+`BKP_REG_PENDING` 에 표식(`0x52535421`)을 남기고, 부팅 시 표식이 있을 때만
+RTC 리셋으로 셉니다.
+
+### ③ 전원을 넘어가는 누적 횟수는 내부 Flash 에
+
+`flash_counter.c` 가 내부 Flash **마지막 페이지**(STM32L562RCT6 = `0x0803F800`,
+512KB 품목이면 `0x0807F800`)에 16바이트 레코드를 덧붙여 기록합니다.
+
+- 레코드 = `[64bit 데이터][데이터의 보수]` — 쓰다 만 레코드를 걸러냅니다.
+- 페이지가 꽉 차면(128개) 지우고 처음부터 다시 씁니다.
+  → **128번 저장마다 erase 1번.** Flash 지우기 수명 10,000회 기준
+  1,280,000번 저장 가능. 5분 주기(하루 288회)면 약 12년입니다.
+- 저장 주소는 `FLASHSIZE_BASE` 의 **실제 칩 용량에서 런타임 계산**하므로
+  256KB / 512KB 품목 모두 자동 대응합니다. 듀얼뱅크(출하 기본, 2KB 페이지)와
+  싱글뱅크(4KB 페이지)도 `FLASH_OPTR.DBANK` 를 보고 자동으로 맞춥니다.
+
+> **주의** — 마지막 페이지를 데이터로 쓰므로 프로그램이 그 영역까지 커지면
+> 안 됩니다. 이 예제는 수십 KB라 여유가 많지만, 코드가 커질 것 같으면
+> 링커 스크립트(`STM32L562RCTX_FLASH.ld`)의 `FLASH` `LENGTH` 를
+> `256K` → `254K` 로 줄여 두세요.
+>
+> Flash 저장이 필요 없으면 `USE_FLASH_COUNTER` 를 `0` 으로 두세요.
+> 그러면 "전원 인가 후 횟수"만 보고합니다.
+
+### ④ RTC 달력 재초기화
+
+`MX_RTC_Init()` 에서 `ICSR.INITS` 비트(달력이 한 번이라도 설정됐는지)를 보고,
+설정된 적 있으면 달력을 다시 쓰지 않습니다. 소프트 리셋 후에는 RTC 가 계속
+돌고 있으므로 건드리지 않고, 전원을 껐다 켜면 `INITS = 0` 이라 자동으로
+`2000-01-01 00:00:00` 으로 다시 초기화됩니다.
+
+오히려 이게 주기 검증에 편합니다 — 부팅할 때마다 찍히는 `RTC time` 이
+설정 주기만큼 늘어나면 정상입니다.
 
 ---
 
 ## 1-4. 살아있음(heartbeat) 로그
 
-계속 동작 중인지 확인하기 쉽도록 **1분마다 uptime 과 리셋까지 남은 시간**을
-UART 로 출력합니다.
+계속 동작 중인지 확인하기 쉽도록 **30초마다 uptime 과 리셋까지 남은 시간**을
+RS485 로 출력합니다.
 
 ```c
 #define USE_HEARTBEAT_LOG     1U    /* 0 이면 출력 안 함 */
-#define HEARTBEAT_PERIOD_SEC  60U   /* 출력 주기 [초] */
+#define HEARTBEAT_PERIOD_SEC  30U   /* 출력 주기 [초] */
 ```
 
 ```
-[ALIVE] uptime 00:01:00 | RTC 2000-01-01 00:01:00 | reset in 107940 s (29h 59m)
-[ALIVE] uptime 00:02:00 | RTC 2000-01-01 00:02:00 | reset in 107880 s (29h 58m)
+[ALIVE] up 00:00:30 | next reset in 00:04:30 | resets 0 (total 41)
+[ALIVE] up 00:01:00 | next reset in 00:04:00 | resets 0 (total 41)
 ```
 
 LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 육안/로그 양쪽으로
@@ -144,172 +226,273 @@ LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 �
 
 ---
 
-## 2. 파일 구성
+## 2. 하드웨어 연결
+
+### 2-1. 핀 배치 (STM32L562RCT6, LQFP64)
+
+| 핀 | 기능 | 비고 |
+|---|---|---|
+| **PB10** | USART3_TX (AF7) | 트랜시버 **DI** |
+| **PB11** | USART3_RX (AF7) | 트랜시버 **RO** |
+| **PB14** | USART3_DE (AF7) | 트랜시버 **DE** (+ `/RE`) |
+| PA5 | 상태 LED (GPIO_Output) | 500ms 토글. 안 쓰면 `USE_STATUS_LED 0` |
+| PA13/PA14 | SWDIO / SWCLK | 디버거 |
+
+> PB14 가 이미 다른 용도로 쓰이고 있으면 `main.h` 의 `RS485_DE_PIN` /
+> `RS485_DE_GPIO_PORT` 를 원하는 핀으로 바꾸고 `RS485_USE_HW_DE` 를 `0` 으로
+> 두세요. 그러면 그 핀을 **일반 GPIO 로 소프트웨어 토글**합니다.
+> (USART3_DE 대체 핀은 PB1 / PD2 / PD12 이지만 LQFP64 에서는 PB1 만 나옵니다.
+> CubeMX 핀아웃 화면에서 핀을 클릭하면 그 핀이 지원하는 신호가 뜹니다.)
+
+### 2-2. RS485 트랜시버 배선 (MAX3485 / SP3485 / SN65HVD3082 등)
+
+```
+  STM32L562                     트랜시버                RS485 선로
+  PB10 (TX) ───────────────────► DI
+  PB11 (RX) ◄─────────────────── RO
+  PB14 (DE) ───────────┬───────► DE
+                       └───────► /RE      ← 묶기를 권장 (아래 설명)
+                                  A  ──────────► A  (+)
+                                  B  ──────────► B  (−)
+                                  GND ────────── GND
+```
+
+- **`/RE` 를 `DE` 와 묶는 것을 권장**합니다. 송신 중에는 수신이 꺼지므로
+  자기 송신이 되돌아오는 에코가 없습니다.
+- `/RE` 를 GND 에 고정해 항상 수신 상태로 두어도 동작합니다. 이 경우 자기
+  송신이 그대로 되돌아오는데, `RS485_Write()` 가 송신 직후 수신 버퍼를 비워
+  에코를 명령으로 오인하지 않도록 처리합니다.
+- 선로 **양 끝단**에 120Ω 종단 저항. 필요하면 A/B 에 바이어스 저항
+  (560Ω~1kΩ 풀업/풀다운)을 달아 유휴 상태를 확정하세요. 바이어스가 없으면
+  아무도 송신하지 않을 때 선로가 플로팅이라 수신 에러가 자주 납니다.
+  (`HAL_UART_ErrorCallback()` 에서 수신을 재무장하므로 멈추지는 않습니다)
+- PC 쪽은 USB-RS485 컨버터를 쓰고 터미널을 **115200-8-N-1** 로 엽니다.
+
+### 2-3. DE 타이밍
+
+`RS485_USE_HW_DE = 1` 이면 USART3 하드웨어가 첫 바이트 전에 DE 를 올리고
+마지막 바이트 뒤에 내려줍니다. 앞뒤 여유 시간은 샘플 단위로 지정합니다.
+
+```c
+#define RS485_DE_ASSERT_TIME    8U   /* 8/16 = 0.5 비트시간 */
+#define RS485_DE_DEASSERT_TIME  8U
+```
+
+`0` 이면 소프트웨어 토글 모드이고, `HAL_UART_Transmit()` 후 `TC` 플래그를
+기다린 뒤 DE 를 내립니다.
+
+---
+
+## 3. 파일 구성
 
 ```
 .
 ├── STM32L562_RTC_WakeUp_Reset.ioc   # CubeMX 설정 파일 (시작점)
 ├── Core/
 │   ├── Inc/
-│   │   ├── main.h                   # 주기, 핀, 로그 설정
+│   │   ├── main.h                   # ★ 모든 사용자 설정이 여기 있음
+│   │   ├── app_reset.h
+│   │   ├── rs485.h
+│   │   ├── flash_counter.h
 │   │   └── stm32l5xx_it.h
 │   └── Src/
-│       ├── main.c                   # RTC 초기화 + 주기 리셋 로직
-│       ├── stm32l5xx_hal_msp.c      # RTC/UART MSP (클럭, NVIC, GPIO)
-│       └── stm32l5xx_it.c           # RTC_IRQHandler
+│       ├── main.c                   # 클럭/주변장치 초기화, main 루프
+│       ├── app_reset.c              # 콜드·웜 판별, 카운터, WUT 장전, 리셋, 배너
+│       ├── rs485.c                  # USART3 RS485(DE) 송수신
+│       ├── flash_counter.c          # Flash 기반 비휘발성 카운터
+│       ├── stm32l5xx_hal_msp.c      # RTC/USART3 클럭·GPIO·NVIC
+│       └── stm32l5xx_it.c           # RTC_IRQHandler, USART3_IRQHandler
 └── README.md
 ```
 
 > HAL 드라이버(`Drivers/`), 링커 스크립트, `startup_stm32l562xx.s`, `syscalls.c` 는
-> 용량이 커서 포함하지 않았습니다. 3장대로 CubeMX/CubeIDE 에서 프로젝트를 만든 뒤
-> 위 소스 4개를 덮어쓰면 바로 빌드됩니다.
+> 용량이 커서 포함하지 않았습니다. 4장대로 CubeMX/CubeIDE 에서 프로젝트를 만든 뒤
+> 위 소스를 덮어쓰고 추가하면 바로 빌드됩니다.
 
 ---
 
-## 3. STM32CubeMX / CubeIDE 설정 순서
+## 4. STM32CubeMX / CubeIDE 설정 순서
 
-### 3-1. 프로젝트 생성
-1. STM32CubeIDE → `File > New > STM32 Project`
-2. Part Number 에 **STM32L562ZET6Q** (또는 사용 중인 파트) 입력 후 선택
-3. 프로젝트 이름: `STM32L562_RTC_WakeUp_Reset`, Targeted Language: **C**
-4. **"Options for TrustZone" 창이 뜨면 `TrustZone: Disabled` 선택**
-   - TrustZone 을 켜면 Secure/NonSecure 두 프로젝트가 생기고 RTC 인터럽트가
-     `RTC_S_IRQn` / `RTC_S_IRQHandler` 로 바뀝니다.
+### 4-1. 프로젝트 생성
 
-### 3-2. 클럭 설정 (RCC / Clock Configuration)
-- **RCC** → `Low Speed Clock (LSE)`: **Disable 그대로** (내부 LSI 사용)
-- **Clock Configuration 탭**
-  - System Clock Mux: **MSI (4 MHz)** — 기본값 그대로
-  - **RTC Clock Mux: `LSI`**
+1. CubeMX → **File ▸ New Project** → MCU 선택기에서 `STM32L562RCT6` 검색 →
+   LQFP64 패키지 선택.
+   - 선택기에 `STM32L562RCTx` 가 없으면 **`STM32L562RETx`** 를 고르세요.
+     핀 배치와 주변장치가 동일하고 Flash 용량만 다릅니다. Flash 저장 주소를
+     런타임에 계산하므로 코드 수정이 필요 없습니다.
+2. **TrustZone 활성화 여부를 묻는 창에서 반드시 `Without TrustZone`
+   (TZEN Disabled) 을 선택**합니다. 켜면 Secure/Non-secure 두 프로젝트가
+   생성되고 RTC 인터럽트도 `RTC_S_IRQn` 으로 바뀝니다.
 
-### 3-3. RTC 설정 (Timers → RTC)
-- **Mode**
-  - ☑ `Activate Clock Source`
-  - ☑ `Activate Calendar`
-  - `WakeUp` → **`Internal WakeUp`**
-- **Configuration → Parameter Settings**
+### 4-2. System Core
 
-  | 항목 | 값 |
-  |------|------|
-  | Asynchronous Predivider value | `127` |
-  | Synchronous Predivider value | `249` |
-  | Wake Up Clock | `RTC_WAKEUPCLOCK_CK_SPRE_17BITS` |
-  | Wake Up Counter | `42463` (30시간) |
+| 항목 | 설정 |
+|---|---|
+| **SYS** | Debug = `Serial Wire` |
+| **RCC** | High Speed Clock (HSE) = `Disable` |
+| | Low Speed Clock (LSE) = `Disable` (크리스탈이 있으면 `Crystal/Ceramic Resonator`) |
+| **ICACHE** | Activated 체크 (1-way) |
 
-  → `(127+1) × (249+1) = 32000` 이 되어 LSI 32 kHz 에서 `ck_spre = 1 Hz`
-  → `42463 + 1 + 65536 = 108000초 = 30시간`
-  → CubeMX 버전에 따라 17BITS 항목이 목록에 없을 수 있는데, 코드(`main.h`)의
-    자동 계산 값이 최종 적용되므로 문제없습니다.
+### 4-3. RTC (Timers → RTC)
 
-- **Configuration → NVIC Settings** → ☑ **`RTC global interrupt`** (Priority 5 권장)
+- **Activate Clock Source** 체크
+- **Activate Calendar** 체크
+- **WakeUp** → `Internal WakeUp` 체크
+- Parameter Settings
+  - Asynchronous Predivider value : `127`
+  - Synchronous Predivider value : `249` (LSI) / `255` (LSE)
+  - Wake Up Clock : `RTC_WAKEUPCLOCK_CK_SPRE_16BITS`
+  - Wake Up Counter : `299` (아무 값이어도 됩니다. 실제 값은 코드에서 넣습니다)
+- **NVIC Settings** → `RTC global interrupt` 체크, Preemption Priority `5`
 
-### 3-4. (선택) 디버그 UART / LED
-- `USART1` → Mode **Asynchronous**, Baud rate **115200** (PA9=TX, PA10=RX)
-- `PA5` → **GPIO_Output** (상태 LED)
-- 보드가 다르면 `Core/Inc/main.h` 상단의 핀 매크로만 수정하세요.
-  - 예) NUCLEO-L552ZE-Q 는 VCP 가 **LPUART1(PG7/PG8)**, LD1 이 **PC7**
-  - 로그가 필요 없으면 `#define USE_DEBUG_UART 0`
+### 4-4. USART3 (RS485)
 
-### 3-5. 코드 생성 & 소스 반영
-1. `Project Manager` → Toolchain **STM32CubeIDE** → **GENERATE CODE (Alt+K)**
-2. 생성된 프로젝트의 아래 파일을 이 저장소의 파일로 덮어쓰기
-   - `Core/Inc/main.h`, `Core/Src/main.c`,
-     `Core/Src/stm32l5xx_hal_msp.c`, `Core/Src/stm32l5xx_it.c`
-3. 빌드(Ctrl+B) 후 다운로드/디버그 실행
+- Mode : `Asynchronous`
+- **Hardware Flow Control (RS485)** : `Driver Enable`
+  → PB14 가 `USART3_DE` 로 잡힙니다.
+  - CubeMX 버전에 따라 이 항목이 안 보일 수 있습니다. **없어도 됩니다.**
+    `rs485.c` 가 `HAL_RS485Ex_Init()` 를 직접 호출하고,
+    `stm32l5xx_hal_msp.c` 가 PB14 를 AF7 로 직접 설정합니다.
+    다만 CubeMX 로 재생성할 때 핀이 겹치지 않도록 PB14 는 비워 두세요.
+- Parameter Settings : 115200 / 8bit / None / 1stop
+- **NVIC Settings** → `USART3 global interrupt` 체크, Preemption Priority `6`
+  (PC 명령 수신용. `USE_RS485_CMD 0` 이면 불필요)
+- 핀아웃에서 **PB10 = USART3_TX, PB11 = USART3_RX** 확인
 
-> 핵심 코드는 모두 `/* USER CODE BEGIN ... END */` 블록 안에 있어서
-> CubeMX 에서 재생성해도 보존됩니다.
+### 4-5. GPIO
 
----
+- **PA5** 클릭 → `GPIO_Output` → User Label `STATUS_LED`
 
-## 4. 리셋 주기 변경
+### 4-6. Clock Configuration
 
-`Core/Inc/main.h` 의 값 하나만 바꾸면 모드와 카운터는 자동 계산됩니다.
+| 항목 | 값 | 이유 |
+|---|---|---|
+| System Clock Mux | **MSI** (4 MHz) | PLL 불필요, Flash 0 wait, 단순/저전력 |
+| **USART3 Clock Mux** | **HSI16** | 시스템 클럭과 분리해 보레이트 정확도 확보 |
+| RTC Clock Mux | **LSI** (또는 LSE) | |
 
-```c
-#define RESET_PERIOD_SEC   (30U * 3600U)   /* 108000초 = 30시간 */
-```
+> USART3 를 HSI16 으로 쓰는 이유: 16 MHz ÷ 115200 = 138.9 → 오차 **−0.08%**.
+> MSI 4 MHz 를 그대로 쓰면 −0.79% 라 장거리 RS485 에서 마진이 줄어듭니다.
 
-| 원하는 주기 | 설정 값 | 자동 선택되는 모드 / 카운터 |
-|------|------|------|
-| 1분 | `60U` | 16BITS / 59 |
-| 5분 | `(5U * 60U)` | 16BITS / 299 |
-| 30분 | `(30U * 60U)` | 16BITS / 1799 |
-| 1시간 | `(1U * 3600U)` | 16BITS / 3599 |
-| 12시간 | `(12U * 3600U)` | 16BITS / 43199 |
-| 18.2시간 | `65536U` | 16BITS / 65535 (16비트 경계) |
-| 24시간 | `(24U * 3600U)` | 17BITS / 20863 |
-| **30시간** | `(30U * 3600U)` | **17BITS / 42463** |
-| 1분 미만 / 30시간 초과 | — | ❌ `#error` 로 빌드 실패 |
+### 4-7. 코드 생성 & 소스 반영
 
-> 30시간은 검증에 하루 넘게 걸리므로, 동작 확인은 `60U`(1분) 로 줄여서 하고
-> 확인 후 되돌리는 것을 권장합니다.
+- Project Manager → Toolchain `STM32CubeIDE` → **GENERATE CODE**
+- 생성된 프로젝트에 이 저장소의 `Core/Inc/*.h`, `Core/Src/*.c` 를 덮어쓰기/추가
+- 빌드 → 다운로드 → RS485 터미널(115200-8-N-1) 열기
 
 ---
 
-## 5. 핵심 코드
+## 5. 리셋 주기 변경 — 분 단위 / 시간 단위
 
-### 5-1. 주기 → 모드/카운터 자동 계산 (`main.h`)
+`Core/Inc/main.h` 상단 두 줄만 고칩니다.
+
 ```c
-#define RESET_PERIOD_SEC      (30U * 3600U)   /* 108000초 = 30시간 */
-
-/* 지원 범위 검사 */
-#if   (RESET_PERIOD_SEC < 60U)
-  #error "RESET_PERIOD_SEC 는 60초(1분) 이상이어야 합니다."
-#elif (RESET_PERIOD_SEC > 108000U)
-  #error "RESET_PERIOD_SEC 는 108000초(30시간) 이하여야 합니다."
-#endif
-
-#if   (RESET_PERIOD_SEC <= 65536U)          /* 최대 약 18.2시간 */
-  #define WUT_CLOCK_SEL   RTC_WAKEUPCLOCK_CK_SPRE_16BITS
-  #define WUT_COUNTER     (RESET_PERIOD_SEC - 1U)
-#elif (RESET_PERIOD_SEC <= 131072U)         /* 최대 약 36.4시간 */
-  #define WUT_CLOCK_SEL   RTC_WAKEUPCLOCK_CK_SPRE_17BITS
-  #define WUT_COUNTER     (RESET_PERIOD_SEC - 65536U - 1U)
-#endif
+#define RESET_PERIOD_UNIT       RESET_UNIT_MINUTE   /* 분 단위 */
+#define RESET_PERIOD_VALUE      5U                  /* 5분마다 리셋 */
 ```
 
-### 5-2. RTC / Wakeup Timer 설정 (`MX_RTC_Init`)
 ```c
-/* LSI 32000 Hz : (127+1) * (249+1) = 32000 -> ck_spre = 1 Hz */
-hrtc.Init.AsynchPrediv = 127;
-hrtc.Init.SynchPrediv  = 249;
-...
-/* 30시간 -> CK_SPRE_17BITS, WUT = 108000 - 65536 - 1 = 42463 */
-if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, WUT_COUNTER,
-                                WUT_CLOCK_SEL, 0U) != HAL_OK)
-{
-  Error_Handler();
-}
-```
-> HAL 버전이 오래되어 인자가 3개뿐이라면 마지막 `0U`(WakeUpAutoClr)를 빼세요.
-
-### 5-3. 인터럽트 핸들러 (`stm32l5xx_it.c`)
-```c
-void RTC_IRQHandler(void)
-{
-  HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
-}
+#define RESET_PERIOD_UNIT       RESET_UNIT_HOUR     /* 시간 단위 */
+#define RESET_PERIOD_VALUE      24U                 /* 24시간마다 리셋 */
 ```
 
-### 5-4. 콜백 → 리셋 (`main.c`)
-```c
-void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc_handle)
-{
-  g_reset_request = 1U;      /* ISR 에서는 플래그만 */
-}
+| 예시 | UNIT | VALUE | 실제 주기 |
+|---|---|---|---|
+| 1분 | `RESET_UNIT_MINUTE` | `1U` | 60 s |
+| 5분 | `RESET_UNIT_MINUTE` | `5U` | 300 s |
+| 30분 | `RESET_UNIT_MINUTE` | `30U` | 1,800 s |
+| 1시간 | `RESET_UNIT_HOUR` | `1U` | 3,600 s |
+| 12시간 | `RESET_UNIT_HOUR` | `12U` | 43,200 s |
+| 24시간 | `RESET_UNIT_HOUR` | `24U` | 86,400 s (2조각) |
+| 48시간 | `RESET_UNIT_HOUR` | `48U` | 172,800 s (3조각) |
 
-/* main loop */
-if (g_reset_request)
-{
-  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
-  HAL_NVIC_SystemReset();    /* 소프트웨어 리셋 */
-}
-```
+`VALUE` 는 1~1000 이며, 벗어나면 `#error` 로 빌드가 막힙니다.
+
+### 실행 중 변경 — RS485 로 문자 하나 보내기
+
+| 명령 | 동작 |
+|---|---|
+| `s` 또는 `?` | 현재 상태 배너 다시 출력 |
+| `r` | 즉시 소프트웨어 리셋 |
+| `m` | 단위를 **분**으로 변경 |
+| `h` | 단위를 **시간**으로 변경 |
+| `+` / `-` | 값 1 증가 / 감소 (1~1000) |
+| `t` | **10초 주기 테스트 모드** (동작 확인용) |
+| `c` | 모든 카운터 초기화 (백업 레지스터 + Flash) |
+
+실행 중 바꾼 값은 백업 레지스터에 저장되어 **소프트 리셋을 넘어 유지**되지만,
+**전원을 껐다 켜면 `main.h` 의 컴파일 타임 기본값으로 돌아갑니다**
+(VBAT 가 같이 꺼지기 때문). 필요 없으면 `USE_RS485_CMD` 를 `0` 으로 두세요.
 
 ---
 
-## 6. STM32L5 사용 시 주의사항
+## 6. 실행 결과 예시 (115200 8N1)
+
+```
+========================================================
+ STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)
+========================================================
+ Reset cause  : BOR/POR NRST-PIN (CSR=0x0C000000)
+ Boot type    : COLD  (power ON - VBAT/backup domain cleared)
+ RTC resets   : 0   (since power ON, backup reg)
+ Boot count   : 1   (since power ON, backup reg)
+ TOTAL resets : 41   (survives power OFF, flash @0x0803F800)
+ Power cycles : 7   (survives power OFF)
+ RTC clock    : LSI 32000Hz(+-5%)
+ Reset period : 5 min  = 300 s (00:05:00)
+ Run time     : 00:00:00  (accumulated since power ON)
+ RTC time     : 2000-01-01 00:00:00
+ Next reset in: 300 s
+--------------------------------------------------------
+ CMD: s=status  r=reset now  m=minute  h=hour  +/-=value
+      t=test(10s)  c=clear counters
+--------------------------------------------------------
+[ALIVE] up 00:00:30 | next reset in 00:04:30 | resets 0 (total 41)
+[ALIVE] up 00:01:00 | next reset in 00:04:00 | resets 0 (total 41)
+      :
+*** SOFTWARE RESET (RTC wakeup) : RTC reset #1, total #42 ***
+
+========================================================
+ STM32L562RCT6  RTC WakeUp -> Software Reset  (RS485)
+========================================================
+ Reset cause  : SOFTWARE (CSR=0x10000000)
+ Boot type    : WARM  *** RESET BY RTC WAKEUP TIMER ***
+ RTC resets   : 1   (since power ON, backup reg)
+ Boot count   : 2   (since power ON, backup reg)
+ TOTAL resets : 42   (survives power OFF, flash @0x0803F800)
+ Power cycles : 7   (survives power OFF)
+ RTC clock    : LSI 32000Hz(+-5%)
+ Reset period : 5 min  = 300 s (00:05:00)
+ Run time     : 00:05:00  (accumulated since power ON)
+ RTC time     : 2000-01-01 00:05:00
+ Next reset in: 300 s
+--------------------------------------------------------
+```
+
+- `RTC resets` : 이번에 전원을 넣은 뒤의 리셋 횟수 (전원을 끄면 0)
+- `TOTAL resets` : 장비 설치 후 누적 리셋 횟수 (전원을 꺼도 유지)
+- `Run time` : 이번에 전원을 넣은 뒤의 누적 동작 시간
+- `RTC time` : 부팅할 때마다 주기만큼 늘어나면 정상 (전원 off 시 초기화)
+
+---
+
+## 7. 동작 확인 순서
+
+1. **5분을 기다리지 말고** 터미널에서 `t` 를 보내세요 → 10초 뒤 리셋됩니다.
+   `*** SOFTWARE RESET ***` 과 새 배너가 연달아 뜨면 전체 경로가 정상입니다.
+2. `r` 로 즉시 리셋 → `Boot type : WARM *** RESET BY RTC WAKEUP TIMER ***`
+   와 `RTC resets` 증가 확인.
+3. 보드 전원을 껐다 켜기 → `Boot type : COLD`, `RTC resets : 0` 으로 돌아가지만
+   `TOTAL resets` 는 유지되고 `Power cycles` 가 1 증가하는지 확인.
+   **VBAT 공용 보드에서 의도한 동작이 이것입니다.**
+4. `c` 로 카운터를 모두 0 으로 되돌리고 실사용 주기로 두기.
+
+글자가 깨지면 보레이트(115200)와 종단 저항을, 아무것도 안 나오면 DE 핀
+동작(오실로스코프로 송신 중 HIGH 인지)을 먼저 확인하세요.
+
+---
+
+## 8. STM32L5 사용 시 주의사항
 
 1. **RTC 인터럽트 벡터가 통합되어 있습니다.**
    STM32F4 처럼 `RTC_WKUP_IRQn` 이 따로 없고, L5 는 Alarm/WakeUp/Timestamp 가
@@ -334,50 +517,22 @@ if (g_reset_request)
    경과 시간을 확인할 수 없게 됩니다. `RTC_ICSR.INITS` 비트를 검사해
    **콜드 부트일 때만** 달력을 설정합니다.
 
-6. **리셋 원인은 `RCC->CSR` 의 `SFTRSTF` 로 확인합니다.**
-   읽은 뒤 `__HAL_RCC_CLEAR_RESET_FLAGS()` 로 지워야 다음 리셋 원인을
-   구분할 수 있습니다.
+6. **리셋 원인 플래그는 1회성입니다.**
+   `RCC->CSR` 를 읽은 뒤 `__HAL_RCC_CLEAR_RESET_FLAGS()` 로 지워야 다음 리셋
+   원인을 구분할 수 있습니다. `AppReset_CaptureCause()` 를 `HAL_Init()` 직후
+   **한 번만** 호출하세요.
 
-7. **IWDG 로는 대체할 수 없습니다.**
+7. **Flash 를 지우거나 쓸 때는 ICACHE 를 끄세요.**
+   L5 는 명령어 캐시(ICACHE)가 있어 Flash 를 고치면 캐시 내용이 낡은 값이
+   됩니다. `flash_counter.c` 가 `HAL_ICACHE_Disable()` / `Invalidate()` /
+   `Enable()` 로 감싸서 처리합니다.
+
+8. **IWDG 로는 대체할 수 없습니다.**
    독립 워치독은 최대 타임아웃이 약 32초라 분 단위 이상의 주기 리셋에는
    사용할 수 없습니다.
 
----
+9. 디버거를 붙인 채로 리셋하면 세션이 끊어질 수 있습니다. 장주기 시험은
+   RS485 로그로 보는 편이 낫습니다.
 
-## 7. 실행 결과 예시 (115200 8N1)
-
-```
-==========================================
- STM32L562 RTC WakeUp Timer Reset
-==========================================
- Reset cause : NRST-PIN (CSR=0x0C000000)
- Boot type   : COLD  (power-on, backup domain cleared)
- RTC clock   : LSI ~32kHz (internal, +/-5%)
- Soft resets since power-on : 0
- RTC time    : 2000-01-01 00:00:00
- Trigger     : RTC WakeUp Timer
- Next reset in 108000 s (30h 00m)
-------------------------------------------
-[ALIVE] uptime 00:01:00 | RTC 2000-01-01 00:01:00 | reset in 107940 s (29h 59m)
-[ALIVE] uptime 00:02:00 | RTC 2000-01-01 00:02:00 | reset in 107880 s (29h 58m)
-
-... (1분마다 계속 출력, 30시간 경과) ...
-
-[ALIVE] uptime 29:59:00 | RTC 2000-01-02 05:59:00 | reset in 60 s (0h 01m)
-[RTC] 108000 s elapsed -> Software reset now!
-
-==========================================
- STM32L562 RTC WakeUp Timer Reset
-==========================================
- Reset cause : SOFTWARE (CSR=0x18000000)
- Boot type   : WARM  (reset only, backup domain kept)
- RTC clock   : LSI ~32kHz (internal, +/-5%)
- Soft resets since power-on : 1
- RTC time    : 2000-01-02 06:00:00
- Trigger     : RTC WakeUp Timer
- Next reset in 108000 s (30h 00m)
-------------------------------------------
-```
-
-RTC 는 리셋 후에도 계속 동작하므로, 부팅할 때마다 찍히는 `RTC time` 이
-설정한 주기만큼 증가하는지로 동작을 검증할 수 있습니다.
+10. Flash 카운터는 리셋 **직전에** 기록합니다. 기록과 리셋 사이(수 ms)에
+    전원이 끊기면 그 1회는 누락될 수 있습니다.

@@ -13,6 +13,9 @@
 
 /* External variables --------------------------------------------------------*/
 extern RTC_HandleTypeDef hrtc;
+#if (USE_RS485 == 1U)
+extern UART_HandleTypeDef huart_rs485;
+#endif
 
 /******************************************************************************/
 /*           Cortex-M33 Processor Interruption and Exception Handlers         */
@@ -96,3 +99,21 @@ void RTC_IRQHandler(void)
   /* USER CODE BEGIN RTC_IRQn 1 */
   /* USER CODE END RTC_IRQn 1 */
 }
+
+#if (USE_RS485 == 1U) && (USE_RS485_CMD == 1U)
+/**
+  * @brief  This function handles USART3 global interrupt.
+  * @note   RS485 수신 명령 처리용. rs485.c 의 HAL_UART_RxCpltCallback()/
+  *         HAL_UART_ErrorCallback() 이 여기서 호출된다.
+  */
+void USART3_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART3_IRQn 0 */
+  /* USER CODE END USART3_IRQn 0 */
+
+  HAL_UART_IRQHandler(&huart_rs485);
+
+  /* USER CODE BEGIN USART3_IRQn 1 */
+  /* USER CODE END USART3_IRQn 1 */
+}
+#endif
