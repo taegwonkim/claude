@@ -25,9 +25,44 @@ namespace Stm32WifiConfigTool.Panels
         private ConnectionManager _conn;
         private AppSettings _settings;
 
+        /// <summary>"분"/"초" 콤보박스에 채워 넣는 값의 최댓값(0부터 이 값까지).</summary>
+        private const int MinuteSecondComboMax = 59;
+
+        /// <summary>"시간" 콤보박스에 채워 넣는 값의 최댓값(0부터 이 값까지).</summary>
+        private const int HourComboMax = 99;
+
         public RtcConfigPanel()
         {
             InitializeComponent();
+            PopulateUnitCombos();
+        }
+
+        /// <summary>_secBox/_minBox/_hourBox에 0부터 각 최댓값까지의 정수를 항목으로 채워 넣고
+        /// 0을 기본 선택한다 - 콤보박스 항목 인덱스가 곧 그 값이므로(Items[i] == i), 값을 읽고
+        /// 쓸 때 단순히 SelectedIndex를 쓰면 된다.</summary>
+        private void PopulateUnitCombos()
+        {
+            for (int i = 0; i <= HourComboMax; i++)
+            {
+                _hourBox.Items.Add(i);
+            }
+            for (int i = 0; i <= MinuteSecondComboMax; i++)
+            {
+                _minBox.Items.Add(i);
+                _secBox.Items.Add(i);
+            }
+            _hourBox.SelectedIndex = 0;
+            _minBox.SelectedIndex = 0;
+            _secBox.SelectedIndex = 0;
+        }
+
+        /// <summary>value를 [0, max] 범위로 자르고, 콤보박스 SelectedIndex로 바로 쓸 수 있는
+        /// 인덱스를 반환한다(항목 인덱스가 곧 값이므로 그대로 반환).</summary>
+        private static int ClampIndex(int value, int max)
+        {
+            if (value < 0) return 0;
+            if (value > max) return max;
+            return value;
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.</summary>
@@ -45,9 +80,9 @@ namespace Stm32WifiConfigTool.Panels
             /* 마지막으로 "Read"에 성공했던 값을 화면에 미리 채운다 - MCU를 다시 조회하기 전까지
              * 참고용이며, 실제 값의 원본은 항상 MCU다. */
             _periodBox.Value = ClampDecimal(settings.RtcPeriodSecCache, _periodBox.Minimum, _periodBox.Maximum);
-            _hourBox.Value = ClampDecimal(settings.RtcHourCache, _hourBox.Minimum, _hourBox.Maximum);
-            _minBox.Value = ClampDecimal(settings.RtcMinuteCache, _minBox.Minimum, _minBox.Maximum);
-            _secBox.Value = ClampDecimal(settings.RtcSecondCache, _secBox.Minimum, _secBox.Maximum);
+            _hourBox.SelectedIndex = ClampIndex(settings.RtcHourCache, HourComboMax);
+            _minBox.SelectedIndex = ClampIndex(settings.RtcMinuteCache, MinuteSecondComboMax);
+            _secBox.SelectedIndex = ClampIndex(settings.RtcSecondCache, MinuteSecondComboMax);
         }
 
         private static decimal ClampDecimal(int value, decimal min, decimal max)
@@ -186,9 +221,9 @@ namespace Stm32WifiConfigTool.Panels
             {
                 Log("RTC_R_H/RTC_R_M/RTC_R_S 요청...");
                 RtcConfig cfg = await Stm32Commands.GetRtcUnitsAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
-                _hourBox.Value = ClampDecimal(cfg.Hour, _hourBox.Minimum, _hourBox.Maximum);
-                _minBox.Value = ClampDecimal(cfg.Minute, _minBox.Minimum, _minBox.Maximum);
-                _secBox.Value = ClampDecimal(cfg.Second, _secBox.Minimum, _secBox.Maximum);
+                _hourBox.SelectedIndex = ClampIndex(cfg.Hour, HourComboMax);
+                _minBox.SelectedIndex = ClampIndex(cfg.Minute, MinuteSecondComboMax);
+                _secBox.SelectedIndex = ClampIndex(cfg.Second, MinuteSecondComboMax);
                 SaveUnitCache(cfg);
                 Log("RTC_R_H/RTC_R_M/RTC_R_S 완료 (" + cfg.Hour + "시 " + cfg.Minute + "분 " + cfg.Second + "초)");
             }
@@ -209,9 +244,9 @@ namespace Stm32WifiConfigTool.Panels
 
             var cfg = new RtcConfig
             {
-                Hour = (int)_hourBox.Value,
-                Minute = (int)_minBox.Value,
-                Second = (int)_secBox.Value
+                Hour = _hourBox.SelectedIndex,
+                Minute = _minBox.SelectedIndex,
+                Second = _secBox.SelectedIndex
             };
             try
             {

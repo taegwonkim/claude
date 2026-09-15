@@ -24,11 +24,11 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.NumericUpDown _periodBox;
         private System.Windows.Forms.GroupBox _unitFieldsGroup;
         private System.Windows.Forms.Label _secLabel;
-        private System.Windows.Forms.NumericUpDown _secBox;
+        private System.Windows.Forms.ComboBox _secBox;
         private System.Windows.Forms.Label _minLabel;
-        private System.Windows.Forms.NumericUpDown _minBox;
+        private System.Windows.Forms.ComboBox _minBox;
         private System.Windows.Forms.Label _hourLabel;
-        private System.Windows.Forms.NumericUpDown _hourBox;
+        private System.Windows.Forms.ComboBox _hourBox;
         private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
         private System.Windows.Forms.Button _unitReadButton;
         private System.Windows.Forms.Button _unitWriteButton;
@@ -57,11 +57,11 @@ namespace Stm32WifiConfigTool.Panels
             this._periodBox = new System.Windows.Forms.NumericUpDown();
             this._unitFieldsGroup = new System.Windows.Forms.GroupBox();
             this._secLabel = new System.Windows.Forms.Label();
-            this._secBox = new System.Windows.Forms.NumericUpDown();
+            this._secBox = new System.Windows.Forms.ComboBox();
             this._minLabel = new System.Windows.Forms.Label();
-            this._minBox = new System.Windows.Forms.NumericUpDown();
+            this._minBox = new System.Windows.Forms.ComboBox();
             this._hourLabel = new System.Windows.Forms.Label();
-            this._hourBox = new System.Windows.Forms.NumericUpDown();
+            this._hourBox = new System.Windows.Forms.ComboBox();
             this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._unitReadButton = new System.Windows.Forms.Button();
             this._unitWriteButton = new System.Windows.Forms.Button();
@@ -77,9 +77,6 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).BeginInit();
             this._unitFieldsGroup.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this._secBox)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this._minBox)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this._hourBox)).BeginInit();
             this._unitButtonRow.SuspendLayout();
             this._bottomLayout.SuspendLayout();
             this._buttonRow.SuspendLayout();
@@ -158,7 +155,7 @@ namespace Stm32WifiConfigTool.Panels
             this._periodLabel.Name = "_periodLabel";
             this._periodLabel.Size = new System.Drawing.Size(110, 23);
             this._periodLabel.TabIndex = 0;
-            this._periodLabel.Text = "리셋 주기(초)";
+            this._periodLabel.Text = "리셋 주기";
             this._periodLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _periodBox
@@ -200,11 +197,12 @@ namespace Stm32WifiConfigTool.Panels
             this._secLabel.Text = "초";
             this._secLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _secBox
+            // _secBox (항목은 코드에서 채운다 - RtcConfigPanel.cs의 PopulateUnitCombo() 참고,
+            // 0~SecondMinuteComboMax 범위의 정수를 드롭다운으로 고른다.)
             //
             this._secBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._secBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this._secBox.Location = new System.Drawing.Point(130, 22);
-            this._secBox.Maximum = new decimal(new int[] { 59, 0, 0, 0 });
             this._secBox.Name = "_secBox";
             this._secBox.Size = new System.Drawing.Size(97, 23);
             this._secBox.TabIndex = 1;
@@ -218,11 +216,11 @@ namespace Stm32WifiConfigTool.Panels
             this._minLabel.Text = "분";
             this._minLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _minBox
+            // _minBox (항목은 코드에서 채운다 - _secBox와 동일한 방식.)
             //
             this._minBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._minBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this._minBox.Location = new System.Drawing.Point(130, 56);
-            this._minBox.Maximum = new decimal(new int[] { 59, 0, 0, 0 });
             this._minBox.Name = "_minBox";
             this._minBox.Size = new System.Drawing.Size(97, 23);
             this._minBox.TabIndex = 3;
@@ -236,11 +234,11 @@ namespace Stm32WifiConfigTool.Panels
             this._hourLabel.Text = "시간";
             this._hourLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _hourBox
+            // _hourBox (항목은 코드에서 채운다 - 0~HourComboMax 범위.)
             //
             this._hourBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._hourBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this._hourBox.Location = new System.Drawing.Point(130, 90);
-            this._hourBox.Maximum = new decimal(new int[] { 99, 0, 0, 0 });
             this._hourBox.Name = "_hourBox";
             this._hourBox.Size = new System.Drawing.Size(97, 23);
             this._hourBox.TabIndex = 5;
@@ -374,9 +372,6 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).EndInit();
             this._unitFieldsGroup.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this._secBox)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this._minBox)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this._hourBox)).EndInit();
             this._unitButtonRow.ResumeLayout(false);
             this._unitButtonRow.PerformLayout();
             this._bottomLayout.ResumeLayout(false);

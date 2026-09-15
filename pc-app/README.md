@@ -165,20 +165,22 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    `RESET_COUNT,<count>` 프레임을 1회 브로드캐스트합니다(누적 리셋 횟수 모니터링용 — 이
    패널 자체는 설정값 Read/Write만 다루며, `RESET_COUNT` 브로드캐스트는 별도로 확인하려면
    포트 설정 패널의 원시 수신 로그나 터미널 프로그램을 이용하세요).
-   - "Read": `RESET_R_ALL` 프레임으로 현재 설정된 리셋 주기(초)를 읽어와 화면에 채웁니다.
-   - "Write": 입력한 리셋 주기(초, 1~65536)를 `RESET_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
-     성공 시 MCU가 즉시 플래시에 저장하고 Wakeup Timer를 새 값으로 재무장합니다.
+   - "리셋 주기" 라벨(값의 단위는 초, 1~65536): "Read"는 `RESET_R_ALL` 프레임으로 현재 설정된
+     값을 읽어와 화면에 채우고, "Write"는 입력한 값을 `RESET_W_ALL` 한 프레임에 담아 MCU에
+     전달합니다. 성공 시 MCU가 즉시 플래시에 저장하고 Wakeup Timer를 새 값으로 재무장합니다.
    - WiFi/Measurement 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖고,
      "Read" 값도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
    - **이 커맨드는 `firmware/`·`firmware-no-rtos/` 양쪽 모두 이미 구현되어 있습니다**
      (아래 WIFI_R_ALL/MEAS_R_ALL 계열과 달리 실제 MCU와 바로 통신됩니다).
-   - **"시/분/초 개별 설정"**(위 "리셋 주기(초)"와는 완전히 별도의 값): `RTC_R_H`/`RTC_R_M`/
+   - **"시/분/초 개별 설정"**(위 "리셋 주기"와는 완전히 별도의 값): `RTC_R_H`/`RTC_R_M`/
      `RTC_R_S`로 시/분/초를 각각 조회하고, `RTC_W_H`/`RTC_W_M`/`RTC_W_S`로 각각 전달합니다.
-     이 그룹만의 별도 "Read"/"Write" 버튼을 씁니다 - 클릭 한 번에 세 프레임을 순서대로
-     보내고(한 번에 하나의 커맨드-응답만 진행한다는 가정 하에 순차 호출), 하나라도 실패하면
-     그 이후 프레임은 보내지 않습니다. "Read" 값도 `AppSettings.RtcHourCache`/
+     값은 직접 입력하지 않고 **드롭다운 콤보박스에서 선택**합니다(시: 0~99, 분/초: 0~59 —
+     `RtcConfigPanel.PopulateUnitCombos()`가 각 콤보박스에 0부터 최댓값까지 정수를 항목으로
+     채워 넣습니다). 이 그룹만의 별도 "Read"/"Write" 버튼을 씁니다 - 클릭 한 번에 세 프레임을
+     순서대로 보내고(한 번에 하나의 커맨드-응답만 진행한다는 가정 하에 순차 호출), 하나라도
+     실패하면 그 이후 프레임은 보내지 않습니다. "Read" 값도 `AppSettings.RtcHourCache`/
      `RtcMinuteCache`/`RtcSecondCache`에 로컬 캐시되어 다음 실행 시 미리 채워집니다. 명령
-     전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기(초)" 그룹과 함께 씁니다
+     전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기" 그룹과 함께 씁니다
      (`Stm32Commands.GetRtcUnitsAsync`/`SetRtcUnitsAsync` 참고).
 
 5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
