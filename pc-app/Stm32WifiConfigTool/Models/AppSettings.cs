@@ -58,13 +58,9 @@ namespace Stm32WifiConfigTool.Models
         /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 리셋 주기(초) 값.</summary>
         public int RtcPeriodSecCache { get; set; } = 3600;
 
-        /// <summary>RTC 설정 패널의 "시/분/초 개별 설정"에서 마지막으로 "Read"한 값(단위별로 각각
-        /// 저장 - <see cref="RtcPeriodSecCache"/>와는 별도의 독립된 값).</summary>
-        public int RtcHourCache { get; set; }
-        public int RtcMinuteCache { get; set; }
-        public int RtcSecondCache { get; set; }
-
-        /// <summary>RTC 설정 패널의 "시/분/초 개별 설정"에서 마지막으로 선택했던 단위: "시"/"분"/"초".</summary>
+        /// <summary>RTC 설정 패널의 "단위"(시/분/초 개별 설정)에서 마지막으로 선택했던 단위:
+        /// "시"/"분"/"초". 값 자체는 <see cref="RtcPeriodSecCache"/>를 시/분/초로 환산해 쓰므로
+        /// 따로 캐시하지 않는다.</summary>
         public string RtcUnitKindCache { get; set; } = "시";
 
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이

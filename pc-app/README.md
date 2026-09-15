@@ -172,17 +172,17 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      "Read" 값도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
    - **이 커맨드는 `firmware/`·`firmware-no-rtos/` 양쪽 모두 이미 구현되어 있습니다**
      (아래 WIFI_R_ALL/MEAS_R_ALL 계열과 달리 실제 MCU와 바로 통신됩니다).
-   - **"시/분/초 개별 설정"**(위 "리셋 주기"와는 완전히 별도의 값): 값을 직접 입력하지 않고
-     **콤보박스 두 개로 선택**합니다 — "단위" 콤보박스에서 시/분/초 중 하나를 고르면, "값"
-     콤보박스가 그 단위에 맞는 범위(시: 0~99, 분/초: 0~59)의 드롭다운으로 다시 채워집니다
-     (`RtcConfigPanel.PopulateUnitValueCombo()`). "Read"/"Write"는 그 순간 선택된 단위
-     **하나**에 대해서만 동작합니다 — 시가 선택된 상태면 `RTC_R_H`/`RTC_W_H`만, 분이면
-     `RTC_R_M`/`RTC_W_M`만, 초면 `RTC_R_S`/`RTC_W_S`만 보냅니다(`Stm32Commands.
-     GetRtcHourAsync`/`SetRtcHourAsync` 등 단위별 헬퍼 참고). "Read" 값은 단위별로
-     `AppSettings.RtcHourCache`/`RtcMinuteCache`/`RtcSecondCache`에 로컬 캐시되고,
-     마지막으로 선택했던 단위 자체도 `RtcUnitKindCache`에 캐시되어 다음 실행 시 그 단위와
-     값이 함께 미리 채워집니다. 명령 전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기" 그룹과
-     함께 씁니다.
+   - **"단위"(시/분/초 개별 설정)**(위 "리셋 주기"와는 완전히 별도의 값이지만, 같은 "RTC 리셋
+     설정" 그룹 안에 함께 있습니다): 값을 직접 입력하는 별도 입력란은 없습니다 — "단위"
+     콤보박스에서 시/분/초 중 하나를 고르고 이 그룹만의 "Read"/"Write" 버튼을 누르면 그
+     단위 **하나**에 대해서만 동작합니다: 시가 선택된 상태면 `RTC_R_H`/`RTC_W_H`만, 분이면
+     `RTC_R_M`/`RTC_W_M`만, 초면 `RTC_R_S`/`RTC_W_S`만 보냅니다. "Write"는 위 "리셋 주기"
+     입력란의 값(초)을 시/분/초로 환산해(`RtcConfigPanel.DecomposePeriod()`, 예: 5000초 →
+     1시 23분 20초) 선택된 단위에 해당하는 값을 그대로 전송합니다 — 별도로 값을 입력할
+     필요가 없습니다. "Read"는 MCU에 저장된 값을 조회해 로그에만 표시합니다(표시할 입력란이
+     없으므로). 마지막으로 선택했던 단위는 `AppSettings.RtcUnitKindCache`에 캐시되어 다음
+     실행 시 미리 채워집니다. 명령 전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기"와 함께
+     씁니다.
 
 5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 STATUS 프레임을 표시합니다. 측정값 프레임 전송

@@ -52,9 +52,6 @@ namespace Stm32WifiConfigTool.Services
                 settings.RtcConfigCommandChannel = GetString(map, "RtcConfigCommandChannel", settings.RtcConfigCommandChannel);
                 settings.RtcConfigCommandTimeoutMs = GetInt(map, "RtcConfigCommandTimeoutMs", settings.RtcConfigCommandTimeoutMs);
                 settings.RtcPeriodSecCache = GetInt(map, "RtcPeriodSecCache", settings.RtcPeriodSecCache);
-                settings.RtcHourCache = GetInt(map, "RtcHourCache", settings.RtcHourCache);
-                settings.RtcMinuteCache = GetInt(map, "RtcMinuteCache", settings.RtcMinuteCache);
-                settings.RtcSecondCache = GetInt(map, "RtcSecondCache", settings.RtcSecondCache);
                 settings.RtcUnitKindCache = GetString(map, "RtcUnitKindCache", settings.RtcUnitKindCache);
                 settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
@@ -115,9 +112,6 @@ namespace Stm32WifiConfigTool.Services
                 "RtcConfigCommandChannel=" + settings.RtcConfigCommandChannel,
                 "RtcConfigCommandTimeoutMs=" + settings.RtcConfigCommandTimeoutMs,
                 "RtcPeriodSecCache=" + settings.RtcPeriodSecCache,
-                "RtcHourCache=" + settings.RtcHourCache,
-                "RtcMinuteCache=" + settings.RtcMinuteCache,
-                "RtcSecondCache=" + settings.RtcSecondCache,
                 "RtcUnitKindCache=" + settings.RtcUnitKindCache,
                 "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
                 "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,

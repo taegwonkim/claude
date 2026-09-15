@@ -22,11 +22,8 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.GroupBox _fieldsGroup;
         private System.Windows.Forms.Label _periodLabel;
         private System.Windows.Forms.NumericUpDown _periodBox;
-        private System.Windows.Forms.GroupBox _unitFieldsGroup;
         private System.Windows.Forms.Label _unitKindLabel;
         private System.Windows.Forms.ComboBox _unitKindBox;
-        private System.Windows.Forms.Label _unitValueLabel;
-        private System.Windows.Forms.ComboBox _unitValueBox;
         private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
         private System.Windows.Forms.Button _unitReadButton;
         private System.Windows.Forms.Button _unitWriteButton;
@@ -53,11 +50,8 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup = new System.Windows.Forms.GroupBox();
             this._periodLabel = new System.Windows.Forms.Label();
             this._periodBox = new System.Windows.Forms.NumericUpDown();
-            this._unitFieldsGroup = new System.Windows.Forms.GroupBox();
             this._unitKindLabel = new System.Windows.Forms.Label();
             this._unitKindBox = new System.Windows.Forms.ComboBox();
-            this._unitValueLabel = new System.Windows.Forms.Label();
-            this._unitValueBox = new System.Windows.Forms.ComboBox();
             this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._unitReadButton = new System.Windows.Forms.Button();
             this._unitWriteButton = new System.Windows.Forms.Button();
@@ -72,7 +66,6 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.SuspendLayout();
             this._fieldsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).BeginInit();
-            this._unitFieldsGroup.SuspendLayout();
             this._unitButtonRow.SuspendLayout();
             this._bottomLayout.SuspendLayout();
             this._buttonRow.SuspendLayout();
@@ -85,14 +78,12 @@ namespace Stm32WifiConfigTool.Panels
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Controls.Add(this._channelGroup, 0, 0);
             this._root.Controls.Add(this._fieldsGroup, 0, 1);
-            this._root.Controls.Add(this._unitFieldsGroup, 0, 2);
-            this._root.Controls.Add(this._bottomLayout, 0, 3);
+            this._root.Controls.Add(this._bottomLayout, 0, 2);
             this._root.Dock = System.Windows.Forms.DockStyle.Fill;
             this._root.Location = new System.Drawing.Point(0, 0);
             this._root.Name = "_root";
             this._root.Padding = new System.Windows.Forms.Padding(6);
-            this._root.RowCount = 4;
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._root.RowCount = 3;
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -133,14 +124,22 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
             // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
-            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다.)
+            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다. "시/분/초 개별 설정"도
+            // 이 그룹 안에 함께 있다 - RTC_R_H/RTC_R_M/RTC_R_S, RTC_W_H/RTC_W_M/RTC_W_S로 개별로
+            // 읽고 쓰는 시/분/초 값으로, "단위"(시/분/초) 콤보박스로 대상을 고른 뒤 그 값은 별도
+            // 입력 없이 위 "리셋 주기" 입력값을 시/분/초로 환산해서 쓴다 - Read/Write는 그 순간
+            // 선택된 단위 하나에 대해서만 동작한다. 리셋 주기 자체의 Read/Write는 _bottomLayout의
+            // _buttonRow에 있다.)
             //
             this._fieldsGroup.Controls.Add(this._periodLabel);
             this._fieldsGroup.Controls.Add(this._periodBox);
+            this._fieldsGroup.Controls.Add(this._unitKindLabel);
+            this._fieldsGroup.Controls.Add(this._unitKindBox);
+            this._fieldsGroup.Controls.Add(this._unitButtonRow);
             this._fieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
             this._fieldsGroup.Location = new System.Drawing.Point(9, 64);
             this._fieldsGroup.Name = "_fieldsGroup";
-            this._fieldsGroup.Size = new System.Drawing.Size(242, 64);
+            this._fieldsGroup.Size = new System.Drawing.Size(242, 130);
             this._fieldsGroup.TabIndex = 1;
             this._fieldsGroup.TabStop = false;
             this._fieldsGroup.Text = "RTC 리셋 설정";
@@ -165,63 +164,26 @@ namespace Stm32WifiConfigTool.Panels
             this._periodBox.TabIndex = 1;
             this._periodBox.Value = new decimal(new int[] { 3600, 0, 0, 0 });
             //
-            // _unitFieldsGroup (자유 배치 - RTC_R_H/RTC_R_M/RTC_R_S, RTC_W_H/RTC_W_M/RTC_W_S로
-            // 개별로 읽고 쓰는 시/분/초 - 위 "리셋 주기"(RESET_R_ALL/RESET_W_ALL)와는 완전히
-            // 별도의 값이며, 이 그룹만의 Read/Write 버튼을 따로 둔다. 값을 직접 입력하지 않고
-            // "단위"(시/분/초) 콤보박스로 대상을 고른 뒤 "값" 콤보박스로 그 값을 고르는 방식 -
-            // Read/Write는 그 순간 선택된 단위 하나에 대해서만 동작한다.)
-            //
-            this._unitFieldsGroup.Controls.Add(this._unitKindLabel);
-            this._unitFieldsGroup.Controls.Add(this._unitKindBox);
-            this._unitFieldsGroup.Controls.Add(this._unitValueLabel);
-            this._unitFieldsGroup.Controls.Add(this._unitValueBox);
-            this._unitFieldsGroup.Controls.Add(this._unitButtonRow);
-            this._unitFieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
-            this._unitFieldsGroup.Location = new System.Drawing.Point(9, 131);
-            this._unitFieldsGroup.Name = "_unitFieldsGroup";
-            this._unitFieldsGroup.Size = new System.Drawing.Size(242, 130);
-            this._unitFieldsGroup.TabIndex = 2;
-            this._unitFieldsGroup.TabStop = false;
-            this._unitFieldsGroup.Text = "시/분/초 개별 설정";
-            //
             // _unitKindLabel
             //
-            this._unitKindLabel.Location = new System.Drawing.Point(15, 25);
+            this._unitKindLabel.Location = new System.Drawing.Point(15, 59);
             this._unitKindLabel.Name = "_unitKindLabel";
             this._unitKindLabel.Size = new System.Drawing.Size(110, 23);
-            this._unitKindLabel.TabIndex = 0;
+            this._unitKindLabel.TabIndex = 2;
             this._unitKindLabel.Text = "단위";
             this._unitKindLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _unitKindBox (항목("시"/"분"/"초")은 코드에서 채운다 - RtcConfigPanel.cs의
-            // 생성자 참고. 선택이 바뀌면 UnitKindBox_SelectedIndexChanged가 _unitValueBox의
-            // 항목 범위(시=0~HourComboMax, 분/초=0~MinuteSecondComboMax)를 다시 채운다.)
+            // 생성자 참고. Write 시 이 선택값에 따라 위 "리셋 주기"를 시/분/초로 환산한 값 중
+            // 해당하는 하나만 RTC_W_H/RTC_W_M/RTC_W_S로 전송한다.)
             //
             this._unitKindBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._unitKindBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._unitKindBox.Location = new System.Drawing.Point(130, 22);
+            this._unitKindBox.Location = new System.Drawing.Point(130, 56);
             this._unitKindBox.Name = "_unitKindBox";
             this._unitKindBox.Size = new System.Drawing.Size(97, 23);
-            this._unitKindBox.TabIndex = 1;
+            this._unitKindBox.TabIndex = 3;
             this._unitKindBox.SelectedIndexChanged += new System.EventHandler(this.UnitKindBox_SelectedIndexChanged);
-            //
-            // _unitValueLabel
-            //
-            this._unitValueLabel.Location = new System.Drawing.Point(15, 59);
-            this._unitValueLabel.Name = "_unitValueLabel";
-            this._unitValueLabel.Size = new System.Drawing.Size(110, 23);
-            this._unitValueLabel.TabIndex = 2;
-            this._unitValueLabel.Text = "값";
-            this._unitValueLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            //
-            // _unitValueBox (항목은 코드에서 채운다 - _unitKindBox 선택에 따라 범위가 바뀐다.)
-            //
-            this._unitValueBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this._unitValueBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._unitValueBox.Location = new System.Drawing.Point(130, 56);
-            this._unitValueBox.Name = "_unitValueBox";
-            this._unitValueBox.Size = new System.Drawing.Size(97, 23);
-            this._unitValueBox.TabIndex = 3;
             //
             // _unitButtonRow
             //
@@ -263,13 +225,13 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.Controls.Add(this._buttonRow, 0, 0);
             this._bottomLayout.Controls.Add(this._logBox, 0, 1);
             this._bottomLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._bottomLayout.Location = new System.Drawing.Point(9, 261);
+            this._bottomLayout.Location = new System.Drawing.Point(9, 197);
             this._bottomLayout.Name = "_bottomLayout";
             this._bottomLayout.RowCount = 2;
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._bottomLayout.Size = new System.Drawing.Size(242, 259);
-            this._bottomLayout.TabIndex = 3;
+            this._bottomLayout.Size = new System.Drawing.Size(242, 323);
+            this._bottomLayout.TabIndex = 2;
             //
             // _buttonRow
             //
@@ -350,8 +312,8 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.ResumeLayout(false);
             this._channelGroup.PerformLayout();
             this._fieldsGroup.ResumeLayout(false);
+            this._fieldsGroup.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).EndInit();
-            this._unitFieldsGroup.ResumeLayout(false);
             this._unitButtonRow.ResumeLayout(false);
             this._unitButtonRow.PerformLayout();
             this._bottomLayout.ResumeLayout(false);
