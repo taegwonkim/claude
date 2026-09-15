@@ -22,6 +22,16 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.GroupBox _fieldsGroup;
         private System.Windows.Forms.Label _periodLabel;
         private System.Windows.Forms.NumericUpDown _periodBox;
+        private System.Windows.Forms.GroupBox _unitFieldsGroup;
+        private System.Windows.Forms.Label _secLabel;
+        private System.Windows.Forms.NumericUpDown _secBox;
+        private System.Windows.Forms.Label _minLabel;
+        private System.Windows.Forms.NumericUpDown _minBox;
+        private System.Windows.Forms.Label _hourLabel;
+        private System.Windows.Forms.NumericUpDown _hourBox;
+        private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
+        private System.Windows.Forms.Button _unitReadButton;
+        private System.Windows.Forms.Button _unitWriteButton;
         private System.Windows.Forms.TableLayoutPanel _bottomLayout;
         private System.Windows.Forms.FlowLayoutPanel _buttonRow;
         private System.Windows.Forms.Button _readButton;
@@ -45,6 +55,16 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup = new System.Windows.Forms.GroupBox();
             this._periodLabel = new System.Windows.Forms.Label();
             this._periodBox = new System.Windows.Forms.NumericUpDown();
+            this._unitFieldsGroup = new System.Windows.Forms.GroupBox();
+            this._secLabel = new System.Windows.Forms.Label();
+            this._secBox = new System.Windows.Forms.NumericUpDown();
+            this._minLabel = new System.Windows.Forms.Label();
+            this._minBox = new System.Windows.Forms.NumericUpDown();
+            this._hourLabel = new System.Windows.Forms.Label();
+            this._hourBox = new System.Windows.Forms.NumericUpDown();
+            this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
+            this._unitReadButton = new System.Windows.Forms.Button();
+            this._unitWriteButton = new System.Windows.Forms.Button();
             this._bottomLayout = new System.Windows.Forms.TableLayoutPanel();
             this._buttonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._readButton = new System.Windows.Forms.Button();
@@ -56,6 +76,11 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.SuspendLayout();
             this._fieldsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).BeginInit();
+            this._unitFieldsGroup.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._secBox)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this._minBox)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this._hourBox)).BeginInit();
+            this._unitButtonRow.SuspendLayout();
             this._bottomLayout.SuspendLayout();
             this._buttonRow.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._cmdTimeoutBox)).BeginInit();
@@ -67,12 +92,14 @@ namespace Stm32WifiConfigTool.Panels
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Controls.Add(this._channelGroup, 0, 0);
             this._root.Controls.Add(this._fieldsGroup, 0, 1);
-            this._root.Controls.Add(this._bottomLayout, 0, 2);
+            this._root.Controls.Add(this._unitFieldsGroup, 0, 2);
+            this._root.Controls.Add(this._bottomLayout, 0, 3);
             this._root.Dock = System.Windows.Forms.DockStyle.Fill;
             this._root.Location = new System.Drawing.Point(0, 0);
             this._root.Name = "_root";
             this._root.Padding = new System.Windows.Forms.Padding(6);
-            this._root.RowCount = 3;
+            this._root.RowCount = 4;
+            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -145,6 +172,112 @@ namespace Stm32WifiConfigTool.Panels
             this._periodBox.TabIndex = 1;
             this._periodBox.Value = new decimal(new int[] { 3600, 0, 0, 0 });
             //
+            // _unitFieldsGroup (자유 배치 - RTC_R_H/RTC_R_M/RTC_R_S, RTC_W_H/RTC_W_M/RTC_W_S로
+            // 개별로 읽고 쓰는 시/분/초 - 위 "리셋 주기(초)"(RESET_R_ALL/RESET_W_ALL)와는 완전히
+            // 별도의 값이며, 이 그룹만의 Read/Write 버튼을 따로 둔다.)
+            //
+            this._unitFieldsGroup.Controls.Add(this._secLabel);
+            this._unitFieldsGroup.Controls.Add(this._secBox);
+            this._unitFieldsGroup.Controls.Add(this._minLabel);
+            this._unitFieldsGroup.Controls.Add(this._minBox);
+            this._unitFieldsGroup.Controls.Add(this._hourLabel);
+            this._unitFieldsGroup.Controls.Add(this._hourBox);
+            this._unitFieldsGroup.Controls.Add(this._unitButtonRow);
+            this._unitFieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
+            this._unitFieldsGroup.Location = new System.Drawing.Point(9, 131);
+            this._unitFieldsGroup.Name = "_unitFieldsGroup";
+            this._unitFieldsGroup.Size = new System.Drawing.Size(242, 165);
+            this._unitFieldsGroup.TabIndex = 2;
+            this._unitFieldsGroup.TabStop = false;
+            this._unitFieldsGroup.Text = "시/분/초 개별 설정";
+            //
+            // _secLabel
+            //
+            this._secLabel.Location = new System.Drawing.Point(15, 25);
+            this._secLabel.Name = "_secLabel";
+            this._secLabel.Size = new System.Drawing.Size(110, 23);
+            this._secLabel.TabIndex = 0;
+            this._secLabel.Text = "초";
+            this._secLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _secBox
+            //
+            this._secBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._secBox.Location = new System.Drawing.Point(130, 22);
+            this._secBox.Maximum = new decimal(new int[] { 59, 0, 0, 0 });
+            this._secBox.Name = "_secBox";
+            this._secBox.Size = new System.Drawing.Size(97, 23);
+            this._secBox.TabIndex = 1;
+            //
+            // _minLabel
+            //
+            this._minLabel.Location = new System.Drawing.Point(15, 59);
+            this._minLabel.Name = "_minLabel";
+            this._minLabel.Size = new System.Drawing.Size(110, 23);
+            this._minLabel.TabIndex = 2;
+            this._minLabel.Text = "분";
+            this._minLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _minBox
+            //
+            this._minBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._minBox.Location = new System.Drawing.Point(130, 56);
+            this._minBox.Maximum = new decimal(new int[] { 59, 0, 0, 0 });
+            this._minBox.Name = "_minBox";
+            this._minBox.Size = new System.Drawing.Size(97, 23);
+            this._minBox.TabIndex = 3;
+            //
+            // _hourLabel
+            //
+            this._hourLabel.Location = new System.Drawing.Point(15, 93);
+            this._hourLabel.Name = "_hourLabel";
+            this._hourLabel.Size = new System.Drawing.Size(110, 23);
+            this._hourLabel.TabIndex = 4;
+            this._hourLabel.Text = "시간";
+            this._hourLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _hourBox
+            //
+            this._hourBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._hourBox.Location = new System.Drawing.Point(130, 90);
+            this._hourBox.Maximum = new decimal(new int[] { 99, 0, 0, 0 });
+            this._hourBox.Name = "_hourBox";
+            this._hourBox.Size = new System.Drawing.Size(97, 23);
+            this._hourBox.TabIndex = 5;
+            //
+            // _unitButtonRow
+            //
+            this._unitButtonRow.AutoSize = true;
+            this._unitButtonRow.Controls.Add(this._unitReadButton);
+            this._unitButtonRow.Controls.Add(this._unitWriteButton);
+            this._unitButtonRow.Location = new System.Drawing.Point(12, 123);
+            this._unitButtonRow.Name = "_unitButtonRow";
+            this._unitButtonRow.Size = new System.Drawing.Size(220, 31);
+            this._unitButtonRow.TabIndex = 6;
+            this._unitButtonRow.WrapContents = false;
+            //
+            // _unitReadButton
+            //
+            this._unitReadButton.AutoSize = true;
+            this._unitReadButton.Location = new System.Drawing.Point(3, 3);
+            this._unitReadButton.Name = "_unitReadButton";
+            this._unitReadButton.Size = new System.Drawing.Size(90, 25);
+            this._unitReadButton.TabIndex = 0;
+            this._unitReadButton.Text = "Read";
+            this._unitReadButton.UseVisualStyleBackColor = true;
+            this._unitReadButton.Click += new System.EventHandler(this.UnitReadButton_Click);
+            //
+            // _unitWriteButton
+            //
+            this._unitWriteButton.AutoSize = true;
+            this._unitWriteButton.Location = new System.Drawing.Point(99, 3);
+            this._unitWriteButton.Name = "_unitWriteButton";
+            this._unitWriteButton.Size = new System.Drawing.Size(90, 25);
+            this._unitWriteButton.TabIndex = 1;
+            this._unitWriteButton.Text = "Write";
+            this._unitWriteButton.UseVisualStyleBackColor = true;
+            this._unitWriteButton.Click += new System.EventHandler(this.UnitWriteButton_Click);
+            //
             // _bottomLayout
             //
             this._bottomLayout.ColumnCount = 1;
@@ -152,13 +285,13 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.Controls.Add(this._buttonRow, 0, 0);
             this._bottomLayout.Controls.Add(this._logBox, 0, 1);
             this._bottomLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._bottomLayout.Location = new System.Drawing.Point(9, 131);
+            this._bottomLayout.Location = new System.Drawing.Point(9, 296);
             this._bottomLayout.Name = "_bottomLayout";
             this._bottomLayout.RowCount = 2;
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._bottomLayout.Size = new System.Drawing.Size(242, 380);
-            this._bottomLayout.TabIndex = 2;
+            this._bottomLayout.Size = new System.Drawing.Size(242, 224);
+            this._bottomLayout.TabIndex = 3;
             //
             // _buttonRow
             //
@@ -240,6 +373,12 @@ namespace Stm32WifiConfigTool.Panels
             this._channelGroup.PerformLayout();
             this._fieldsGroup.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).EndInit();
+            this._unitFieldsGroup.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this._secBox)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this._minBox)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this._hourBox)).EndInit();
+            this._unitButtonRow.ResumeLayout(false);
+            this._unitButtonRow.PerformLayout();
             this._bottomLayout.ResumeLayout(false);
             this._bottomLayout.PerformLayout();
             this._buttonRow.ResumeLayout(false);

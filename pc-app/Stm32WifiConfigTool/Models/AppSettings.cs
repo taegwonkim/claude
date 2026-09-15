@@ -55,8 +55,15 @@ namespace Stm32WifiConfigTool.Models
         public string RtcConfigCommandChannel { get; set; } = "Usb";
         public int RtcConfigCommandTimeoutMs { get; set; } = 3000;
 
-        /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 값.</summary>
+        /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 리셋 주기(초) 값.</summary>
         public int RtcPeriodSecCache { get; set; } = 3600;
+
+        /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 시/분/초 값(RTC_R_H/RTC_R_M/RTC_R_S,
+        /// <see cref="RtcPeriodSecCache"/>와는 별도의 독립된 값 - <see cref="Models.RtcConfig"/>
+        /// 클래스 주석 참고).</summary>
+        public int RtcHourCache { get; set; }
+        public int RtcMinuteCache { get; set; }
+        public int RtcSecondCache { get; set; }
 
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
         /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.MeasurementPanel.Initialize"/> 참고.)</summary>

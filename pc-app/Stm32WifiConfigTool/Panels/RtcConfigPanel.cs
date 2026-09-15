@@ -6,9 +6,14 @@ using Stm32WifiConfigTool.Services;
 namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// RTC Wakeup Timer 기반 주기적 리셋 설정 패널. "Read"로 MCU에 RESET_R_ALL을 보내 현재
-    /// 설정된 리셋 주기(초)를 화면에 채우고, "Write"로 입력값을 RESET_W_ALL 한 프레임에 담아
-    /// MCU에 전달한다(docs/프로토콜_명세.md §6, firmware/firmware-no-rtos 양쪽 이미 구현됨).
+    /// RTC 관련 설정 패널. 두 개의 독립된 그룹이 있다:
+    /// (1) "RTC 리셋 설정" - "Read"로 MCU에 RESET_R_ALL을 보내 현재 설정된 리셋 주기(초)를 화면에
+    /// 채우고, "Write"로 입력값을 RESET_W_ALL 한 프레임에 담아 MCU에 전달한다(docs/프로토콜_명세.md
+    /// §6, firmware/firmware-no-rtos 양쪽 이미 구현됨).
+    /// (2) "시/분/초 개별 설정" - RTC_R_H/RTC_R_M/RTC_R_S를 순서대로 보내 시/분/초를 각각 조회하고,
+    /// RTC_W_H/RTC_W_M/RTC_W_S로 각각 전달한다. (1)과는 완전히 별도의 값이며 자체 Read/Write
+    /// 버튼(<c>_unitReadButton</c>/<c>_unitWriteButton</c>)을 따로 쓴다 - 채널 선택/커맨드
+    /// 타임아웃/로그는 두 그룹이 함께 쓴다.
     /// "Read" 성공 시 값을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
     /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
     /// UI 레이아웃은 <c>RtcConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
@@ -40,6 +45,9 @@ namespace Stm32WifiConfigTool.Panels
             /* 마지막으로 "Read"에 성공했던 값을 화면에 미리 채운다 - MCU를 다시 조회하기 전까지
              * 참고용이며, 실제 값의 원본은 항상 MCU다. */
             _periodBox.Value = ClampDecimal(settings.RtcPeriodSecCache, _periodBox.Minimum, _periodBox.Maximum);
+            _hourBox.Value = ClampDecimal(settings.RtcHourCache, _hourBox.Minimum, _hourBox.Maximum);
+            _minBox.Value = ClampDecimal(settings.RtcMinuteCache, _minBox.Minimum, _minBox.Maximum);
+            _secBox.Value = ClampDecimal(settings.RtcSecondCache, _secBox.Minimum, _secBox.Maximum);
         }
 
         private static decimal ClampDecimal(int value, decimal min, decimal max)
@@ -51,11 +59,28 @@ namespace Stm32WifiConfigTool.Panels
 
         private SerialLinkService SelectedLink => _channelUsb.Checked ? _conn.Usb : _conn.Uart;
 
-        /// <summary>"Read"로 받은 값을 로컬 캐시에 저장하고 즉시 파일에 반영한다(다음 실행 시
-        /// <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
-        private void SaveConfigCache(RtcConfig cfg)
+        /// <summary>"Read"(리셋 주기)로 받은 값을 로컬 캐시에 저장하고 즉시 파일에 반영한다
+        /// (다음 실행 시 <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
+        private void SavePeriodCache(RtcConfig cfg)
         {
             _settings.RtcPeriodSecCache = cfg.PeriodSec;
+            try
+            {
+                AppSettingsStore.Save(_settings);
+            }
+            catch (Exception)
+            {
+                /* 설정 저장 실패(권한/디스크 문제 등)로 UI 동작 자체가 막히면 안 되므로 무시 */
+            }
+        }
+
+        /// <summary>"Read"(시/분/초)로 받은 값을 로컬 캐시에 저장하고 즉시 파일에 반영한다
+        /// (다음 실행 시 <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
+        private void SaveUnitCache(RtcConfig cfg)
+        {
+            _settings.RtcHourCache = cfg.Hour;
+            _settings.RtcMinuteCache = cfg.Minute;
+            _settings.RtcSecondCache = cfg.Second;
             try
             {
                 AppSettingsStore.Save(_settings);
@@ -117,7 +142,7 @@ namespace Stm32WifiConfigTool.Panels
                 Log("RESET_R_ALL 요청...");
                 RtcConfig cfg = await Stm32Commands.GetResetAllAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
                 _periodBox.Value = ClampDecimal(cfg.PeriodSec, _periodBox.Minimum, _periodBox.Maximum);
-                SaveConfigCache(cfg);
+                SavePeriodCache(cfg);
                 Log("RESET_R_ALL 완료 (" + cfg.PeriodSec + "초)");
             }
             catch (Exception ex)
@@ -145,6 +170,59 @@ namespace Stm32WifiConfigTool.Panels
             catch (Exception ex)
             {
                 Log("RESET_W_ALL 실패: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>RTC_R_H/RTC_R_M/RTC_R_S를 순서대로 보내 시/분/초를 조회해 화면에 채운다
+        /// (위 "리셋 주기(초)"와는 완전히 별도의 값).</summary>
+        private async void UnitReadButton_Click(object sender, EventArgs e)
+        {
+            if (!EnsureConnected())
+            {
+                return;
+            }
+            try
+            {
+                Log("RTC_R_H/RTC_R_M/RTC_R_S 요청...");
+                RtcConfig cfg = await Stm32Commands.GetRtcUnitsAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                _hourBox.Value = ClampDecimal(cfg.Hour, _hourBox.Minimum, _hourBox.Maximum);
+                _minBox.Value = ClampDecimal(cfg.Minute, _minBox.Minimum, _minBox.Maximum);
+                _secBox.Value = ClampDecimal(cfg.Second, _secBox.Minimum, _secBox.Maximum);
+                SaveUnitCache(cfg);
+                Log("RTC_R_H/RTC_R_M/RTC_R_S 완료 (" + cfg.Hour + "시 " + cfg.Minute + "분 " + cfg.Second + "초)");
+            }
+            catch (Exception ex)
+            {
+                Log("RTC_R_H/RTC_R_M/RTC_R_S 실패: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>화면의 시/분/초 입력값을 RTC_W_H/RTC_W_M/RTC_W_S 순서로 MCU에 전달한다.</summary>
+        private async void UnitWriteButton_Click(object sender, EventArgs e)
+        {
+            if (!EnsureConnected())
+            {
+                return;
+            }
+
+            var cfg = new RtcConfig
+            {
+                Hour = (int)_hourBox.Value,
+                Minute = (int)_minBox.Value,
+                Second = (int)_secBox.Value
+            };
+            try
+            {
+                Log("RTC_W_H/RTC_W_M/RTC_W_S 전송... (" + cfg.Hour + "시 " + cfg.Minute + "분 " + cfg.Second + "초)");
+                await Stm32Commands.SetRtcUnitsAsync(SelectedLink, cfg, (int)_cmdTimeoutBox.Value);
+                Log("RTC_W_H/RTC_W_M/RTC_W_S 완료");
+                MessageBox.Show(this, "전달되었습니다.", "RTC 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                Log("RTC_W_H/RTC_W_M/RTC_W_S 실패: " + ex.Message);
                 MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

@@ -74,15 +74,34 @@ namespace Stm32WifiConfigTool.Services
                    intervalSec.ToString(CultureInfo.InvariantCulture);
         }
 
-        /// <summary>RTC Wakeup Timer 리셋 주기(초)를 한 번에 조회한다.
-        /// 응답: RESET_R_ALL,seconds</summary>
-        public static readonly string CmdResetReadAll = Stx + "RESET_R_ALL";
+        /// <summary>RTC 리셋 주기의 "시" 값을 조회한다. 응답: RTC_R_H,hour</summary>
+        public static readonly string CmdRtcHourReadAll = Stx + "RTC_R_H";
 
-        /// <summary>RTC Wakeup Timer 리셋 주기(초)를 MCU에 전달한다. 응답: RESET_W_ALL,OK 또는
-        /// RESET_W_ALL,ERR,&lt;reason&gt; (MISSING_ARGS/INVALID_SECONDS)</summary>
-        public static string BuildResetWriteAll(int periodSec)
+        /// <summary>RTC 리셋 주기의 "시" 값을 MCU에 전달한다. 응답: RTC_W_H,OK 또는
+        /// RTC_W_H,ERR,&lt;reason&gt;</summary>
+        public static string BuildRtcHourWrite(int hour)
         {
-            return Stx + "RESET_W_ALL," + periodSec.ToString(CultureInfo.InvariantCulture);
+            return Stx + "RTC_W_H," + hour.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>RTC 리셋 주기의 "분" 값을 조회한다. 응답: RTC_R_M,minute</summary>
+        public static readonly string CmdRtcMinuteReadAll = Stx + "RTC_R_M";
+
+        /// <summary>RTC 리셋 주기의 "분" 값을 MCU에 전달한다. 응답: RTC_W_M,OK 또는
+        /// RTC_W_M,ERR,&lt;reason&gt;</summary>
+        public static string BuildRtcMinuteWrite(int minute)
+        {
+            return Stx + "RTC_W_M," + minute.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>RTC 리셋 주기의 "초" 값을 조회한다. 응답: RTC_R_S,second</summary>
+        public static readonly string CmdRtcSecondReadAll = Stx + "RTC_R_S";
+
+        /// <summary>RTC 리셋 주기의 "초" 값을 MCU에 전달한다. 응답: RTC_W_S,OK 또는
+        /// RTC_W_S,ERR,&lt;reason&gt;</summary>
+        public static string BuildRtcSecondWrite(int second)
+        {
+            return Stx + "RTC_W_S," + second.ToString(CultureInfo.InvariantCulture);
         }
 
         /// <summary>SerialLinkService.LineReceived로 전달된 한 줄을 파싱한다. 맨 앞이 STX가 아니면

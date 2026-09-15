@@ -172,6 +172,14 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      "Read" 값도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
    - **이 커맨드는 `firmware/`·`firmware-no-rtos/` 양쪽 모두 이미 구현되어 있습니다**
      (아래 WIFI_R_ALL/MEAS_R_ALL 계열과 달리 실제 MCU와 바로 통신됩니다).
+   - **"시/분/초 개별 설정"**(위 "리셋 주기(초)"와는 완전히 별도의 값): `RTC_R_H`/`RTC_R_M`/
+     `RTC_R_S`로 시/분/초를 각각 조회하고, `RTC_W_H`/`RTC_W_M`/`RTC_W_S`로 각각 전달합니다.
+     이 그룹만의 별도 "Read"/"Write" 버튼을 씁니다 - 클릭 한 번에 세 프레임을 순서대로
+     보내고(한 번에 하나의 커맨드-응답만 진행한다는 가정 하에 순차 호출), 하나라도 실패하면
+     그 이후 프레임은 보내지 않습니다. "Read" 값도 `AppSettings.RtcHourCache`/
+     `RtcMinuteCache`/`RtcSecondCache`에 로컬 캐시되어 다음 실행 시 미리 채워집니다. 명령
+     전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기(초)" 그룹과 함께 씁니다
+     (`Stm32Commands.GetRtcUnitsAsync`/`SetRtcUnitsAsync` 참고).
 
 5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 STATUS 프레임을 표시합니다. 측정값 프레임 전송
@@ -269,7 +277,7 @@ Stm32WifiConfigTool/
     PortSettingsPanel.cs / .Designer.cs
     WifiConfigPanel.cs / .Designer.cs
     MeasurementConfigPanel.cs / .Designer.cs  - Reference/Offset/Resistance/Interval Time 설정
-    RtcConfigPanel.cs / .Designer.cs      - RTC Wakeup Timer 리셋 주기(초) 설정 (신규)
+    RtcConfigPanel.cs / .Designer.cs      - RTC Wakeup Timer 리셋 주기(초) 설정 + 시/분/초 개별 설정 (신규)
     EspStatusPanel.cs / .Designer.cs      - ESP32 상태(STATUS,<번호>) 전용 패널
     MeasurementPanel.cs / .Designer.cs
   Services/
@@ -277,13 +285,13 @@ Stm32WifiConfigTool/
     SerialLinkService.cs    - 시리얼 연결 1개(연결/해제, 라인 단위 수신, 타임아웃)
     ConnectionManager.cs    - Usb/Uart SerialLinkService 2개를 앱 전체에서 공유
     Stm32Protocol.cs        - STX+CSV+CRLF 프레임 빌더/파서, 메시지 종류 분류(화이트리스트)
-    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RESET_R_ALL/RESET_W_ALL
-                              async 요청-응답 헬퍼
+    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RESET_R_ALL/RESET_W_ALL/
+                              RTC_R_H/RTC_W_H/RTC_R_M/RTC_W_M/RTC_R_S/RTC_W_S async 요청-응답 헬퍼
     AppSettingsStore.cs     - PC측 UI 설정 로드/저장 (%AppData%\Stm32WifiConfigTool\settings.ini)
   Models/
     NetConfig.cs
     MeasurementConfig.cs    - Reference/Offset/Resistance/Interval Time
-    RtcConfig.cs            - RTC 리셋 주기(초) (신규)
+    RtcConfig.cs            - RTC 리셋 주기(초) + 시/분/초 개별 값 (신규)
     MeasurementRecord.cs    - DC IP/MAC + data1..N (개수 가변)
     AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
@@ -317,6 +325,13 @@ MCU 측 `pc_comm.c`를 이 형식(태그 있는 응답이든 없는 응답이든
 반대로 **`RESET_R_ALL`/`RESET_W_ALL`(§6, RTC 설정 패널)은 `firmware/`·`firmware-no-rtos/` 양쪽
 `pc_comm.c`에 이미 구현되어 있습니다**(단, 실제 테스트 중인 MCU가 이 저장소 펌웨어와 다르다면
 이 커맨드도 마찬가지로 태그 없는 형태로 응답할 수 있습니다 — 위 설명대로 어느 쪽이든 동작합니다).
+
+**`RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`("시/분/초 개별 설정")도
+WIFI_R_ALL 계열과 마찬가지로 이 PC 도구에서 새로 도입한 커맨드로, `firmware/`·`firmware-no-rtos/`에는
+아직 구현되어 있지 않습니다** — 프레임 형태는 `Services/Stm32Protocol.cs`의 `BuildRtcHourWrite`/
+`BuildRtcMinuteWrite`/`BuildRtcSecondWrite` 및 `Stm32Commands.cs`의 `GetRtcUnitsAsync`/
+`SetRtcUnitsAsync` 등의 XML 주석에 정의되어 있습니다.
+
 MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`,
 ESP32 상태 브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`,
 RTC Wakeup Timer는 `firmware/Core/Src/rtc_wakeup.c` 참고.
