@@ -25,12 +25,10 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Label _unitKindLabel;
         private System.Windows.Forms.ComboBox _unitKindBox;
         private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
-        private System.Windows.Forms.Button _unitReadButton;
-        private System.Windows.Forms.Button _unitWriteButton;
-        private System.Windows.Forms.TableLayoutPanel _bottomLayout;
-        private System.Windows.Forms.FlowLayoutPanel _buttonRow;
         private System.Windows.Forms.Button _readButton;
         private System.Windows.Forms.Button _writeButton;
+        private System.Windows.Forms.TableLayoutPanel _bottomLayout;
+        private System.Windows.Forms.FlowLayoutPanel _buttonRow;
         private System.Windows.Forms.Label _cmdTimeoutCaptionLabel;
         private System.Windows.Forms.NumericUpDown _cmdTimeoutBox;
         private System.Windows.Forms.TextBox _logBox;
@@ -53,12 +51,10 @@ namespace Stm32WifiConfigTool.Panels
             this._unitKindLabel = new System.Windows.Forms.Label();
             this._unitKindBox = new System.Windows.Forms.ComboBox();
             this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
-            this._unitReadButton = new System.Windows.Forms.Button();
-            this._unitWriteButton = new System.Windows.Forms.Button();
-            this._bottomLayout = new System.Windows.Forms.TableLayoutPanel();
-            this._buttonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._readButton = new System.Windows.Forms.Button();
             this._writeButton = new System.Windows.Forms.Button();
+            this._bottomLayout = new System.Windows.Forms.TableLayoutPanel();
+            this._buttonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._cmdTimeoutCaptionLabel = new System.Windows.Forms.Label();
             this._cmdTimeoutBox = new System.Windows.Forms.NumericUpDown();
             this._logBox = new System.Windows.Forms.TextBox();
@@ -125,11 +121,10 @@ namespace Stm32WifiConfigTool.Panels
             // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
             // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
             // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다. "시/분/초 개별 설정"도
-            // 이 그룹 안에 함께 있다 - RTC_R_H/RTC_R_M/RTC_R_S, RTC_W_H/RTC_W_M/RTC_W_S로 개별로
-            // 읽고 쓰는 시/분/초 값으로, "단위"(시/분/초) 콤보박스로 대상을 고른 뒤 그 값은 별도
-            // 입력 없이 위 "리셋 주기" 입력값을 시/분/초로 환산해서 쓴다 - Read/Write는 그 순간
-            // 선택된 단위 하나에 대해서만 동작한다. 리셋 주기 자체의 Read/Write는 _bottomLayout의
-            // _buttonRow에 있다.)
+            // 이 그룹 안에 함께 있다. _readButton/_writeButton이 이 패널의 유일한
+            // Read/Write 버튼으로, 클릭 시 위 "리셋 주기"(RESET_R_ALL/RESET_W_ALL)와 아래
+            // "단위" 콤보박스로 고른 시/분/초 하나(RTC_R_x/RTC_W_x)를 함께 처리한다 -
+            // RtcConfigPanel.cs의 UnitReadButton_Click/UnitWriteButton_Click 참고.)
             //
             this._fieldsGroup.Controls.Add(this._periodLabel);
             this._fieldsGroup.Controls.Add(this._periodBox);
@@ -188,35 +183,35 @@ namespace Stm32WifiConfigTool.Panels
             // _unitButtonRow
             //
             this._unitButtonRow.AutoSize = true;
-            this._unitButtonRow.Controls.Add(this._unitReadButton);
-            this._unitButtonRow.Controls.Add(this._unitWriteButton);
+            this._unitButtonRow.Controls.Add(this._readButton);
+            this._unitButtonRow.Controls.Add(this._writeButton);
             this._unitButtonRow.Location = new System.Drawing.Point(12, 89);
             this._unitButtonRow.Name = "_unitButtonRow";
             this._unitButtonRow.Size = new System.Drawing.Size(220, 31);
             this._unitButtonRow.TabIndex = 4;
             this._unitButtonRow.WrapContents = false;
             //
-            // _unitReadButton
+            // _readButton
             //
-            this._unitReadButton.AutoSize = true;
-            this._unitReadButton.Location = new System.Drawing.Point(3, 3);
-            this._unitReadButton.Name = "_unitReadButton";
-            this._unitReadButton.Size = new System.Drawing.Size(90, 25);
-            this._unitReadButton.TabIndex = 0;
-            this._unitReadButton.Text = "Read";
-            this._unitReadButton.UseVisualStyleBackColor = true;
-            this._unitReadButton.Click += new System.EventHandler(this.UnitReadButton_Click);
+            this._readButton.AutoSize = true;
+            this._readButton.Location = new System.Drawing.Point(3, 3);
+            this._readButton.Name = "_readButton";
+            this._readButton.Size = new System.Drawing.Size(90, 25);
+            this._readButton.TabIndex = 0;
+            this._readButton.Text = "Read";
+            this._readButton.UseVisualStyleBackColor = true;
+            this._readButton.Click += new System.EventHandler(this.UnitReadButton_Click);
             //
-            // _unitWriteButton
+            // _writeButton
             //
-            this._unitWriteButton.AutoSize = true;
-            this._unitWriteButton.Location = new System.Drawing.Point(99, 3);
-            this._unitWriteButton.Name = "_unitWriteButton";
-            this._unitWriteButton.Size = new System.Drawing.Size(90, 25);
-            this._unitWriteButton.TabIndex = 1;
-            this._unitWriteButton.Text = "Write";
-            this._unitWriteButton.UseVisualStyleBackColor = true;
-            this._unitWriteButton.Click += new System.EventHandler(this.UnitWriteButton_Click);
+            this._writeButton.AutoSize = true;
+            this._writeButton.Location = new System.Drawing.Point(99, 3);
+            this._writeButton.Name = "_writeButton";
+            this._writeButton.Size = new System.Drawing.Size(90, 25);
+            this._writeButton.TabIndex = 1;
+            this._writeButton.Text = "Write";
+            this._writeButton.UseVisualStyleBackColor = true;
+            this._writeButton.Click += new System.EventHandler(this.UnitWriteButton_Click);
             //
             // _bottomLayout
             //
@@ -233,47 +228,25 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.Size = new System.Drawing.Size(242, 323);
             this._bottomLayout.TabIndex = 2;
             //
-            // _buttonRow
+            // _buttonRow (Read/Write 버튼은 삭제되었다 - _fieldsGroup 안의 _readButton/
+            // _writeButton이 이 패널의 유일한 Read/Write이며, 이제 이 행에는 커맨드 타임아웃만
+            // 남는다.)
             //
             this._buttonRow.AutoSize = true;
-            this._buttonRow.Controls.Add(this._readButton);
-            this._buttonRow.Controls.Add(this._writeButton);
             this._buttonRow.Controls.Add(this._cmdTimeoutCaptionLabel);
             this._buttonRow.Controls.Add(this._cmdTimeoutBox);
             this._buttonRow.Dock = System.Windows.Forms.DockStyle.Top;
             this._buttonRow.Location = new System.Drawing.Point(0, 0);
             this._buttonRow.Margin = new System.Windows.Forms.Padding(0);
             this._buttonRow.Name = "_buttonRow";
-            this._buttonRow.Size = new System.Drawing.Size(242, 56);
+            this._buttonRow.Size = new System.Drawing.Size(242, 29);
             this._buttonRow.TabIndex = 0;
-            this._buttonRow.WrapContents = true;
-            //
-            // _readButton
-            //
-            this._readButton.AutoSize = true;
-            this._readButton.Location = new System.Drawing.Point(3, 3);
-            this._readButton.Name = "_readButton";
-            this._readButton.Size = new System.Drawing.Size(90, 25);
-            this._readButton.TabIndex = 0;
-            this._readButton.Text = "Read";
-            this._readButton.UseVisualStyleBackColor = true;
-            this._readButton.Click += new System.EventHandler(this.ReadButton_Click);
-            //
-            // _writeButton
-            //
-            this._writeButton.AutoSize = true;
-            this._writeButton.Location = new System.Drawing.Point(99, 3);
-            this._writeButton.Name = "_writeButton";
-            this._writeButton.Size = new System.Drawing.Size(90, 25);
-            this._writeButton.TabIndex = 1;
-            this._writeButton.Text = "Write";
-            this._writeButton.UseVisualStyleBackColor = true;
-            this._writeButton.Click += new System.EventHandler(this.WriteButton_Click);
+            this._buttonRow.WrapContents = false;
             //
             // _cmdTimeoutCaptionLabel
             //
             this._cmdTimeoutCaptionLabel.AutoSize = true;
-            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(3, 34);
+            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(3, 6);
             this._cmdTimeoutCaptionLabel.Name = "_cmdTimeoutCaptionLabel";
             this._cmdTimeoutCaptionLabel.Size = new System.Drawing.Size(120, 15);
             this._cmdTimeoutCaptionLabel.TabIndex = 2;
@@ -282,7 +255,7 @@ namespace Stm32WifiConfigTool.Panels
             // _cmdTimeoutBox
             //
             this._cmdTimeoutBox.Increment = new decimal(new int[] { 100, 0, 0, 0 });
-            this._cmdTimeoutBox.Location = new System.Drawing.Point(129, 32);
+            this._cmdTimeoutBox.Location = new System.Drawing.Point(129, 3);
             this._cmdTimeoutBox.Maximum = new decimal(new int[] { 30000, 0, 0, 0 });
             this._cmdTimeoutBox.Minimum = new decimal(new int[] { 200, 0, 0, 0 });
             this._cmdTimeoutBox.Name = "_cmdTimeoutBox";
