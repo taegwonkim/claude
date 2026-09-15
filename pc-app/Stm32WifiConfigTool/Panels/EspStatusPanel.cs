@@ -11,6 +11,11 @@ namespace Stm32WifiConfigTool.Panels
     /// <see cref="Stm32Protocol.TryParseStatusText"/> 참고) 표시 패널. MCU는 측정값 전송 사이사이에
     /// 이 프레임을 주기적으로 브로드캐스트한다(docs/프로토콜_명세.md §1). 측정값 프레임과는
     /// 별도로 구분해서 여기 표시한다. USB/UART 채널을 선택해 어느 쪽을 표시할지 고를 수 있다.
+    /// STATUS 값은 위 "현재 ESP32 상태"(큰 글씨)만 갱신하며, 아래 "수신 이력"에는 더 이상
+    /// 기록하지 않는다 - 대신 "[RESET]"로 시작하는 소프트웨어 리셋 로그 줄(예: "[RESET]
+    /// Software Reset Count: 0", <see cref="Stm32Protocol.IsResetLogText"/> 참고)이 오면
+    /// 그 원본 텍스트를 그대로 수신 이력에 기록한다. 수신 이력에는 더 이상 채널([USB]/[UART])
+    /// 표시를 붙이지 않는다.
     /// UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
     /// 디자이너로 편집 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는
     /// 생성 직후 <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을
@@ -63,8 +68,6 @@ namespace Stm32WifiConfigTool.Panels
             return (channel == LinkChannel.Usb && _showUsb.Checked) || (channel == LinkChannel.Uart && _showUart.Checked);
         }
 
-        private static string ChannelLabel(LinkChannel channel) => channel == LinkChannel.Usb ? "USB" : "UART";
-
         private static Color ColorForStatus(int statusNumber)
         {
             switch (statusNumber)
@@ -101,22 +104,25 @@ namespace Stm32WifiConfigTool.Panels
                 return;
             }
 
-            /* STX 유무와 관계없이 처리한다(실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않음),
-             * 콤마 "STATUS,<번호>"와 콜론 "STATUS:<번호>" 형식을 모두 인식한다. */
+            /* STX 유무와 관계없이 처리한다(실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않음). */
             string payload = Stm32Protocol.DisplayText(line);
-            if (!Stm32Protocol.TryParseStatusText(payload, out int statusNumber))
+
+            /* STATUS는 위 "현재 ESP32 상태"만 갱신하고, 수신 이력에는 더 이상 기록하지 않는다
+             * (콤마 "STATUS,<번호>"와 콜론 "STATUS:<번호>" 형식을 모두 인식한다). */
+            if (Stm32Protocol.TryParseStatusText(payload, out int statusNumber))
             {
-                return; /* STATUS 프레임이 아님 */
+                string text = Stm32Protocol.DescribeStatus(statusNumber);
+                _currentStatusLabel.Text = text + " (" + statusNumber + ")";
+                _currentStatusLabel.ForeColor = ColorForStatus(statusNumber);
+                _lastUpdateLabel.Text = "마지막 수신: " + DateTime.Now.ToString("HH:mm:ss.fff");
+                return;
             }
 
-            string text = Stm32Protocol.DescribeStatus(statusNumber);
-            DateTime now = DateTime.Now;
-
-            _currentStatusLabel.Text = text + " (" + statusNumber + ")";
-            _currentStatusLabel.ForeColor = ColorForStatus(statusNumber);
-            _lastUpdateLabel.Text = "마지막 수신: " + now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "]";
-
-            AppendLog(now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] STATUS:" + statusNumber + " (" + text + ")");
+            /* 수신 이력에는 대신 소프트웨어 리셋 로그("[RESET] ...")를 기록한다. */
+            if (Stm32Protocol.IsResetLogText(payload))
+            {
+                AppendLog(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload);
+            }
         }
 
         private void AppendLog(string text)

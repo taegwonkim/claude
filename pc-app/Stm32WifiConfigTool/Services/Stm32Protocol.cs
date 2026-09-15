@@ -160,6 +160,17 @@ namespace Stm32WifiConfigTool.Services
             return int.TryParse(text.Substring(prefix.Length + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out statusNumber);
         }
 
+        private const string ResetLogPrefix = "[RESET]";
+
+        /// <summary>STX 유무와 관계없이(<see cref="DisplayText"/>로 이미 STX를 뗀) 원본 텍스트가
+        /// 소프트웨어 리셋 로그 줄인지 "[RESET]" 표시만으로 판별한다(예: "[RESET] Software Reset
+        /// Count: 0"). 실측 결과 MCU는 문서가 가정한 CSV 프레임 "RESET_COUNT,&lt;count&gt;"
+        /// (<see cref="IsResetCountFrame"/>)가 아니라 이런 평문으로 브로드캐스트하며, 뒤에 붙는
+        /// 문구/형식이 바뀔 수 있으므로 값을 따로 파싱하지 않고 "[RESET]"로 시작하는지만 확인해
+        /// 원본 텍스트를 그대로 표시한다.</summary>
+        public static bool IsResetLogText(string text) =>
+            !string.IsNullOrEmpty(text) && text.StartsWith(ResetLogPrefix, StringComparison.Ordinal);
+
         /// <summary>Esp32_LinkState_t 값(0/1/2)을 사람이 읽을 수 있는 텍스트로 변환한다.</summary>
         public static string DescribeStatus(int statusNumber)
         {

@@ -163,8 +163,9 @@ namespace Stm32WifiConfigTool.Panels
             else
             {
                 /* 측정값이 아닌 나머지 전부(STATUS/EVENT/RESET_COUNT/커맨드 응답 및 STX 없이 오는
-                 * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다. */
-                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  [" + ChannelLabel(channel) + "] " + payload + Environment.NewLine);
+                 * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다(채널([USB]/[UART]) 표시는
+                 * 붙이지 않는다). */
+                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload + Environment.NewLine);
             }
         }
 
