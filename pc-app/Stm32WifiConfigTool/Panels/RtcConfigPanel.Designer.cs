@@ -54,7 +54,6 @@ namespace Stm32WifiConfigTool.Panels
             this._periodLabel = new System.Windows.Forms.Label();
             this._periodBox = new System.Windows.Forms.NumericUpDown();
             this._unitFieldsGroup = new System.Windows.Forms.GroupBox();
-            this._secLabel = new System.Windows.Forms.Label();
             this._unitKindLabel = new System.Windows.Forms.Label();
             this._unitKindBox = new System.Windows.Forms.ComboBox();
             this._unitValueLabel = new System.Windows.Forms.Label();
