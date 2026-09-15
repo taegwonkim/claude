@@ -23,12 +23,10 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Label _periodLabel;
         private System.Windows.Forms.NumericUpDown _periodBox;
         private System.Windows.Forms.GroupBox _unitFieldsGroup;
-        private System.Windows.Forms.Label _secLabel;
-        private System.Windows.Forms.ComboBox _secBox;
-        private System.Windows.Forms.Label _minLabel;
-        private System.Windows.Forms.ComboBox _minBox;
-        private System.Windows.Forms.Label _hourLabel;
-        private System.Windows.Forms.ComboBox _hourBox;
+        private System.Windows.Forms.Label _unitKindLabel;
+        private System.Windows.Forms.ComboBox _unitKindBox;
+        private System.Windows.Forms.Label _unitValueLabel;
+        private System.Windows.Forms.ComboBox _unitValueBox;
         private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
         private System.Windows.Forms.Button _unitReadButton;
         private System.Windows.Forms.Button _unitWriteButton;
@@ -57,11 +55,10 @@ namespace Stm32WifiConfigTool.Panels
             this._periodBox = new System.Windows.Forms.NumericUpDown();
             this._unitFieldsGroup = new System.Windows.Forms.GroupBox();
             this._secLabel = new System.Windows.Forms.Label();
-            this._secBox = new System.Windows.Forms.ComboBox();
-            this._minLabel = new System.Windows.Forms.Label();
-            this._minBox = new System.Windows.Forms.ComboBox();
-            this._hourLabel = new System.Windows.Forms.Label();
-            this._hourBox = new System.Windows.Forms.ComboBox();
+            this._unitKindLabel = new System.Windows.Forms.Label();
+            this._unitKindBox = new System.Windows.Forms.ComboBox();
+            this._unitValueLabel = new System.Windows.Forms.Label();
+            this._unitValueBox = new System.Windows.Forms.ComboBox();
             this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._unitReadButton = new System.Windows.Forms.Button();
             this._unitWriteButton = new System.Windows.Forms.Button();
@@ -170,88 +167,72 @@ namespace Stm32WifiConfigTool.Panels
             this._periodBox.Value = new decimal(new int[] { 3600, 0, 0, 0 });
             //
             // _unitFieldsGroup (자유 배치 - RTC_R_H/RTC_R_M/RTC_R_S, RTC_W_H/RTC_W_M/RTC_W_S로
-            // 개별로 읽고 쓰는 시/분/초 - 위 "리셋 주기(초)"(RESET_R_ALL/RESET_W_ALL)와는 완전히
-            // 별도의 값이며, 이 그룹만의 Read/Write 버튼을 따로 둔다.)
+            // 개별로 읽고 쓰는 시/분/초 - 위 "리셋 주기"(RESET_R_ALL/RESET_W_ALL)와는 완전히
+            // 별도의 값이며, 이 그룹만의 Read/Write 버튼을 따로 둔다. 값을 직접 입력하지 않고
+            // "단위"(시/분/초) 콤보박스로 대상을 고른 뒤 "값" 콤보박스로 그 값을 고르는 방식 -
+            // Read/Write는 그 순간 선택된 단위 하나에 대해서만 동작한다.)
             //
-            this._unitFieldsGroup.Controls.Add(this._secLabel);
-            this._unitFieldsGroup.Controls.Add(this._secBox);
-            this._unitFieldsGroup.Controls.Add(this._minLabel);
-            this._unitFieldsGroup.Controls.Add(this._minBox);
-            this._unitFieldsGroup.Controls.Add(this._hourLabel);
-            this._unitFieldsGroup.Controls.Add(this._hourBox);
+            this._unitFieldsGroup.Controls.Add(this._unitKindLabel);
+            this._unitFieldsGroup.Controls.Add(this._unitKindBox);
+            this._unitFieldsGroup.Controls.Add(this._unitValueLabel);
+            this._unitFieldsGroup.Controls.Add(this._unitValueBox);
             this._unitFieldsGroup.Controls.Add(this._unitButtonRow);
             this._unitFieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
             this._unitFieldsGroup.Location = new System.Drawing.Point(9, 131);
             this._unitFieldsGroup.Name = "_unitFieldsGroup";
-            this._unitFieldsGroup.Size = new System.Drawing.Size(242, 165);
+            this._unitFieldsGroup.Size = new System.Drawing.Size(242, 130);
             this._unitFieldsGroup.TabIndex = 2;
             this._unitFieldsGroup.TabStop = false;
             this._unitFieldsGroup.Text = "시/분/초 개별 설정";
             //
-            // _secLabel
+            // _unitKindLabel
             //
-            this._secLabel.Location = new System.Drawing.Point(15, 25);
-            this._secLabel.Name = "_secLabel";
-            this._secLabel.Size = new System.Drawing.Size(110, 23);
-            this._secLabel.TabIndex = 0;
-            this._secLabel.Text = "초";
-            this._secLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this._unitKindLabel.Location = new System.Drawing.Point(15, 25);
+            this._unitKindLabel.Name = "_unitKindLabel";
+            this._unitKindLabel.Size = new System.Drawing.Size(110, 23);
+            this._unitKindLabel.TabIndex = 0;
+            this._unitKindLabel.Text = "단위";
+            this._unitKindLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _secBox (항목은 코드에서 채운다 - RtcConfigPanel.cs의 PopulateUnitCombo() 참고,
-            // 0~SecondMinuteComboMax 범위의 정수를 드롭다운으로 고른다.)
+            // _unitKindBox (항목("시"/"분"/"초")은 코드에서 채운다 - RtcConfigPanel.cs의
+            // 생성자 참고. 선택이 바뀌면 UnitKindBox_SelectedIndexChanged가 _unitValueBox의
+            // 항목 범위(시=0~HourComboMax, 분/초=0~MinuteSecondComboMax)를 다시 채운다.)
             //
-            this._secBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this._secBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._secBox.Location = new System.Drawing.Point(130, 22);
-            this._secBox.Name = "_secBox";
-            this._secBox.Size = new System.Drawing.Size(97, 23);
-            this._secBox.TabIndex = 1;
+            this._unitKindBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._unitKindBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this._unitKindBox.Location = new System.Drawing.Point(130, 22);
+            this._unitKindBox.Name = "_unitKindBox";
+            this._unitKindBox.Size = new System.Drawing.Size(97, 23);
+            this._unitKindBox.TabIndex = 1;
+            this._unitKindBox.SelectedIndexChanged += new System.EventHandler(this.UnitKindBox_SelectedIndexChanged);
             //
-            // _minLabel
+            // _unitValueLabel
             //
-            this._minLabel.Location = new System.Drawing.Point(15, 59);
-            this._minLabel.Name = "_minLabel";
-            this._minLabel.Size = new System.Drawing.Size(110, 23);
-            this._minLabel.TabIndex = 2;
-            this._minLabel.Text = "분";
-            this._minLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this._unitValueLabel.Location = new System.Drawing.Point(15, 59);
+            this._unitValueLabel.Name = "_unitValueLabel";
+            this._unitValueLabel.Size = new System.Drawing.Size(110, 23);
+            this._unitValueLabel.TabIndex = 2;
+            this._unitValueLabel.Text = "값";
+            this._unitValueLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _minBox (항목은 코드에서 채운다 - _secBox와 동일한 방식.)
+            // _unitValueBox (항목은 코드에서 채운다 - _unitKindBox 선택에 따라 범위가 바뀐다.)
             //
-            this._minBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this._minBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._minBox.Location = new System.Drawing.Point(130, 56);
-            this._minBox.Name = "_minBox";
-            this._minBox.Size = new System.Drawing.Size(97, 23);
-            this._minBox.TabIndex = 3;
-            //
-            // _hourLabel
-            //
-            this._hourLabel.Location = new System.Drawing.Point(15, 93);
-            this._hourLabel.Name = "_hourLabel";
-            this._hourLabel.Size = new System.Drawing.Size(110, 23);
-            this._hourLabel.TabIndex = 4;
-            this._hourLabel.Text = "시간";
-            this._hourLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            //
-            // _hourBox (항목은 코드에서 채운다 - 0~HourComboMax 범위.)
-            //
-            this._hourBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this._hourBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._hourBox.Location = new System.Drawing.Point(130, 90);
-            this._hourBox.Name = "_hourBox";
-            this._hourBox.Size = new System.Drawing.Size(97, 23);
-            this._hourBox.TabIndex = 5;
+            this._unitValueBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._unitValueBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this._unitValueBox.Location = new System.Drawing.Point(130, 56);
+            this._unitValueBox.Name = "_unitValueBox";
+            this._unitValueBox.Size = new System.Drawing.Size(97, 23);
+            this._unitValueBox.TabIndex = 3;
             //
             // _unitButtonRow
             //
             this._unitButtonRow.AutoSize = true;
             this._unitButtonRow.Controls.Add(this._unitReadButton);
             this._unitButtonRow.Controls.Add(this._unitWriteButton);
-            this._unitButtonRow.Location = new System.Drawing.Point(12, 123);
+            this._unitButtonRow.Location = new System.Drawing.Point(12, 89);
             this._unitButtonRow.Name = "_unitButtonRow";
             this._unitButtonRow.Size = new System.Drawing.Size(220, 31);
-            this._unitButtonRow.TabIndex = 6;
+            this._unitButtonRow.TabIndex = 4;
             this._unitButtonRow.WrapContents = false;
             //
             // _unitReadButton
@@ -283,12 +264,12 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.Controls.Add(this._buttonRow, 0, 0);
             this._bottomLayout.Controls.Add(this._logBox, 0, 1);
             this._bottomLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._bottomLayout.Location = new System.Drawing.Point(9, 296);
+            this._bottomLayout.Location = new System.Drawing.Point(9, 261);
             this._bottomLayout.Name = "_bottomLayout";
             this._bottomLayout.RowCount = 2;
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._bottomLayout.Size = new System.Drawing.Size(242, 224);
+            this._bottomLayout.Size = new System.Drawing.Size(242, 259);
             this._bottomLayout.TabIndex = 3;
             //
             // _buttonRow

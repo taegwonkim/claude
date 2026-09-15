@@ -268,26 +268,5 @@ namespace Stm32WifiConfigTool.Services
         /// <summary>second를 RTC_W_S 한 프레임으로 전송한다.</summary>
         public static Task SetRtcSecondAsync(SerialLinkService link, int second, int timeoutMs) =>
             SetRtcUnitAsync(link, Stm32Protocol.BuildRtcSecondWrite(second), "RTC_W_S", timeoutMs);
-
-        /// <summary>RTC_R_H/RTC_R_M/RTC_R_S를 순서대로 보내 시/분/초를 모두 조회한다(한 번에
-        /// 하나의 커맨드-응답만 진행한다는 가정 하에 순차 호출). 응답이 태그 있는 형태로 오면
-        /// "RTC_R_H"만 사용되고, 다른 두 개는 해당 함수의 응답 처리 단계에서 각각의 태그로
-        /// 처리된다.</summary>
-        public static async Task<RtcConfig> GetRtcUnitsAsync(SerialLinkService link, int timeoutMs)
-        {
-            int hour = await GetRtcHourAsync(link, timeoutMs);
-            int minute = await GetRtcMinuteAsync(link, timeoutMs);
-            int second = await GetRtcSecondAsync(link, timeoutMs);
-            return new RtcConfig { Hour = hour, Minute = minute, Second = second };
-        }
-
-        /// <summary>cfg.Hour/Minute/Second를 RTC_W_H/RTC_W_M/RTC_W_S 순서로 각각 전송한다.
-        /// 하나라도 실패하면(예외) 그 이후 것은 전송되지 않는다.</summary>
-        public static async Task SetRtcUnitsAsync(SerialLinkService link, RtcConfig cfg, int timeoutMs)
-        {
-            await SetRtcHourAsync(link, cfg.Hour, timeoutMs);
-            await SetRtcMinuteAsync(link, cfg.Minute, timeoutMs);
-            await SetRtcSecondAsync(link, cfg.Second, timeoutMs);
-        }
     }
 }

@@ -172,16 +172,17 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      "Read" 값도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
    - **이 커맨드는 `firmware/`·`firmware-no-rtos/` 양쪽 모두 이미 구현되어 있습니다**
      (아래 WIFI_R_ALL/MEAS_R_ALL 계열과 달리 실제 MCU와 바로 통신됩니다).
-   - **"시/분/초 개별 설정"**(위 "리셋 주기"와는 완전히 별도의 값): `RTC_R_H`/`RTC_R_M`/
-     `RTC_R_S`로 시/분/초를 각각 조회하고, `RTC_W_H`/`RTC_W_M`/`RTC_W_S`로 각각 전달합니다.
-     값은 직접 입력하지 않고 **드롭다운 콤보박스에서 선택**합니다(시: 0~99, 분/초: 0~59 —
-     `RtcConfigPanel.PopulateUnitCombos()`가 각 콤보박스에 0부터 최댓값까지 정수를 항목으로
-     채워 넣습니다). 이 그룹만의 별도 "Read"/"Write" 버튼을 씁니다 - 클릭 한 번에 세 프레임을
-     순서대로 보내고(한 번에 하나의 커맨드-응답만 진행한다는 가정 하에 순차 호출), 하나라도
-     실패하면 그 이후 프레임은 보내지 않습니다. "Read" 값도 `AppSettings.RtcHourCache`/
-     `RtcMinuteCache`/`RtcSecondCache`에 로컬 캐시되어 다음 실행 시 미리 채워집니다. 명령
-     전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기" 그룹과 함께 씁니다
-     (`Stm32Commands.GetRtcUnitsAsync`/`SetRtcUnitsAsync` 참고).
+   - **"시/분/초 개별 설정"**(위 "리셋 주기"와는 완전히 별도의 값): 값을 직접 입력하지 않고
+     **콤보박스 두 개로 선택**합니다 — "단위" 콤보박스에서 시/분/초 중 하나를 고르면, "값"
+     콤보박스가 그 단위에 맞는 범위(시: 0~99, 분/초: 0~59)의 드롭다운으로 다시 채워집니다
+     (`RtcConfigPanel.PopulateUnitValueCombo()`). "Read"/"Write"는 그 순간 선택된 단위
+     **하나**에 대해서만 동작합니다 — 시가 선택된 상태면 `RTC_R_H`/`RTC_W_H`만, 분이면
+     `RTC_R_M`/`RTC_W_M`만, 초면 `RTC_R_S`/`RTC_W_S`만 보냅니다(`Stm32Commands.
+     GetRtcHourAsync`/`SetRtcHourAsync` 등 단위별 헬퍼 참고). "Read" 값은 단위별로
+     `AppSettings.RtcHourCache`/`RtcMinuteCache`/`RtcSecondCache`에 로컬 캐시되고,
+     마지막으로 선택했던 단위 자체도 `RtcUnitKindCache`에 캐시되어 다음 실행 시 그 단위와
+     값이 함께 미리 채워집니다. 명령 전송 채널/커맨드 타임아웃/로그는 위 "리셋 주기" 그룹과
+     함께 씁니다.
 
 5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 STATUS 프레임을 표시합니다. 측정값 프레임 전송
@@ -293,7 +294,7 @@ Stm32WifiConfigTool/
   Models/
     NetConfig.cs
     MeasurementConfig.cs    - Reference/Offset/Resistance/Interval Time
-    RtcConfig.cs            - RTC 리셋 주기(초) + 시/분/초 개별 값 (신규)
+    RtcConfig.cs            - RTC 리셋 주기(초) (신규 - 시/분/초 개별 값은 모델 없이 int로 주고받음)
     MeasurementRecord.cs    - DC IP/MAC + data1..N (개수 가변)
     AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
@@ -331,8 +332,8 @@ MCU 측 `pc_comm.c`를 이 형식(태그 있는 응답이든 없는 응답이든
 **`RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`("시/분/초 개별 설정")도
 WIFI_R_ALL 계열과 마찬가지로 이 PC 도구에서 새로 도입한 커맨드로, `firmware/`·`firmware-no-rtos/`에는
 아직 구현되어 있지 않습니다** — 프레임 형태는 `Services/Stm32Protocol.cs`의 `BuildRtcHourWrite`/
-`BuildRtcMinuteWrite`/`BuildRtcSecondWrite` 및 `Stm32Commands.cs`의 `GetRtcUnitsAsync`/
-`SetRtcUnitsAsync` 등의 XML 주석에 정의되어 있습니다.
+`BuildRtcMinuteWrite`/`BuildRtcSecondWrite` 및 `Stm32Commands.cs`의 `GetRtcHourAsync`/
+`SetRtcHourAsync` 등의 XML 주석에 정의되어 있습니다.
 
 MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`,
 ESP32 상태 브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`,
