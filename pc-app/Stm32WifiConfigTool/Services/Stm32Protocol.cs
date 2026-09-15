@@ -74,6 +74,17 @@ namespace Stm32WifiConfigTool.Services
                    intervalSec.ToString(CultureInfo.InvariantCulture);
         }
 
+        /// <summary>RTC Wakeup Timer 리셋 주기(초)를 한 번에 조회한다.
+        /// 응답: RESET_R_ALL,seconds</summary>
+        public static readonly string CmdResetReadAll = Stx + "RESET_R_ALL";
+
+        /// <summary>RTC Wakeup Timer 리셋 주기(초)를 MCU에 전달한다. 응답: RESET_W_ALL,OK 또는
+        /// RESET_W_ALL,ERR,&lt;reason&gt; (MISSING_ARGS/INVALID_SECONDS)</summary>
+        public static string BuildResetWriteAll(int periodSec)
+        {
+            return Stx + "RESET_W_ALL," + periodSec.ToString(CultureInfo.InvariantCulture);
+        }
+
         /// <summary>RTC 리셋 주기의 "시" 값을 조회한다. 응답: RTC_R_H,hour</summary>
         public static readonly string CmdRtcHourReadAll = Stx + "RTC_R_H";
 
