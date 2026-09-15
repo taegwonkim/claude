@@ -6,8 +6,8 @@ using Stm32WifiConfigTool.Models;
 namespace Stm32WifiConfigTool.Services
 {
     /// <summary>
-    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RESET_R_ALL/RESET_W_ALL 프레임을 보내고 응답
-    /// 프레임을 기다리는 async 헬퍼.
+    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_H/RTC_W_H/RTC_R_M/RTC_W_M/RTC_R_S/RTC_W_S
+    /// 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
     /// 측정값/EVENT/STATUS/RESET_COUNT 프레임은 비동기 텔레메트리(브로드캐스트)이므로 일반 커맨드
     /// 응답으로 취급하지 않고 건너뛴다(<see cref="Stm32Protocol.IsBroadcastFrame"/> 참고). 그 외에는
     /// 태그가 있든("MEAS_R_ALL,...") 없든("5000,200,0,1,0"만 맨몸으로 - 실측 결과 실제 MCU가 이
@@ -183,38 +183,6 @@ namespace Stm32WifiConfigTool.Services
             }
         }
 
-        /// <summary>RESET_R_ALL을 보내고 응답(태그 있으면 "RESET_R_ALL,seconds" 없으면 값만
-        /// "seconds")을 RtcConfig로 변환한다.</summary>
-        public static async Task<RtcConfig> GetResetAllAsync(SerialLinkService link, int timeoutMs)
-        {
-            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdResetReadAll, timeoutMs);
-            string[] v = StripTag(fields, "RESET_R_ALL");
-
-            if (v.Length < 1)
-            {
-                throw new InvalidOperationException("RESET_R_ALL 응답 필드 부족 (" + v.Length + "/1): " + string.Join(",", fields));
-            }
-
-            int.TryParse(v[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int periodSec);
-
-            return new RtcConfig { PeriodSec = periodSec };
-        }
-
-        /// <summary>cfg.PeriodSec을 RESET_W_ALL 한 프레임으로 전송한다. 응답이 "OK"(태그 있으면
-        /// "RESET_W_ALL,OK")가 아니면(ERR,MISSING_ARGS / ERR,INVALID_SECONDS 등) 실패로 간주해
-        /// 예외를 던진다.</summary>
-        public static async Task SetResetAllAsync(SerialLinkService link, RtcConfig cfg, int timeoutMs)
-        {
-            string command = Stm32Protocol.BuildResetWriteAll(cfg.PeriodSec);
-            string[] reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
-            string[] v = StripTag(reply, "RESET_W_ALL");
-
-            if (v.Length < 1 || v[0] != "OK")
-            {
-                throw new InvalidOperationException("RESET_W_ALL 실패: " + string.Join(",", reply));
-            }
-        }
-
         /// <summary>RTC_R_H/RTC_R_M/RTC_R_S 공통 처리: command를 보내고 응답(태그 있으면
         /// "&lt;tag&gt;,value" 없으면 값만)에서 정수 하나를 꺼낸다.</summary>
         private static async Task<int> GetRtcUnitAsync(SerialLinkService link, string command, string tag, int timeoutMs)
@@ -244,29 +212,29 @@ namespace Stm32WifiConfigTool.Services
             }
         }
 
-        /// <summary>RTC_R_H를 보내 "시" 값을 조회한다(<see cref="RtcConfig.PeriodSec"/>과는 별도의
-        /// 독립된 값 - <see cref="Models.RtcConfig"/> 클래스 주석 참고).</summary>
+        /// <summary>RTC_R_H를 보내 리셋 주기(초) 값을 조회한다 - RTC_R_M/RTC_R_S와 값의 의미는
+        /// 완전히 같고(전체 리셋 주기), 조회에 쓰는 커맨드 이름만 다르다.</summary>
         public static Task<int> GetRtcHourAsync(SerialLinkService link, int timeoutMs) =>
             GetRtcUnitAsync(link, Stm32Protocol.CmdRtcHourReadAll, "RTC_R_H", timeoutMs);
 
-        /// <summary>hour를 RTC_W_H 한 프레임으로 전송한다.</summary>
-        public static Task SetRtcHourAsync(SerialLinkService link, int hour, int timeoutMs) =>
-            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcHourWrite(hour), "RTC_W_H", timeoutMs);
+        /// <summary>리셋 주기(초) 전체 값을 RTC_W_H 한 프레임으로 전송한다.</summary>
+        public static Task SetRtcHourAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
+            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcHourWrite(periodSec), "RTC_W_H", timeoutMs);
 
-        /// <summary>RTC_R_M을 보내 "분" 값을 조회한다.</summary>
+        /// <summary>RTC_R_M을 보내 리셋 주기(초) 값을 조회한다 - <see cref="GetRtcHourAsync"/> 참고.</summary>
         public static Task<int> GetRtcMinuteAsync(SerialLinkService link, int timeoutMs) =>
             GetRtcUnitAsync(link, Stm32Protocol.CmdRtcMinuteReadAll, "RTC_R_M", timeoutMs);
 
-        /// <summary>minute를 RTC_W_M 한 프레임으로 전송한다.</summary>
-        public static Task SetRtcMinuteAsync(SerialLinkService link, int minute, int timeoutMs) =>
-            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcMinuteWrite(minute), "RTC_W_M", timeoutMs);
+        /// <summary>리셋 주기(초) 전체 값을 RTC_W_M 한 프레임으로 전송한다.</summary>
+        public static Task SetRtcMinuteAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
+            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcMinuteWrite(periodSec), "RTC_W_M", timeoutMs);
 
-        /// <summary>RTC_R_S를 보내 "초" 값을 조회한다.</summary>
+        /// <summary>RTC_R_S를 보내 리셋 주기(초) 값을 조회한다 - <see cref="GetRtcHourAsync"/> 참고.</summary>
         public static Task<int> GetRtcSecondAsync(SerialLinkService link, int timeoutMs) =>
             GetRtcUnitAsync(link, Stm32Protocol.CmdRtcSecondReadAll, "RTC_R_S", timeoutMs);
 
-        /// <summary>second를 RTC_W_S 한 프레임으로 전송한다.</summary>
-        public static Task SetRtcSecondAsync(SerialLinkService link, int second, int timeoutMs) =>
-            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcSecondWrite(second), "RTC_W_S", timeoutMs);
+        /// <summary>리셋 주기(초) 전체 값을 RTC_W_S 한 프레임으로 전송한다.</summary>
+        public static Task SetRtcSecondAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
+            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcSecondWrite(periodSec), "RTC_W_S", timeoutMs);
     }
 }

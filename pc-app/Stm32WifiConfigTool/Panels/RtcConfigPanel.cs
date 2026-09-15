@@ -6,20 +6,15 @@ using Stm32WifiConfigTool.Services;
 namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// RTC 관련 설정 패널. "RTC 리셋 설정" 그룹 하나에 두 가지 값이 있고, 그 아래 Read/Write
-    /// 버튼(<c>_readButton</c>/<c>_writeButton</c>) 하나로 둘 다 함께 처리한다(별도의 버튼이
-    /// 더 있지 않다):
-    /// (1) "리셋 주기" - RESET_R_ALL/RESET_W_ALL 프레임으로 MCU와 주고받는 리셋 주기(초)
-    /// (docs/프로토콜_명세.md §6, firmware/firmware-no-rtos 양쪽 이미 구현됨).
-    /// (2) "단위"(시/분/초) - RTC_R_H/RTC_R_M/RTC_R_S 또는 RTC_W_H/RTC_W_M/RTC_W_S 중 "단위"
-    /// 콤보박스에서 고른 것 하나만 개별로 읽고 쓴다. 별도의 "값" 입력란은 없고, Write 시 위
-    /// "리셋 주기"(초)를 시/분/초로 환산한 값 중 선택된 단위에 해당하는 값을 그대로 보낸다
-    /// (<see cref="DecomposePeriod"/>).
-    /// "Read"를 누르면 RESET_R_ALL로 리셋 주기를 먼저 읽어 화면에 채우고, 이어서 선택된 단위의
-    /// RTC_R_x도 조회해 로그에 표시한다(별도 표시 입력란은 없다). "Write"를 누르면 화면의 리셋
-    /// 주기를 RESET_W_ALL로 먼저 전달하고, 이어서 그 값을 시/분/초로 환산해 선택된 단위의
-    /// RTC_W_x도 전송한다 - 즉 한 번의 클릭으로 (1)과 (2)가 항상 함께 처리된다
-    /// (<see cref="UnitReadButton_Click"/>/<see cref="UnitWriteButton_Click"/>).
+    /// RTC 리셋 주기(초) 설정 패널. "RESET_R_ALL"/"RESET_W_ALL" 커맨드는 쓰지 않는다 - "리셋 주기"
+    /// 값은 항상 "단위"(시/분/초) 콤보박스에서 고른 것에 해당하는 RTC_R_H/RTC_R_M/RTC_R_S(읽기)
+    /// 또는 RTC_W_H/RTC_W_M/RTC_W_S(쓰기)로만 주고받는다 - 세 커맨드 모두 값의 의미는 완전히
+    /// 같은 "리셋 주기 전체(초)"이며, 어느 것을 쓰든 커맨드 이름만 다를 뿐 결과는 같다(예:
+    /// "단위"에서 "시"를 고르면 Read는 RTC_R_H, Write는 RTC_W_H,&lt;리셋 주기 값&gt;을 보낸다).
+    /// 값을 시/분/초로 쪼개서 보내지 않는다.
+    /// "Read"/"Write" 버튼(<c>_readButton</c>/<c>_writeButton</c>)은 이 패널에 하나씩만 있고,
+    /// "단위" 콤보박스에서 선택된 것을 그대로 써서 동작한다(<see cref="UnitReadButton_Click"/>/
+    /// <see cref="UnitWriteButton_Click"/>).
     /// "Read" 성공 시 리셋 주기 값을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
     /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
     /// UI 레이아웃은 <c>RtcConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
@@ -43,16 +38,6 @@ namespace Stm32WifiConfigTool.Panels
             InitializeComponent();
             _unitKindBox.Items.AddRange(UnitKinds);
             _unitKindBox.SelectedIndex = 0;
-        }
-
-        /// <summary>_periodBox의 현재 값(초)을 시/분/초로 환산한다(예: 5000초 → 1시 23분 20초).</summary>
-        private void DecomposePeriod(out int hour, out int minute, out int second)
-        {
-            int total = (int)_periodBox.Value;
-            hour = total / 3600;
-            int remainder = total % 3600;
-            minute = remainder / 60;
-            second = remainder % 60;
         }
 
         private void UnitKindBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -96,9 +81,9 @@ namespace Stm32WifiConfigTool.Panels
 
         /// <summary>"Read"(리셋 주기)로 받은 값을 로컬 캐시에 저장하고 즉시 파일에 반영한다
         /// (다음 실행 시 <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
-        private void SavePeriodCache(RtcConfig cfg)
+        private void SavePeriodCache(int periodSec)
         {
-            _settings.RtcPeriodSecCache = cfg.PeriodSec;
+            _settings.RtcPeriodSecCache = periodSec;
             try
             {
                 AppSettingsStore.Save(_settings);
@@ -149,10 +134,8 @@ namespace Stm32WifiConfigTool.Panels
             }
         }
 
-        /// <summary>이 패널의 유일한 Read 버튼: RESET_R_ALL로 리셋 주기를 먼저 읽어 화면에
-        /// 채우고 캐시한 뒤, 이어서 _unitKindBox에서 선택된 단위 하나(RTC_R_H/RTC_R_M/RTC_R_S 중
-        /// 해당하는 것)도 조회해 로그에 표시한다(별도 표시 입력란은 없다). 리셋 주기 읽기가
-        /// 실패하면 단위 읽기는 시도하지 않는다.</summary>
+        /// <summary>_unitKindBox에서 선택된 단위 하나에 해당하는 커맨드(RTC_R_H/RTC_R_M/RTC_R_S 중
+        /// 하나)로 리셋 주기(초) 전체 값을 조회해 화면에 채우고 캐시한다.</summary>
         private async void UnitReadButton_Click(object sender, EventArgs e)
         {
             if (!EnsureConnected())
@@ -160,41 +143,28 @@ namespace Stm32WifiConfigTool.Panels
                 return;
             }
 
-            try
-            {
-                Log("RESET_R_ALL 요청...");
-                RtcConfig cfg = await Stm32Commands.GetResetAllAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
-                _periodBox.Value = ClampDecimal(cfg.PeriodSec, _periodBox.Minimum, _periodBox.Maximum);
-                SavePeriodCache(cfg);
-                Log("RESET_R_ALL 완료 (" + cfg.PeriodSec + "초)");
-            }
-            catch (Exception ex)
-            {
-                Log("RESET_R_ALL 실패: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
             string kind = (string)_unitKindBox.SelectedItem;
             try
             {
-                int value;
+                int periodSec;
                 switch (kind)
                 {
                     case UnitKindHour:
                         Log("RTC_R_H 요청...");
-                        value = await Stm32Commands.GetRtcHourAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                        periodSec = await Stm32Commands.GetRtcHourAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
                         break;
                     case UnitKindMinute:
                         Log("RTC_R_M 요청...");
-                        value = await Stm32Commands.GetRtcMinuteAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                        periodSec = await Stm32Commands.GetRtcMinuteAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
                         break;
                     default:
                         Log("RTC_R_S 요청...");
-                        value = await Stm32Commands.GetRtcSecondAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                        periodSec = await Stm32Commands.GetRtcSecondAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
                         break;
                 }
-                Log(kind + " 읽기 완료 (현재 MCU 값: " + value + ")");
+                _periodBox.Value = ClampDecimal(periodSec, _periodBox.Minimum, _periodBox.Maximum);
+                SavePeriodCache(periodSec);
+                Log(kind + " 읽기 완료 (리셋 주기: " + periodSec + "초)");
             }
             catch (Exception ex)
             {
@@ -203,10 +173,8 @@ namespace Stm32WifiConfigTool.Panels
             }
         }
 
-        /// <summary>이 패널의 유일한 Write 버튼: 화면의 리셋 주기를 RESET_W_ALL로 먼저
-        /// 전달하고, 이어서 그 값을 시/분/초로 환산해(<see cref="DecomposePeriod"/>)
-        /// _unitKindBox에서 선택된 단위 하나(RTC_W_H/RTC_W_M/RTC_W_S 중 해당하는 것)도
-        /// 전송한다. 리셋 주기 쓰기가 실패하면 단위 쓰기는 시도하지 않는다.</summary>
+        /// <summary>화면의 "리셋 주기" 값을 _unitKindBox에서 선택된 단위 하나에 해당하는
+        /// 커맨드(RTC_W_H/RTC_W_M/RTC_W_S 중 하나)로 그대로 전송한다.</summary>
         private async void UnitWriteButton_Click(object sender, EventArgs e)
         {
             if (!EnsureConnected())
@@ -214,40 +182,26 @@ namespace Stm32WifiConfigTool.Panels
                 return;
             }
 
-            var cfg = new RtcConfig { PeriodSec = (int)_periodBox.Value };
-            try
-            {
-                Log("RESET_W_ALL 전송... (" + cfg.PeriodSec + "초)");
-                await Stm32Commands.SetResetAllAsync(SelectedLink, cfg, (int)_cmdTimeoutBox.Value);
-                SavePeriodCache(cfg);
-                Log("RESET_W_ALL 완료");
-            }
-            catch (Exception ex)
-            {
-                Log("RESET_W_ALL 실패: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
             string kind = (string)_unitKindBox.SelectedItem;
-            DecomposePeriod(out int hour, out int minute, out int second);
+            int periodSec = (int)_periodBox.Value;
             try
             {
                 switch (kind)
                 {
                     case UnitKindHour:
-                        Log("RTC_W_H 전송... (" + hour + ")");
-                        await Stm32Commands.SetRtcHourAsync(SelectedLink, hour, (int)_cmdTimeoutBox.Value);
+                        Log("RTC_W_H 전송... (" + periodSec + ")");
+                        await Stm32Commands.SetRtcHourAsync(SelectedLink, periodSec, (int)_cmdTimeoutBox.Value);
                         break;
                     case UnitKindMinute:
-                        Log("RTC_W_M 전송... (" + minute + ")");
-                        await Stm32Commands.SetRtcMinuteAsync(SelectedLink, minute, (int)_cmdTimeoutBox.Value);
+                        Log("RTC_W_M 전송... (" + periodSec + ")");
+                        await Stm32Commands.SetRtcMinuteAsync(SelectedLink, periodSec, (int)_cmdTimeoutBox.Value);
                         break;
                     default:
-                        Log("RTC_W_S 전송... (" + second + ")");
-                        await Stm32Commands.SetRtcSecondAsync(SelectedLink, second, (int)_cmdTimeoutBox.Value);
+                        Log("RTC_W_S 전송... (" + periodSec + ")");
+                        await Stm32Commands.SetRtcSecondAsync(SelectedLink, periodSec, (int)_cmdTimeoutBox.Value);
                         break;
                 }
+                SavePeriodCache(periodSec);
                 Log(kind + " 쓰기 완료");
                 MessageBox.Show(this, "전달되었습니다.", "RTC 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }

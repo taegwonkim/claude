@@ -120,10 +120,10 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
             // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
-            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다. "시/분/초 개별 설정"도
-            // 이 그룹 안에 함께 있다. _readButton/_writeButton이 이 패널의 유일한
-            // Read/Write 버튼으로, 클릭 시 위 "리셋 주기"(RESET_R_ALL/RESET_W_ALL)와 아래
-            // "단위" 콤보박스로 고른 시/분/초 하나(RTC_R_x/RTC_W_x)를 함께 처리한다 -
+            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다. "리셋 주기" 값은
+            // RESET_R_ALL/RESET_W_ALL을 쓰지 않고, 아래 "단위" 콤보박스로 고른 시/분/초 하나에
+            // 해당하는 RTC_R_x/RTC_W_x로만 주고받는다(셋 다 값의 의미는 같은 리셋 주기 전체).
+            // _readButton/_writeButton이 이 패널의 유일한 Read/Write 버튼이다 -
             // RtcConfigPanel.cs의 UnitReadButton_Click/UnitWriteButton_Click 참고.)
             //
             this._fieldsGroup.Controls.Add(this._periodLabel);
