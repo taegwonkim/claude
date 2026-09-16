@@ -171,6 +171,23 @@ namespace Stm32WifiConfigTool.Services
         public static bool IsResetLogText(string text) =>
             !string.IsNullOrEmpty(text) && text.StartsWith(ResetLogPrefix, StringComparison.Ordinal);
 
+        private const string MacAddressPrefix = "MAC_";
+
+        /// <summary>STX 유무와 관계없이(<see cref="DisplayText"/>로 이미 STX를 뗀) 원본 텍스트가
+        /// "MAC_&lt;mac address&gt;" 형식인지 확인하고, "MAC_" 뒤의 값을 꺼낸다. 이 프레임의 원본
+        /// 텍스트 자체는 다른 프레임과 마찬가지로 그대로 로그에 남기고, 이 값은 그와 별도로 화면의
+        /// MAC Address 표시 영역을 갱신하는 데만 쓴다.</summary>
+        public static bool TryParseMacAddress(string text, out string macAddress)
+        {
+            macAddress = null;
+            if (string.IsNullOrEmpty(text) || !text.StartsWith(MacAddressPrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+            macAddress = text.Substring(MacAddressPrefix.Length);
+            return true;
+        }
+
         /// <summary>Esp32_LinkState_t 값(0/1/2)을 사람이 읽을 수 있는 텍스트로 변환한다.</summary>
         public static string DescribeStatus(int statusNumber)
         {

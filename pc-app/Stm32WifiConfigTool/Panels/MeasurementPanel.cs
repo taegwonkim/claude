@@ -16,6 +16,10 @@ namespace Stm32WifiConfigTool.Panels
     /// 등)을 한 로그에 원본 그대로 모아 보여준다 — ESP32 상태(STATUS)는 별도 EspStatusPanel의
     /// "현재 ESP32 상태"에 이미 크게 표시되므로 여기서는 별도 칸을 두지 않는다. 측정값이 아닌
     /// 프레임은 STX 유무에 관계없이 전부 표시된다(<see cref="Stm32Protocol.DisplayText"/> 참고).
+    /// 그 중 "MAC_&lt;mac address&gt;" 형식("&lt;STX&gt;MAC_mac address&lt;CR&gt;&lt;LF&gt;"로 옴,
+    /// <see cref="Stm32Protocol.TryParseMacAddress"/> 참고)인 경우에는 원본 프레임을 위 로그에
+    /// 그대로 남기는 것과 별도로, "MAC_" 뒤의 값만 상단 "자동 스크롤" 체크박스 옆의
+    /// MAC Address 표시 영역에도 갱신한다.
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -166,6 +170,13 @@ namespace Stm32WifiConfigTool.Panels
                  * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다(채널([USB]/[UART]) 표시는
                  * 붙이지 않는다). */
                 _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload + Environment.NewLine);
+
+                /* "MAC_<mac address>" 형식이면 그 값만 별도로 MAC Address 표시 영역에도 갱신한다
+                 * (위 원본 로그 표시는 그대로 유지한 채 추가로 표시하는 것). */
+                if (Stm32Protocol.TryParseMacAddress(payload, out string macAddress))
+                {
+                    _macAddressValueLabel.Text = macAddress;
+                }
             }
         }
 

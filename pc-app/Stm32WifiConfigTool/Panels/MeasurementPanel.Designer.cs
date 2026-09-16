@@ -13,6 +13,8 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Button _clearButton;
         private System.Windows.Forms.Button _exportButton;
         private System.Windows.Forms.CheckBox _autoScrollCheck;
+        private System.Windows.Forms.Label _macAddressCaptionLabel;
+        private System.Windows.Forms.Label _macAddressValueLabel;
         private System.Windows.Forms.SplitContainer _splitDisplay;
         private System.Windows.Forms.TableLayoutPanel _leftLayout;
         private System.Windows.Forms.DataGridView _grid;
@@ -42,6 +44,8 @@ namespace Stm32WifiConfigTool.Panels
             this._clearButton = new System.Windows.Forms.Button();
             this._exportButton = new System.Windows.Forms.Button();
             this._autoScrollCheck = new System.Windows.Forms.CheckBox();
+            this._macAddressCaptionLabel = new System.Windows.Forms.Label();
+            this._macAddressValueLabel = new System.Windows.Forms.Label();
             this._splitDisplay = new System.Windows.Forms.SplitContainer();
             this._leftLayout = new System.Windows.Forms.TableLayoutPanel();
             this._grid = new System.Windows.Forms.DataGridView();
@@ -89,10 +93,12 @@ namespace Stm32WifiConfigTool.Panels
             this._topRow.Controls.Add(this._clearButton);
             this._topRow.Controls.Add(this._exportButton);
             this._topRow.Controls.Add(this._autoScrollCheck);
+            this._topRow.Controls.Add(this._macAddressCaptionLabel);
+            this._topRow.Controls.Add(this._macAddressValueLabel);
             this._topRow.Dock = System.Windows.Forms.DockStyle.Top;
             this._topRow.Location = new System.Drawing.Point(9, 9);
             this._topRow.Name = "_topRow";
-            this._topRow.Size = new System.Drawing.Size(410, 56);
+            this._topRow.Size = new System.Drawing.Size(600, 56);
             this._topRow.TabIndex = 0;
             this._topRow.WrapContents = false;
             //
@@ -164,6 +170,28 @@ namespace Stm32WifiConfigTool.Panels
             this._autoScrollCheck.TabIndex = 3;
             this._autoScrollCheck.Text = "자동 스크롤";
             this._autoScrollCheck.CheckedChanged += new System.EventHandler(this.AutoScrollCheck_CheckedChanged);
+            //
+            // _macAddressCaptionLabel (MCU가 "<STX>MAC_<mac address><CR><LF>" 형식으로 보내면
+            // MAC_ 뒤의 값만 여기 _macAddressValueLabel에 별도 표시한다. 수신 프레임 원본은
+            // 평소대로 우측 "그 외 수신값" 로그에도 그대로 남는다.)
+            //
+            this._macAddressCaptionLabel.AutoSize = true;
+            this._macAddressCaptionLabel.Location = new System.Drawing.Point(523, 20);
+            this._macAddressCaptionLabel.Margin = new System.Windows.Forms.Padding(10, 20, 3, 3);
+            this._macAddressCaptionLabel.Name = "_macAddressCaptionLabel";
+            this._macAddressCaptionLabel.Size = new System.Drawing.Size(75, 15);
+            this._macAddressCaptionLabel.TabIndex = 4;
+            this._macAddressCaptionLabel.Text = "MAC Address";
+            //
+            // _macAddressValueLabel
+            //
+            this._macAddressValueLabel.AutoSize = true;
+            this._macAddressValueLabel.Location = new System.Drawing.Point(611, 20);
+            this._macAddressValueLabel.Margin = new System.Windows.Forms.Padding(6, 20, 3, 3);
+            this._macAddressValueLabel.Name = "_macAddressValueLabel";
+            this._macAddressValueLabel.Size = new System.Drawing.Size(12, 15);
+            this._macAddressValueLabel.TabIndex = 5;
+            this._macAddressValueLabel.Text = "-";
             //
             // _splitDisplay (좌: 측정값 그리드 | 우: STATUS + 그 외 수신값 로그.
             // 사용자가 경계선을 드래그해 폭을 조절할 수 있고, 조절한 폭은 저장된다.)
