@@ -14,7 +14,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Button _exportButton;
         private System.Windows.Forms.CheckBox _autoScrollCheck;
         private System.Windows.Forms.Label _macAddressCaptionLabel;
-        private System.Windows.Forms.Label _macAddressValueLabel;
+        private System.Windows.Forms.TextBox _macAddressValueLabel;
         private System.Windows.Forms.SplitContainer _splitDisplay;
         private System.Windows.Forms.TableLayoutPanel _leftLayout;
         private System.Windows.Forms.DataGridView _grid;
@@ -45,7 +45,7 @@ namespace Stm32WifiConfigTool.Panels
             this._exportButton = new System.Windows.Forms.Button();
             this._autoScrollCheck = new System.Windows.Forms.CheckBox();
             this._macAddressCaptionLabel = new System.Windows.Forms.Label();
-            this._macAddressValueLabel = new System.Windows.Forms.Label();
+            this._macAddressValueLabel = new System.Windows.Forms.TextBox();
             this._splitDisplay = new System.Windows.Forms.SplitContainer();
             this._leftLayout = new System.Windows.Forms.TableLayoutPanel();
             this._grid = new System.Windows.Forms.DataGridView();
@@ -183,13 +183,14 @@ namespace Stm32WifiConfigTool.Panels
             this._macAddressCaptionLabel.TabIndex = 4;
             this._macAddressCaptionLabel.Text = "MAC Address";
             //
-            // _macAddressValueLabel
+            // _macAddressValueLabel (흰색 바탕의 읽기 전용 텍스트 박스로 표시)
             //
-            this._macAddressValueLabel.AutoSize = true;
+            this._macAddressValueLabel.BackColor = System.Drawing.Color.White;
             this._macAddressValueLabel.Location = new System.Drawing.Point(611, 20);
             this._macAddressValueLabel.Margin = new System.Windows.Forms.Padding(6, 20, 3, 3);
             this._macAddressValueLabel.Name = "_macAddressValueLabel";
-            this._macAddressValueLabel.Size = new System.Drawing.Size(12, 15);
+            this._macAddressValueLabel.ReadOnly = true;
+            this._macAddressValueLabel.Size = new System.Drawing.Size(120, 23);
             this._macAddressValueLabel.TabIndex = 5;
             this._macAddressValueLabel.Text = "-";
             //
