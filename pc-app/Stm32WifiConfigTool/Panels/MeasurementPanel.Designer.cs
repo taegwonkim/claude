@@ -18,11 +18,11 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.SplitContainer _splitDisplay;
         private System.Windows.Forms.TableLayoutPanel _leftLayout;
         private System.Windows.Forms.DataGridView _grid;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colReceivedAt;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colChannel;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colTimeStamp;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colDcIp;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colMac;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colSamples;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colRawLine;
         private System.Windows.Forms.Label _countLabel;
         private System.Windows.Forms.TableLayoutPanel _rightLayout;
         private System.Windows.Forms.Label _eventLabel;
@@ -49,11 +49,11 @@ namespace Stm32WifiConfigTool.Panels
             this._splitDisplay = new System.Windows.Forms.SplitContainer();
             this._leftLayout = new System.Windows.Forms.TableLayoutPanel();
             this._grid = new System.Windows.Forms.DataGridView();
-            this._colReceivedAt = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colChannel = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._colTimeStamp = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colDcIp = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colMac = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colSamples = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._colRawLine = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._countLabel = new System.Windows.Forms.Label();
             this._rightLayout = new System.Windows.Forms.TableLayoutPanel();
             this._eventLabel = new System.Windows.Forms.Label();
@@ -232,11 +232,11 @@ namespace Stm32WifiConfigTool.Panels
             this._grid.AllowUserToDeleteRows = false;
             this._grid.AutoGenerateColumns = false;
             this._grid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this._colReceivedAt,
-            this._colChannel,
+            this._colTimeStamp,
             this._colDcIp,
             this._colMac,
-            this._colSamples});
+            this._colSamples,
+            this._colRawLine});
             this._grid.Dock = System.Windows.Forms.DockStyle.Fill;
             this._grid.Location = new System.Drawing.Point(3, 3);
             this._grid.Name = "_grid";
@@ -245,23 +245,16 @@ namespace Stm32WifiConfigTool.Panels
             this._grid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this._grid.Size = new System.Drawing.Size(544, 297);
             this._grid.TabIndex = 0;
+            this._grid.ColumnWidthChanged += new System.Windows.Forms.DataGridViewColumnEventHandler(this.Grid_ColumnWidthChanged);
             //
-            // _colReceivedAt
+            // _colTimeStamp
             //
-            this._colReceivedAt.DataPropertyName = "ReceivedAt";
-            this._colReceivedAt.DefaultCellStyle = new System.Windows.Forms.DataGridViewCellStyle() { Format = "HH:mm:ss.fff" };
-            this._colReceivedAt.HeaderText = "수신 시각";
-            this._colReceivedAt.Name = "_colReceivedAt";
-            this._colReceivedAt.ReadOnly = true;
-            this._colReceivedAt.Width = 140;
-            //
-            // _colChannel
-            //
-            this._colChannel.DataPropertyName = "SourceChannel";
-            this._colChannel.HeaderText = "채널";
-            this._colChannel.Name = "_colChannel";
-            this._colChannel.ReadOnly = true;
-            this._colChannel.Width = 60;
+            this._colTimeStamp.DataPropertyName = "TimeStamp";
+            this._colTimeStamp.DefaultCellStyle = new System.Windows.Forms.DataGridViewCellStyle() { Format = "HH:mm:ss.fff" };
+            this._colTimeStamp.HeaderText = "TimeStamp";
+            this._colTimeStamp.Name = "_colTimeStamp";
+            this._colTimeStamp.ReadOnly = true;
+            this._colTimeStamp.Width = 140;
             //
             // _colDcIp
             //
@@ -281,12 +274,21 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _colSamples
             //
-            this._colSamples.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
             this._colSamples.DataPropertyName = "SamplesText";
             this._colSamples.HeaderText = "Data1..N";
             this._colSamples.Name = "_colSamples";
             this._colSamples.ReadOnly = true;
             this._colSamples.Width = 260;
+            //
+            // _colRawLine (측정값 프레임의 원본 텍스트 전체 - 항상 마지막 열에 놓고, 남는 폭을
+            // 모두 채운다(AutoSizeMode.Fill))
+            //
+            this._colRawLine.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this._colRawLine.DataPropertyName = "RawLine";
+            this._colRawLine.HeaderText = "RawLine";
+            this._colRawLine.MinimumWidth = 150;
+            this._colRawLine.Name = "_colRawLine";
+            this._colRawLine.ReadOnly = true;
             //
             // _countLabel
             //

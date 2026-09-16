@@ -224,7 +224,7 @@ namespace Stm32WifiConfigTool.Services
 
             record = new MeasurementRecord
             {
-                ReceivedAt = DateTime.Now,
+                TimeStamp = DateTime.Now,
                 SourceChannel = sourceChannel,
                 DcIp = fields[0].Substring(MeasurementTagPrefix.Length),
                 MacAddress = fields[1],

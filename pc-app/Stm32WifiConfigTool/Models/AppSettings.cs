@@ -72,6 +72,14 @@ namespace Stm32WifiConfigTool.Models
         /// 위치(px, 좌측 폭). 다른 패널 폭들과 마찬가지로 드래그 즉시 저장되고 재시작 후 복원된다.</summary>
         public int MeasurementGridWidth { get; set; } = 550;
 
+        /// <summary>측정값 그리드 각 열의 폭(px). 사용자가 열 경계선을 드래그해 폭을 조절하면
+        /// 즉시 저장되고 재시작 후에도 유지된다(<see cref="Panels.MeasurementPanel.Grid_ColumnWidthChanged"/>
+        /// 참고). "RawLine" 열은 항상 나머지 폭을 채우는 Fill 열이라 별도로 저장하지 않는다.</summary>
+        public int MeasurementColTimeStampWidth { get; set; } = 140;
+        public int MeasurementColDcIpWidth { get; set; } = 110;
+        public int MeasurementColMacWidth { get; set; } = 130;
+        public int MeasurementColSamplesWidth { get; set; } = 260;
+
         /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
         /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.EspStatusPanel.Initialize"/> 참고.)</summary>
         public string EspStatusDisplayChannel { get; set; } = "Usb";

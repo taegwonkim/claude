@@ -56,6 +56,10 @@ namespace Stm32WifiConfigTool.Services
                 settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
                 settings.MeasurementGridWidth = GetInt(map, "MeasurementGridWidth", settings.MeasurementGridWidth);
+                settings.MeasurementColTimeStampWidth = GetInt(map, "MeasurementColTimeStampWidth", settings.MeasurementColTimeStampWidth);
+                settings.MeasurementColDcIpWidth = GetInt(map, "MeasurementColDcIpWidth", settings.MeasurementColDcIpWidth);
+                settings.MeasurementColMacWidth = GetInt(map, "MeasurementColMacWidth", settings.MeasurementColMacWidth);
+                settings.MeasurementColSamplesWidth = GetInt(map, "MeasurementColSamplesWidth", settings.MeasurementColSamplesWidth);
                 settings.EspStatusDisplayChannel = GetString(map, "EspStatusDisplayChannel", settings.EspStatusDisplayChannel);
                 settings.PortPanelWidth = GetInt(map, "PortPanelWidth", settings.PortPanelWidth);
                 settings.WifiPanelWidth = GetInt(map, "WifiPanelWidth", settings.WifiPanelWidth);
@@ -116,6 +120,10 @@ namespace Stm32WifiConfigTool.Services
                 "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
                 "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,
                 "MeasurementGridWidth=" + settings.MeasurementGridWidth,
+                "MeasurementColTimeStampWidth=" + settings.MeasurementColTimeStampWidth,
+                "MeasurementColDcIpWidth=" + settings.MeasurementColDcIpWidth,
+                "MeasurementColMacWidth=" + settings.MeasurementColMacWidth,
+                "MeasurementColSamplesWidth=" + settings.MeasurementColSamplesWidth,
                 "EspStatusDisplayChannel=" + settings.EspStatusDisplayChannel,
                 "PortPanelWidth=" + settings.PortPanelWidth,
                 "WifiPanelWidth=" + settings.WifiPanelWidth,

@@ -49,6 +49,11 @@ namespace Stm32WifiConfigTool.Panels
             _showUart.Checked = settings.MeasurementDisplayChannel == "Uart";
             _autoScrollCheck.Checked = settings.MeasurementAutoScroll;
 
+            _colTimeStamp.Width = settings.MeasurementColTimeStampWidth;
+            _colDcIp.Width = settings.MeasurementColDcIpWidth;
+            _colMac.Width = settings.MeasurementColMacWidth;
+            _colSamples.Width = settings.MeasurementColSamplesWidth;
+
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
 
@@ -75,6 +80,47 @@ namespace Stm32WifiConfigTool.Panels
                 return;
             }
             _settings.MeasurementGridWidth = _splitDisplay.SplitterDistance;
+            try
+            {
+                AppSettingsStore.Save(_settings);
+            }
+            catch (Exception)
+            {
+                /* 설정 저장 실패(권한/디스크 문제 등)로 UI 동작 자체가 막히면 안 되므로 무시 */
+            }
+        }
+
+        /* 사용자가 그리드 열 폭을 드래그로 조절하면(RawLine 열은 Fill이라 남는 폭을 자동으로
+         * 흡수할 뿐 사용자가 직접 조절하는 대상이 아니므로 저장하지 않는다) 즉시 저장하고,
+         * 다음 실행 시 Initialize에서 그대로 복원한다. */
+        private void Grid_ColumnWidthChanged(object sender, DataGridViewColumnEventArgs e)
+        {
+            if (_settings == null)
+            {
+                return;
+            }
+
+            if (e.Column == _colTimeStamp)
+            {
+                _settings.MeasurementColTimeStampWidth = e.Column.Width;
+            }
+            else if (e.Column == _colDcIp)
+            {
+                _settings.MeasurementColDcIpWidth = e.Column.Width;
+            }
+            else if (e.Column == _colMac)
+            {
+                _settings.MeasurementColMacWidth = e.Column.Width;
+            }
+            else if (e.Column == _colSamples)
+            {
+                _settings.MeasurementColSamplesWidth = e.Column.Width;
+            }
+            else
+            {
+                return;
+            }
+
             try
             {
                 AppSettingsStore.Save(_settings);
@@ -206,11 +252,11 @@ namespace Stm32WifiConfigTool.Panels
                 {
                     using (var writer = new StreamWriter(dialog.FileName, false, Encoding.UTF8))
                     {
-                        writer.WriteLine("ReceivedAt,Channel,DcIp,MacAddress,Samples");
+                        writer.WriteLine("TimeStamp,Channel,DcIp,MacAddress,Samples");
                         foreach (MeasurementRecord r in _records)
                         {
                             writer.WriteLine(
-                                r.ReceivedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") + "," +
+                                r.TimeStamp.ToString("yyyy-MM-dd HH:mm:ss.fff") + "," +
                                 r.SourceChannel + "," +
                                 r.DcIp + "," +
                                 r.MacAddress + "," +

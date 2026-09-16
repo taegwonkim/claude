@@ -202,8 +202,14 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      프레임만 표로 보여줍니다. 첫 필드가 리터럴 `DC_` 접두어로 시작하는지로 식별하며(샘플 개수
      N은 고정이 아닙니다 — 실측 결과 6개가 아니라 12개까지 관측되어, 이 접두어 기준으로만
      판별하도록 되어 있습니다. `docs/프로토콜_명세.md` §2가 문서화한 "태그 없음/6개 고정"
-     포맷과는 실제 다르니 유의하세요). `DC IP`/`MAC`은 이 장치(ESP32)의 station IP/MAC
-     주소로, 측정값을 보낸 장치를 구분하는 용도입니다(그리드에는 `DC_` 접두어를 뗀 IP만 표시).
+     포맷과는 실제 다르니 유의하세요). 열은 왼쪽부터 `TimeStamp`(`HH:mm:ss.fff` 형식) /
+     `DC IP`(이 장치(ESP32)의 station IP, `DC_` 접두어는 뗀 값) / `MAC`(같은 장치의 station MAC
+     주소) / `Data1..N` / `RawLine`(수신한 프레임 원본 전체, 항상 마지막 열이며 남는 폭을 모두
+     채웁니다) 순입니다. 채널(USB/UART) 열은 없습니다. `TimeStamp`/`DC IP`/`MAC`/`Data1..N`
+     열의 폭은 경계선을 드래그해 조절할 수 있고, 조절한 폭은 각각 `AppSettings.MeasurementColTimeStampWidth`
+     / `MeasurementColDcIpWidth` / `MeasurementColMacWidth` / `MeasurementColSamplesWidth`로
+     저장되어 재시작 후에도 유지됩니다(`RawLine` 열은 항상 남는 폭을 채우는 열이라 폭을
+     따로 저장하지 않습니다).
    - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지를 한 로그에 원본
      그대로 모아 보여줍니다(높이 전체를 채움) — STX 유무나 태그 형식에 관계없이 전부 표시되며
      (`Stm32Protocol.DisplayText`가 STX를 있으면 떼고 없으면 그대로 두며, 빈 줄만 무시합니다 —

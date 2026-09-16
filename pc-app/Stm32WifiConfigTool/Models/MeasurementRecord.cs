@@ -9,7 +9,7 @@ namespace Stm32WifiConfigTool.Models
     /// </summary>
     public class MeasurementRecord
     {
-        public DateTime ReceivedAt { get; set; }
+        public DateTime TimeStamp { get; set; }
         public string SourceChannel { get; set; } = string.Empty;
 
         /// <summary>측정값을 보낸 장치(STM32+ESP32 유닛)의 ESP32 station IP ("DC_" 접두어는 제거된 값).</summary>
