@@ -11,14 +11,16 @@ namespace Stm32WifiConfigTool.Panels
     /// 또는 RTC_W_H/RTC_W_M/RTC_W_S(쓰기)로만 주고받는다 - 세 커맨드 모두 값의 의미는 완전히
     /// 같은 "리셋 주기 전체(초)"이며, 어느 것을 쓰든 커맨드 이름만 다를 뿐 결과는 같다(예:
     /// "단위"에서 "시"를 고르면 Read는 RTC_R_H, Write는 RTC_W_H,&lt;리셋 주기 값&gt;을 보낸다).
-    /// 값을 시/분/초로 쪼개서 보내지 않는다.
-    /// "리셋 사용"(<c>_resetEnabledBox</c>, YES/NO)은 리셋 주기와 별개로 RTC_R_RST(읽기)/
-    /// RTC_W_RST(쓰기)로만 주고받는다.
-    /// "Read"/"Write" 버튼(<c>_readButton</c>/<c>_writeButton</c>)은 이 패널에 하나씩만 있고,
-    /// "단위" 콤보박스에서 선택된 것과 "리셋 사용" 값을 한 번에 함께 읽고 쓴다
-    /// (<see cref="UnitReadButton_Click"/>/<see cref="UnitWriteButton_Click"/>).
-    /// "Read" 성공 시 리셋 주기/리셋 사용 값을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
-    /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
+    /// 값을 시/분/초로 쪼개서 보내지 않는다. 이 값은 "리셋 주기"/"단위" 전용 Read/Write 버튼
+    /// (<c>_readButton</c>/<c>_writeButton</c>, <see cref="UnitReadButton_Click"/>/
+    /// <see cref="UnitWriteButton_Click"/>)으로만 주고받는다.
+    /// "리셋 사용"(<c>_resetEnabledBox</c>, YES/NO)은 리셋 주기와 완전히 별개로 RTC_R_RST(읽기)/
+    /// RTC_W_RST(쓰기)로 주고받으며, 이 값도 전용 Read/Write 버튼(<c>_resetEnabledReadButton</c>/
+    /// <c>_resetEnabledWriteButton</c>, <see cref="ResetEnabledReadButton_Click"/>/
+    /// <see cref="ResetEnabledWriteButton_Click"/>)이 따로 있다 - 위 리셋 주기/단위 버튼과는
+    /// 서로 영향을 주지 않는다.
+    /// "Read" 성공 시 리셋 주기/리셋 사용 값을 각각 <see cref="AppSettings"/>에 캐시해두고, 다음
+    /// 실행 시 <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
     /// UI 레이아웃은 <c>RtcConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
     /// 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -201,16 +203,10 @@ namespace Stm32WifiConfigTool.Panels
                 _periodBox.Value = ClampDecimal(periodSec, _periodBox.Minimum, _periodBox.Maximum);
                 SavePeriodCache(periodSec);
                 Log(kind + " 읽기 완료 (리셋 주기: " + periodSec + "초)");
-
-                Log("RTC_R_RST 요청...");
-                bool enabled = await Stm32Commands.GetRtcResetEnabledAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
-                _resetEnabledBox.SelectedIndex = enabled ? 0 : 1;
-                SaveResetEnabledCache(enabled);
-                Log("RTC_R_RST 읽기 완료 (리셋 사용: " + (enabled ? YesText : NoText) + ")");
             }
             catch (Exception ex)
             {
-                Log("읽기 실패: " + ex.Message);
+                Log(kind + " 읽기 실패: " + ex.Message);
                 MessageBox.Show(this, ex.Message, "읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -245,18 +241,60 @@ namespace Stm32WifiConfigTool.Panels
                 }
                 SavePeriodCache(periodSec);
                 Log(kind + " 쓰기 완료");
-
-                bool enabled = (string)_resetEnabledBox.SelectedItem == YesText;
-                Log("RTC_W_RST 전송... (" + (enabled ? YesText : NoText) + ")");
-                await Stm32Commands.SetRtcResetEnabledAsync(SelectedLink, enabled, (int)_cmdTimeoutBox.Value);
-                SaveResetEnabledCache(enabled);
-                Log("RTC_W_RST 쓰기 완료");
-
                 MessageBox.Show(this, "전달되었습니다.", "RTC 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                Log("쓰기 실패: " + ex.Message);
+                Log(kind + " 쓰기 실패: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>RTC_R_RST를 보내 "리셋 사용" 여부를 조회해 화면에 채우고 캐시한다 - "리셋
+        /// 주기"/"단위"(<see cref="UnitReadButton_Click"/>)와는 완전히 별개의 버튼이다.</summary>
+        private async void ResetEnabledReadButton_Click(object sender, EventArgs e)
+        {
+            if (!EnsureConnected())
+            {
+                return;
+            }
+
+            try
+            {
+                Log("RTC_R_RST 요청...");
+                bool enabled = await Stm32Commands.GetRtcResetEnabledAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                _resetEnabledBox.SelectedIndex = enabled ? 0 : 1;
+                SaveResetEnabledCache(enabled);
+                Log("RTC_R_RST 읽기 완료 (리셋 사용: " + (enabled ? YesText : NoText) + ")");
+            }
+            catch (Exception ex)
+            {
+                Log("RTC_R_RST 읽기 실패: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>화면의 "리셋 사용" 값을 RTC_W_RST로 그대로 전송한다 - "리셋 주기"/"단위"
+        /// (<see cref="UnitWriteButton_Click"/>)와는 완전히 별개의 버튼이다.</summary>
+        private async void ResetEnabledWriteButton_Click(object sender, EventArgs e)
+        {
+            if (!EnsureConnected())
+            {
+                return;
+            }
+
+            bool enabled = (string)_resetEnabledBox.SelectedItem == YesText;
+            try
+            {
+                Log("RTC_W_RST 전송... (" + (enabled ? YesText : NoText) + ")");
+                await Stm32Commands.SetRtcResetEnabledAsync(SelectedLink, enabled, (int)_cmdTimeoutBox.Value);
+                SaveResetEnabledCache(enabled);
+                Log("RTC_W_RST 쓰기 완료");
+                MessageBox.Show(this, "전달되었습니다.", "RTC 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                Log("RTC_W_RST 쓰기 실패: " + ex.Message);
                 MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
