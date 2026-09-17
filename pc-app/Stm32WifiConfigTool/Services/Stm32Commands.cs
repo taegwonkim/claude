@@ -6,8 +6,8 @@ using Stm32WifiConfigTool.Models;
 namespace Stm32WifiConfigTool.Services
 {
     /// <summary>
-    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_H/RTC_W_H/RTC_R_M/RTC_W_M/RTC_R_S/RTC_W_S
-    /// 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
+    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_H/RTC_W_H/RTC_R_M/RTC_W_M/RTC_R_S/RTC_W_S/
+    /// RTC_R_RST/RTC_W_RST 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
     /// 측정값/EVENT/STATUS/RESET_COUNT 프레임은 비동기 텔레메트리(브로드캐스트)이므로 일반 커맨드
     /// 응답으로 취급하지 않고 건너뛴다(<see cref="Stm32Protocol.IsBroadcastFrame"/> 참고). 그 외에는
     /// 태그가 있든("MEAS_R_ALL,...") 없든("5000,200,0,1,0"만 맨몸으로 - 실측 결과 실제 MCU가 이
@@ -236,5 +236,46 @@ namespace Stm32WifiConfigTool.Services
         /// <summary>리셋 주기(초) 전체 값을 RTC_W_S 한 프레임으로 전송한다.</summary>
         public static Task SetRtcSecondAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
             SetRtcUnitAsync(link, Stm32Protocol.BuildRtcSecondWrite(periodSec), "RTC_W_S", timeoutMs);
+
+        /// <summary>"YES"/"NO"(대소문자 무관, "1"/"0"도 함께 허용)를 bool로 해석한다.</summary>
+        private static bool ParseYesNo(string tag, string value)
+        {
+            if (string.Equals(value, "YES", StringComparison.OrdinalIgnoreCase) || value == "1")
+            {
+                return true;
+            }
+            if (string.Equals(value, "NO", StringComparison.OrdinalIgnoreCase) || value == "0")
+            {
+                return false;
+            }
+            throw new InvalidOperationException(tag + " 응답값을 YES/NO로 해석할 수 없음: " + value);
+        }
+
+        /// <summary>RTC_R_RST를 보내 "리셋 사용" 여부를 조회한다.</summary>
+        public static async Task<bool> GetRtcResetEnabledAsync(SerialLinkService link, int timeoutMs)
+        {
+            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdRtcResetEnabledReadAll, timeoutMs);
+            string[] v = StripTag(fields, "RTC_R_RST");
+
+            if (v.Length < 1)
+            {
+                throw new InvalidOperationException("RTC_R_RST 응답 필드 부족 (" + v.Length + "/1): " + string.Join(",", fields));
+            }
+
+            return ParseYesNo("RTC_R_RST", v[0]);
+        }
+
+        /// <summary>"리셋 사용" 여부를 RTC_W_RST 한 프레임으로 전송한다.</summary>
+        public static async Task SetRtcResetEnabledAsync(SerialLinkService link, bool enabled, int timeoutMs)
+        {
+            string command = Stm32Protocol.BuildRtcResetEnabledWrite(enabled);
+            string[] reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
+            string[] v = StripTag(reply, "RTC_W_RST");
+
+            if (v.Length < 1 || v[0] != "OK")
+            {
+                throw new InvalidOperationException("RTC_W_RST 실패: " + string.Join(",", reply));
+            }
+        }
     }
 }

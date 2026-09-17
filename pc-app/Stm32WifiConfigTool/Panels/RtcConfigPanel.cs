@@ -12,10 +12,12 @@ namespace Stm32WifiConfigTool.Panels
     /// 같은 "리셋 주기 전체(초)"이며, 어느 것을 쓰든 커맨드 이름만 다를 뿐 결과는 같다(예:
     /// "단위"에서 "시"를 고르면 Read는 RTC_R_H, Write는 RTC_W_H,&lt;리셋 주기 값&gt;을 보낸다).
     /// 값을 시/분/초로 쪼개서 보내지 않는다.
+    /// "리셋 사용"(<c>_resetEnabledBox</c>, YES/NO)은 리셋 주기와 별개로 RTC_R_RST(읽기)/
+    /// RTC_W_RST(쓰기)로만 주고받는다.
     /// "Read"/"Write" 버튼(<c>_readButton</c>/<c>_writeButton</c>)은 이 패널에 하나씩만 있고,
-    /// "단위" 콤보박스에서 선택된 것을 그대로 써서 동작한다(<see cref="UnitReadButton_Click"/>/
-    /// <see cref="UnitWriteButton_Click"/>).
-    /// "Read" 성공 시 리셋 주기 값을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
+    /// "단위" 콤보박스에서 선택된 것과 "리셋 사용" 값을 한 번에 함께 읽고 쓴다
+    /// (<see cref="UnitReadButton_Click"/>/<see cref="UnitWriteButton_Click"/>).
+    /// "Read" 성공 시 리셋 주기/리셋 사용 값을 <see cref="AppSettings"/>에 캐시해두고, 다음 실행 시
     /// <see cref="Initialize"/>가 이를 화면에 미리 채운다(MCU 재조회 전 참고용).
     /// UI 레이아웃은 <c>RtcConfigPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
@@ -33,11 +35,19 @@ namespace Stm32WifiConfigTool.Panels
         /// <summary>"단위" 콤보박스("_unitKindBox")의 항목 - 순서가 곧 표시 순서다.</summary>
         private static readonly string[] UnitKinds = { UnitKindHour, UnitKindMinute, UnitKindSecond };
 
+        private const string YesText = "YES";
+        private const string NoText = "NO";
+
+        /// <summary>"리셋 사용" 콤보박스("_resetEnabledBox")의 항목 - 순서가 곧 표시 순서다.</summary>
+        private static readonly string[] YesNoOptions = { YesText, NoText };
+
         public RtcConfigPanel()
         {
             InitializeComponent();
             _unitKindBox.Items.AddRange(UnitKinds);
             _unitKindBox.SelectedIndex = 0;
+            _resetEnabledBox.Items.AddRange(YesNoOptions);
+            _resetEnabledBox.SelectedIndex = 1; // 기본값: NO
         }
 
         private void UnitKindBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -45,6 +55,14 @@ namespace Stm32WifiConfigTool.Panels
             if (_settings != null)
             {
                 _settings.RtcUnitKindCache = (string)_unitKindBox.SelectedItem;
+            }
+        }
+
+        private void ResetEnabledBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (_settings != null)
+            {
+                _settings.RtcResetEnabledCache = _resetEnabledBox.SelectedItem as string == YesText;
             }
         }
 
@@ -68,6 +86,9 @@ namespace Stm32WifiConfigTool.Panels
              * (예: 설정 파일 손상) 첫 항목("시")으로 대체한다. */
             int kindIndex = Array.IndexOf(UnitKinds, settings.RtcUnitKindCache);
             _unitKindBox.SelectedIndex = kindIndex >= 0 ? kindIndex : 0;
+
+            /* 마지막으로 "Read"에 성공했던 "리셋 사용" 값을 미리 채운다(참고용, 원본은 MCU). */
+            _resetEnabledBox.SelectedIndex = settings.RtcResetEnabledCache ? 0 : 1;
         }
 
         private static decimal ClampDecimal(int value, decimal min, decimal max)
@@ -84,6 +105,21 @@ namespace Stm32WifiConfigTool.Panels
         private void SavePeriodCache(int periodSec)
         {
             _settings.RtcPeriodSecCache = periodSec;
+            try
+            {
+                AppSettingsStore.Save(_settings);
+            }
+            catch (Exception)
+            {
+                /* 설정 저장 실패(권한/디스크 문제 등)로 UI 동작 자체가 막히면 안 되므로 무시 */
+            }
+        }
+
+        /// <summary>"Read"(리셋 사용)로 받은 값을 로컬 캐시에 저장하고 즉시 파일에 반영한다
+        /// (다음 실행 시 <see cref="Initialize"/>가 이 값을 화면에 미리 채운다).</summary>
+        private void SaveResetEnabledCache(bool enabled)
+        {
+            _settings.RtcResetEnabledCache = enabled;
             try
             {
                 AppSettingsStore.Save(_settings);
@@ -165,10 +201,16 @@ namespace Stm32WifiConfigTool.Panels
                 _periodBox.Value = ClampDecimal(periodSec, _periodBox.Minimum, _periodBox.Maximum);
                 SavePeriodCache(periodSec);
                 Log(kind + " 읽기 완료 (리셋 주기: " + periodSec + "초)");
+
+                Log("RTC_R_RST 요청...");
+                bool enabled = await Stm32Commands.GetRtcResetEnabledAsync(SelectedLink, (int)_cmdTimeoutBox.Value);
+                _resetEnabledBox.SelectedIndex = enabled ? 0 : 1;
+                SaveResetEnabledCache(enabled);
+                Log("RTC_R_RST 읽기 완료 (리셋 사용: " + (enabled ? YesText : NoText) + ")");
             }
             catch (Exception ex)
             {
-                Log(kind + " 읽기 실패: " + ex.Message);
+                Log("읽기 실패: " + ex.Message);
                 MessageBox.Show(this, ex.Message, "읽기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -203,11 +245,18 @@ namespace Stm32WifiConfigTool.Panels
                 }
                 SavePeriodCache(periodSec);
                 Log(kind + " 쓰기 완료");
+
+                bool enabled = (string)_resetEnabledBox.SelectedItem == YesText;
+                Log("RTC_W_RST 전송... (" + (enabled ? YesText : NoText) + ")");
+                await Stm32Commands.SetRtcResetEnabledAsync(SelectedLink, enabled, (int)_cmdTimeoutBox.Value);
+                SaveResetEnabledCache(enabled);
+                Log("RTC_W_RST 쓰기 완료");
+
                 MessageBox.Show(this, "전달되었습니다.", "RTC 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                Log(kind + " 쓰기 실패: " + ex.Message);
+                Log("쓰기 실패: " + ex.Message);
                 MessageBox.Show(this, ex.Message, "쓰기 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

@@ -63,6 +63,10 @@ namespace Stm32WifiConfigTool.Models
         /// 따로 캐시하지 않는다.</summary>
         public string RtcUnitKindCache { get; set; } = "시";
 
+        /// <summary>RTC 설정 패널의 "리셋 사용"(YES/NO)에서 마지막으로 "Read"한 값. true=YES,
+        /// false=NO.</summary>
+        public bool RtcResetEnabledCache { get; set; } = false;
+
         /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
         /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.MeasurementPanel.Initialize"/> 참고.)</summary>
         public string MeasurementDisplayChannel { get; set; } = "Usb";

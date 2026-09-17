@@ -24,6 +24,8 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.NumericUpDown _periodBox;
         private System.Windows.Forms.Label _unitKindLabel;
         private System.Windows.Forms.ComboBox _unitKindBox;
+        private System.Windows.Forms.Label _resetEnabledLabel;
+        private System.Windows.Forms.ComboBox _resetEnabledBox;
         private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
         private System.Windows.Forms.Button _readButton;
         private System.Windows.Forms.Button _writeButton;
@@ -50,6 +52,8 @@ namespace Stm32WifiConfigTool.Panels
             this._periodBox = new System.Windows.Forms.NumericUpDown();
             this._unitKindLabel = new System.Windows.Forms.Label();
             this._unitKindBox = new System.Windows.Forms.ComboBox();
+            this._resetEnabledLabel = new System.Windows.Forms.Label();
+            this._resetEnabledBox = new System.Windows.Forms.ComboBox();
             this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
             this._readButton = new System.Windows.Forms.Button();
             this._writeButton = new System.Windows.Forms.Button();
@@ -123,18 +127,22 @@ namespace Stm32WifiConfigTool.Panels
             // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다. "리셋 주기" 값은
             // RESET_R_ALL/RESET_W_ALL을 쓰지 않고, 아래 "단위" 콤보박스로 고른 시/분/초 하나에
             // 해당하는 RTC_R_x/RTC_W_x로만 주고받는다(셋 다 값의 의미는 같은 리셋 주기 전체).
-            // _readButton/_writeButton이 이 패널의 유일한 Read/Write 버튼이다 -
-            // RtcConfigPanel.cs의 UnitReadButton_Click/UnitWriteButton_Click 참고.)
+            // "리셋 사용"(_resetEnabledBox, YES/NO)은 RTC_R_RST(읽기)/RTC_W_RST(쓰기)로 별도로
+            // 주고받는다. _readButton/_writeButton이 이 패널의 유일한 Read/Write 버튼이며, 리셋
+            // 주기와 리셋 사용 여부를 한 번에 함께 읽고 쓴다 - RtcConfigPanel.cs의
+            // UnitReadButton_Click/UnitWriteButton_Click 참고.)
             //
             this._fieldsGroup.Controls.Add(this._periodLabel);
             this._fieldsGroup.Controls.Add(this._periodBox);
             this._fieldsGroup.Controls.Add(this._unitKindLabel);
             this._fieldsGroup.Controls.Add(this._unitKindBox);
+            this._fieldsGroup.Controls.Add(this._resetEnabledLabel);
+            this._fieldsGroup.Controls.Add(this._resetEnabledBox);
             this._fieldsGroup.Controls.Add(this._unitButtonRow);
             this._fieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
             this._fieldsGroup.Location = new System.Drawing.Point(9, 64);
             this._fieldsGroup.Name = "_fieldsGroup";
-            this._fieldsGroup.Size = new System.Drawing.Size(242, 130);
+            this._fieldsGroup.Size = new System.Drawing.Size(242, 164);
             this._fieldsGroup.TabIndex = 1;
             this._fieldsGroup.TabStop = false;
             this._fieldsGroup.Text = "RTC 리셋 설정";
@@ -180,15 +188,35 @@ namespace Stm32WifiConfigTool.Panels
             this._unitKindBox.TabIndex = 3;
             this._unitKindBox.SelectedIndexChanged += new System.EventHandler(this.UnitKindBox_SelectedIndexChanged);
             //
+            // _resetEnabledLabel
+            //
+            this._resetEnabledLabel.Location = new System.Drawing.Point(15, 93);
+            this._resetEnabledLabel.Name = "_resetEnabledLabel";
+            this._resetEnabledLabel.Size = new System.Drawing.Size(110, 23);
+            this._resetEnabledLabel.TabIndex = 4;
+            this._resetEnabledLabel.Text = "리셋 사용";
+            this._resetEnabledLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _resetEnabledBox (항목("YES"/"NO")은 코드에서 채운다 - RtcConfigPanel.cs의 생성자
+            // 참고. RTC_R_RST(읽기)/RTC_W_RST(쓰기)로만 주고받는다.)
+            //
+            this._resetEnabledBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._resetEnabledBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this._resetEnabledBox.Location = new System.Drawing.Point(130, 90);
+            this._resetEnabledBox.Name = "_resetEnabledBox";
+            this._resetEnabledBox.Size = new System.Drawing.Size(97, 23);
+            this._resetEnabledBox.TabIndex = 5;
+            this._resetEnabledBox.SelectedIndexChanged += new System.EventHandler(this.ResetEnabledBox_SelectedIndexChanged);
+            //
             // _unitButtonRow
             //
             this._unitButtonRow.AutoSize = true;
             this._unitButtonRow.Controls.Add(this._readButton);
             this._unitButtonRow.Controls.Add(this._writeButton);
-            this._unitButtonRow.Location = new System.Drawing.Point(12, 89);
+            this._unitButtonRow.Location = new System.Drawing.Point(12, 123);
             this._unitButtonRow.Name = "_unitButtonRow";
             this._unitButtonRow.Size = new System.Drawing.Size(220, 31);
-            this._unitButtonRow.TabIndex = 4;
+            this._unitButtonRow.TabIndex = 6;
             this._unitButtonRow.WrapContents = false;
             //
             // _readButton

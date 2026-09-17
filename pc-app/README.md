@@ -172,14 +172,19 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      "시"를 고르면 Read는 `RTC_R_H`, Write는 `RTC_W_H,<리셋 주기 값>`을 그대로 보냅니다).
      "리셋 주기" 입력란과 "단위" 콤보박스는 같은 "RTC 리셋 설정" 그룹 안에 함께 있고, **이
      패널 전체에 Read/Write 버튼이 하나씩만** 있습니다(그룹 맨 아래 `_readButton`/
-     `_writeButton`) — 그 순간 "단위"에서 선택된 커맨드 하나만 보냅니다.
+     `_writeButton`) — 클릭 한 번에 그 순간 "단위"에서 선택된 커맨드와 아래 "리셋 사용" 값을
+     함께 읽거나 씁니다.
+   - **"리셋 사용"**: "단위" 아래에 있는 YES/NO 콤보박스(`_resetEnabledBox`)로, 리셋 주기와는
+     별개로 `RTC_R_RST`(읽기)/`RTC_W_RST`(쓰기)로만 주고받습니다(값은 "YES"/"NO" 그대로
+     전송). 위 Read/Write 버튼을 누르면 리셋 주기와 이 값을 함께 읽고 씁니다.
    - WiFi/Measurement 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖고,
-     "Read" 값(리셋 주기)도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다. 마지막으로
-     선택했던 단위는 `AppSettings.RtcUnitKindCache`에 캐시됩니다.
-   - **`RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`는 이 PC 도구에서 새로
-     도입한 커맨드로, WIFI_R_ALL 계열과 마찬가지로 `firmware/`·`firmware-no-rtos/`에는 아직
-     구현되어 있지 않습니다**(아래 참고). 기존에 구현돼 있던 `RESET_R_ALL`/`RESET_W_ALL`은
-     더 이상 이 패널에서 쓰지 않습니다.
+     "Read" 값(리셋 주기, 리셋 사용)도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
+     마지막으로 선택했던 단위는 `AppSettings.RtcUnitKindCache`에, 리셋 사용 값은
+     `AppSettings.RtcResetEnabledCache`에 캐시됩니다.
+   - **`RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`/`RTC_R_RST`/`RTC_W_RST`는
+     이 PC 도구에서 새로 도입한 커맨드로, WIFI_R_ALL 계열과 마찬가지로
+     `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다**(아래 참고). 기존에
+     구현돼 있던 `RESET_R_ALL`/`RESET_W_ALL`은 더 이상 이 패널에서 쓰지 않습니다.
 
 5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 STATUS 프레임을 표시합니다. 측정값 프레임 전송
@@ -338,12 +343,14 @@ MCU 측 `pc_comm.c`를 이 형식(태그 있는 응답이든 없는 응답이든
 `RESET_R_ALL`/`RESET_W_ALL`(§6)은 `firmware/`·`firmware-no-rtos/` 양쪽 `pc_comm.c`에 이미
 구현되어 있지만, **RTC 설정 패널은 더 이상 이 커맨드를 쓰지 않습니다** — 리셋 주기(초) 값은
 이제 항상 `RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`("단위" 콤보박스에서
-고른 것 하나) 중 하나로만 읽고 씁니다. **이 커맨드들은 WIFI_R_ALL 계열과 마찬가지로 이 PC
+고른 것 하나) 중 하나로만 읽고 씁니다. 이와는 별개로 "리셋 사용"(YES/NO)은
+`RTC_R_RST`/`RTC_W_RST`로만 읽고 씁니다. **이 커맨드들은 WIFI_R_ALL 계열과 마찬가지로 이 PC
 도구에서 새로 도입한 것으로, `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다**
 — 프레임 형태는 `Services/Stm32Protocol.cs`의 `BuildRtcHourWrite`/`BuildRtcMinuteWrite`/
-`BuildRtcSecondWrite` 및 `Stm32Commands.cs`의 `GetRtcHourAsync`/`SetRtcHourAsync` 등의 XML
-주석에 정의되어 있습니다. 값의 의미는 세 커맨드(시/분/초) 모두 동일한 "리셋 주기 전체(초)"이며,
-시/분/초로 쪼개서 보내지 않습니다.
+`BuildRtcSecondWrite`/`BuildRtcResetEnabledWrite` 및 `Stm32Commands.cs`의
+`GetRtcHourAsync`/`SetRtcHourAsync`/`GetRtcResetEnabledAsync`/`SetRtcResetEnabledAsync` 등의
+XML 주석에 정의되어 있습니다. 값의 의미는 세 커맨드(시/분/초) 모두 동일한 "리셋 주기
+전체(초)"이며, 시/분/초로 쪼개서 보내지 않습니다.
 
 MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`,
 ESP32 상태 브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`,

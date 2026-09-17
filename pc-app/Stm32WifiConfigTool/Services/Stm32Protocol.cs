@@ -108,6 +108,15 @@ namespace Stm32WifiConfigTool.Services
             return Stx + "RTC_W_S," + periodSec.ToString(CultureInfo.InvariantCulture);
         }
 
+        /// <summary>"리셋 사용" 여부(YES/NO)를 조회한다. 응답: RTC_R_RST,YES 또는 RTC_R_RST,NO.</summary>
+        public static readonly string CmdRtcResetEnabledReadAll = Stx + "RTC_R_RST";
+
+        /// <summary>"리셋 사용" 여부를 MCU에 전달한다. 응답: RTC_W_RST,OK 또는 RTC_W_RST,ERR,&lt;reason&gt;</summary>
+        public static string BuildRtcResetEnabledWrite(bool enabled)
+        {
+            return Stx + "RTC_W_RST," + (enabled ? "YES" : "NO");
+        }
+
         /// <summary>SerialLinkService.LineReceived로 전달된 한 줄을 파싱한다. 맨 앞이 STX가 아니면
         /// false(잡음/깨진 프레임 - 호출자는 무시해야 한다).</summary>
         public static bool TryParseFrame(string rawLine, out string[] fields)
