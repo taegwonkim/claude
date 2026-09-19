@@ -1,0 +1,230 @@
+namespace Stm32WifiConfigTool.Panels
+{
+    partial class SerialChannelPanel
+    {
+        /// <summary>Required designer variable.</summary>
+        private System.ComponentModel.IContainer components = null;
+
+        private System.Windows.Forms.GroupBox _groupBox;
+        private System.Windows.Forms.Label _portLabel;
+        private System.Windows.Forms.Panel _portRow;
+        private System.Windows.Forms.ComboBox _portCombo;
+        private System.Windows.Forms.Button _refreshButton;
+        private System.Windows.Forms.Label _baudLabel;
+        private System.Windows.Forms.ComboBox _baudCombo;
+        private System.Windows.Forms.Label _readTimeoutLabel;
+        private System.Windows.Forms.NumericUpDown _readTimeout;
+        private System.Windows.Forms.Label _writeTimeoutLabel;
+        private System.Windows.Forms.NumericUpDown _writeTimeout;
+        private System.Windows.Forms.Button _connectButton;
+        private System.Windows.Forms.Label _statusCaptionLabel;
+        private System.Windows.Forms.Label _statusLabel;
+        private System.Windows.Forms.ToolTip _refreshButtonTip;
+
+        #region Component Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+            this._groupBox = new System.Windows.Forms.GroupBox();
+            this._portLabel = new System.Windows.Forms.Label();
+            this._portRow = new System.Windows.Forms.Panel();
+            this._portCombo = new System.Windows.Forms.ComboBox();
+            this._refreshButton = new System.Windows.Forms.Button();
+            this._baudLabel = new System.Windows.Forms.Label();
+            this._baudCombo = new System.Windows.Forms.ComboBox();
+            this._readTimeoutLabel = new System.Windows.Forms.Label();
+            this._readTimeout = new System.Windows.Forms.NumericUpDown();
+            this._writeTimeoutLabel = new System.Windows.Forms.Label();
+            this._writeTimeout = new System.Windows.Forms.NumericUpDown();
+            this._connectButton = new System.Windows.Forms.Button();
+            this._statusCaptionLabel = new System.Windows.Forms.Label();
+            this._statusLabel = new System.Windows.Forms.Label();
+            this._refreshButtonTip = new System.Windows.Forms.ToolTip(this.components);
+            this._groupBox.SuspendLayout();
+            this._portRow.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this._writeTimeout)).BeginInit();
+            this.SuspendLayout();
+            //
+            // _groupBox (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
+            // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
+            // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다.)
+            //
+            this._groupBox.Controls.Add(this._portLabel);
+            this._groupBox.Controls.Add(this._portRow);
+            this._groupBox.Controls.Add(this._baudLabel);
+            this._groupBox.Controls.Add(this._baudCombo);
+            this._groupBox.Controls.Add(this._readTimeoutLabel);
+            this._groupBox.Controls.Add(this._readTimeout);
+            this._groupBox.Controls.Add(this._writeTimeoutLabel);
+            this._groupBox.Controls.Add(this._writeTimeout);
+            this._groupBox.Controls.Add(this._connectButton);
+            this._groupBox.Controls.Add(this._statusCaptionLabel);
+            this._groupBox.Controls.Add(this._statusLabel);
+            this._groupBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._groupBox.Location = new System.Drawing.Point(0, 0);
+            this._groupBox.Name = "_groupBox";
+            this._groupBox.Padding = new System.Windows.Forms.Padding(8);
+            this._groupBox.Size = new System.Drawing.Size(440, 250);
+            this._groupBox.TabIndex = 0;
+            this._groupBox.TabStop = false;
+            this._groupBox.Text = "채널";
+            //
+            // _portLabel
+            //
+            this._portLabel.Location = new System.Drawing.Point(15, 25);
+            this._portLabel.Name = "_portLabel";
+            this._portLabel.Size = new System.Drawing.Size(100, 23);
+            this._portLabel.TabIndex = 0;
+            this._portLabel.Text = "포트";
+            this._portLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _portRow (자유 배치 - _portCombo는 Anchor=Left|Right로 늘어나고, _refreshButton은
+            // Anchor=Right로 오른쪽 끝에 고정된 채 따라간다.)
+            //
+            this._portRow.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._portRow.Controls.Add(this._portCombo);
+            this._portRow.Controls.Add(this._refreshButton);
+            this._portRow.Location = new System.Drawing.Point(125, 22);
+            this._portRow.Name = "_portRow";
+            this._portRow.Size = new System.Drawing.Size(300, 30);
+            this._portRow.TabIndex = 1;
+            //
+            // _portCombo
+            //
+            this._portCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._portCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this._portCombo.Location = new System.Drawing.Point(0, 3);
+            this._portCombo.Name = "_portCombo";
+            this._portCombo.Size = new System.Drawing.Size(130, 23);
+            this._portCombo.TabIndex = 0;
+            //
+            // _refreshButton (기본은 텍스트 "새로고침" - Windows 11 아이콘 폰트(Segoe Fluent
+            // Icons/Segoe MDL2 Assets)가 설치되어 있으면 실행 시 ApplyRefreshButtonIcon()이
+            // 새로고침 글리프로 바꿔치기한다. 아이콘만 남아도 뜻을 알 수 있도록 툴팁을 단다.)
+            //
+            this._refreshButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this._refreshButton.AccessibleName = "새로고침";
+            this._refreshButton.AutoSize = true;
+            this._refreshButton.Location = new System.Drawing.Point(136, 3);
+            this._refreshButton.Name = "_refreshButton";
+            this._refreshButton.Padding = new System.Windows.Forms.Padding(6, 3, 6, 3);
+            this._refreshButton.Size = new System.Drawing.Size(90, 25);
+            this._refreshButton.TabIndex = 1;
+            this._refreshButton.Text = "새로고침";
+            this._refreshButton.UseVisualStyleBackColor = true;
+            this._refreshButtonTip.SetToolTip(this._refreshButton, "새로고침");
+            this._refreshButton.Click += new System.EventHandler(this.RefreshButton_Click);
+            //
+            // _baudLabel
+            //
+            this._baudLabel.Location = new System.Drawing.Point(15, 59);
+            this._baudLabel.Name = "_baudLabel";
+            this._baudLabel.Size = new System.Drawing.Size(100, 23);
+            this._baudLabel.TabIndex = 2;
+            this._baudLabel.Text = "Baud Rate";
+            this._baudLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _baudCombo
+            //
+            this._baudCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._baudCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this._baudCombo.Location = new System.Drawing.Point(125, 56);
+            this._baudCombo.Name = "_baudCombo";
+            this._baudCombo.Size = new System.Drawing.Size(300, 23);
+            this._baudCombo.TabIndex = 3;
+            //
+            // _readTimeoutLabel
+            //
+            this._readTimeoutLabel.Location = new System.Drawing.Point(15, 93);
+            this._readTimeoutLabel.Name = "_readTimeoutLabel";
+            this._readTimeoutLabel.Size = new System.Drawing.Size(100, 23);
+            this._readTimeoutLabel.TabIndex = 4;
+            this._readTimeoutLabel.Text = "읽기 타임아웃(ms)";
+            this._readTimeoutLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _readTimeout
+            //
+            this._readTimeout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._readTimeout.Increment = new decimal(new int[] { 100, 0, 0, 0 });
+            this._readTimeout.Location = new System.Drawing.Point(125, 90);
+            this._readTimeout.Maximum = new decimal(new int[] { 60000, 0, 0, 0 });
+            this._readTimeout.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
+            this._readTimeout.Name = "_readTimeout";
+            this._readTimeout.Size = new System.Drawing.Size(300, 23);
+            this._readTimeout.TabIndex = 5;
+            this._readTimeout.Value = new decimal(new int[] { 3000, 0, 0, 0 });
+            //
+            // _writeTimeoutLabel
+            //
+            this._writeTimeoutLabel.Location = new System.Drawing.Point(15, 127);
+            this._writeTimeoutLabel.Name = "_writeTimeoutLabel";
+            this._writeTimeoutLabel.Size = new System.Drawing.Size(100, 23);
+            this._writeTimeoutLabel.TabIndex = 6;
+            this._writeTimeoutLabel.Text = "쓰기 타임아웃(ms)";
+            this._writeTimeoutLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _writeTimeout
+            //
+            this._writeTimeout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._writeTimeout.Increment = new decimal(new int[] { 100, 0, 0, 0 });
+            this._writeTimeout.Location = new System.Drawing.Point(125, 124);
+            this._writeTimeout.Maximum = new decimal(new int[] { 60000, 0, 0, 0 });
+            this._writeTimeout.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
+            this._writeTimeout.Name = "_writeTimeout";
+            this._writeTimeout.Size = new System.Drawing.Size(300, 23);
+            this._writeTimeout.TabIndex = 7;
+            this._writeTimeout.Value = new decimal(new int[] { 2000, 0, 0, 0 });
+            //
+            // _connectButton
+            //
+            this._connectButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._connectButton.Location = new System.Drawing.Point(125, 161);
+            this._connectButton.Name = "_connectButton";
+            this._connectButton.Size = new System.Drawing.Size(300, 30);
+            this._connectButton.TabIndex = 8;
+            this._connectButton.Text = "연결";
+            this._connectButton.UseVisualStyleBackColor = true;
+            this._connectButton.Click += new System.EventHandler(this.ConnectButton_Click);
+            //
+            // _statusCaptionLabel
+            //
+            this._statusCaptionLabel.Location = new System.Drawing.Point(15, 199);
+            this._statusCaptionLabel.Name = "_statusCaptionLabel";
+            this._statusCaptionLabel.Size = new System.Drawing.Size(100, 30);
+            this._statusCaptionLabel.TabIndex = 9;
+            this._statusCaptionLabel.Text = "상태";
+            this._statusCaptionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // _statusLabel
+            //
+            this._statusLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this._statusLabel.ForeColor = System.Drawing.Color.Firebrick;
+            this._statusLabel.Location = new System.Drawing.Point(125, 199);
+            this._statusLabel.Name = "_statusLabel";
+            this._statusLabel.Size = new System.Drawing.Size(300, 30);
+            this._statusLabel.TabIndex = 10;
+            this._statusLabel.Text = "연결 안됨";
+            this._statusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // SerialChannelPanel
+            //
+            this.Controls.Add(this._groupBox);
+            this.Name = "SerialChannelPanel";
+            this.Size = new System.Drawing.Size(440, 250);
+            this._groupBox.ResumeLayout(false);
+            this._portRow.ResumeLayout(false);
+            this._portRow.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this._writeTimeout)).EndInit();
+            this.ResumeLayout(false);
+        }
+
+        #endregion
+    }
+}
