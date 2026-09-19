@@ -6,8 +6,8 @@ using Stm32WifiConfigTool.Models;
 namespace Stm32WifiConfigTool.Services
 {
     /// <summary>
-    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_H/RTC_W_H/RTC_R_M/RTC_W_M/RTC_R_S/RTC_W_S/
-    /// RTC_R_RST/RTC_W_RST 프레임을 보내고 응답 프레임을 기다리는 async 헬퍼.
+    /// WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_ALL/RTC_W_ALL 프레임을 보내고 응답
+    /// 프레임을 기다리는 async 헬퍼.
     /// 측정값/EVENT/STATUS/RESET_COUNT 프레임은 비동기 텔레메트리(브로드캐스트)이므로 일반 커맨드
     /// 응답으로 취급하지 않고 건너뛴다(<see cref="Stm32Protocol.IsBroadcastFrame"/> 참고). 그 외에는
     /// 태그가 있든("MEAS_R_ALL,...") 없든("5000,200,0,1,0"만 맨몸으로 - 실측 결과 실제 MCU가 이
@@ -183,60 +183,6 @@ namespace Stm32WifiConfigTool.Services
             }
         }
 
-        /// <summary>RTC_R_H/RTC_R_M/RTC_R_S 공통 처리: command를 보내고 응답(태그 있으면
-        /// "&lt;tag&gt;,value" 없으면 값만)에서 정수 하나를 꺼낸다.</summary>
-        private static async Task<int> GetRtcUnitAsync(SerialLinkService link, string command, string tag, int timeoutMs)
-        {
-            string[] fields = await SendAndWaitReplyAsync(link, command, timeoutMs);
-            string[] v = StripTag(fields, tag);
-
-            if (v.Length < 1)
-            {
-                throw new InvalidOperationException(tag + " 응답 필드 부족 (" + v.Length + "/1): " + string.Join(",", fields));
-            }
-
-            int.TryParse(v[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int value);
-            return value;
-        }
-
-        /// <summary>RTC_W_H/RTC_W_M/RTC_W_S 공통 처리: command를 보내고 응답이 "OK"(태그 있으면
-        /// "&lt;tag&gt;,OK")가 아니면 실패로 간주해 예외를 던진다.</summary>
-        private static async Task SetRtcUnitAsync(SerialLinkService link, string command, string tag, int timeoutMs)
-        {
-            string[] reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
-            string[] v = StripTag(reply, tag);
-
-            if (v.Length < 1 || v[0] != "OK")
-            {
-                throw new InvalidOperationException(tag + " 실패: " + string.Join(",", reply));
-            }
-        }
-
-        /// <summary>RTC_R_H를 보내 리셋 주기(초) 값을 조회한다 - RTC_R_M/RTC_R_S와 값의 의미는
-        /// 완전히 같고(전체 리셋 주기), 조회에 쓰는 커맨드 이름만 다르다.</summary>
-        public static Task<int> GetRtcHourAsync(SerialLinkService link, int timeoutMs) =>
-            GetRtcUnitAsync(link, Stm32Protocol.CmdRtcHourReadAll, "RTC_R_H", timeoutMs);
-
-        /// <summary>리셋 주기(초) 전체 값을 RTC_W_H 한 프레임으로 전송한다.</summary>
-        public static Task SetRtcHourAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
-            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcHourWrite(periodSec), "RTC_W_H", timeoutMs);
-
-        /// <summary>RTC_R_M을 보내 리셋 주기(초) 값을 조회한다 - <see cref="GetRtcHourAsync"/> 참고.</summary>
-        public static Task<int> GetRtcMinuteAsync(SerialLinkService link, int timeoutMs) =>
-            GetRtcUnitAsync(link, Stm32Protocol.CmdRtcMinuteReadAll, "RTC_R_M", timeoutMs);
-
-        /// <summary>리셋 주기(초) 전체 값을 RTC_W_M 한 프레임으로 전송한다.</summary>
-        public static Task SetRtcMinuteAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
-            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcMinuteWrite(periodSec), "RTC_W_M", timeoutMs);
-
-        /// <summary>RTC_R_S를 보내 리셋 주기(초) 값을 조회한다 - <see cref="GetRtcHourAsync"/> 참고.</summary>
-        public static Task<int> GetRtcSecondAsync(SerialLinkService link, int timeoutMs) =>
-            GetRtcUnitAsync(link, Stm32Protocol.CmdRtcSecondReadAll, "RTC_R_S", timeoutMs);
-
-        /// <summary>리셋 주기(초) 전체 값을 RTC_W_S 한 프레임으로 전송한다.</summary>
-        public static Task SetRtcSecondAsync(SerialLinkService link, int periodSec, int timeoutMs) =>
-            SetRtcUnitAsync(link, Stm32Protocol.BuildRtcSecondWrite(periodSec), "RTC_W_S", timeoutMs);
-
         /// <summary>"YES"/"NO"(대소문자 무관, "1"/"0"도 함께 허용)를 bool로 해석한다.</summary>
         private static bool ParseYesNo(string tag, string value)
         {
@@ -251,30 +197,40 @@ namespace Stm32WifiConfigTool.Services
             throw new InvalidOperationException(tag + " 응답값을 YES/NO로 해석할 수 없음: " + value);
         }
 
-        /// <summary>RTC_R_RST를 보내 "리셋 사용" 여부를 조회한다.</summary>
-        public static async Task<bool> GetRtcResetEnabledAsync(SerialLinkService link, int timeoutMs)
+        /// <summary>RTC_R_ALL을 보내 리셋 주기(초)/단위(H/M/S)/리셋 사용(YES/NO) 전체를 한 번에
+        /// 조회한다. 응답(태그 있으면 "RTC_R_ALL,period_sec,unit,enabled" 없으면 값만)에서 세
+        /// 값을 꺼낸다.</summary>
+        public static async Task<RtcAllConfig> GetRtcAllAsync(SerialLinkService link, int timeoutMs)
         {
-            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdRtcResetEnabledReadAll, timeoutMs);
-            string[] v = StripTag(fields, "RTC_R_RST");
+            string[] fields = await SendAndWaitReplyAsync(link, Stm32Protocol.CmdRtcAllReadAll, timeoutMs);
+            string[] v = StripTag(fields, "RTC_R_ALL");
 
-            if (v.Length < 1)
+            if (v.Length < 3)
             {
-                throw new InvalidOperationException("RTC_R_RST 응답 필드 부족 (" + v.Length + "/1): " + string.Join(",", fields));
+                throw new InvalidOperationException("RTC_R_ALL 응답 필드 부족 (" + v.Length + "/3): " + string.Join(",", fields));
             }
 
-            return ParseYesNo("RTC_R_RST", v[0]);
+            int.TryParse(v[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int periodSec);
+
+            return new RtcAllConfig
+            {
+                PeriodSec = periodSec,
+                UnitCode = v[1],
+                ResetEnabled = ParseYesNo("RTC_R_ALL", v[2])
+            };
         }
 
-        /// <summary>"리셋 사용" 여부를 RTC_W_RST 한 프레임으로 전송한다.</summary>
-        public static async Task SetRtcResetEnabledAsync(SerialLinkService link, bool enabled, int timeoutMs)
+        /// <summary>cfg 전체를 RTC_W_ALL 한 프레임으로 전송한다. 응답이 "OK"(태그 있으면
+        /// "RTC_W_ALL,OK")가 아니면 실패로 간주해 예외를 던진다.</summary>
+        public static async Task SetRtcAllAsync(SerialLinkService link, RtcAllConfig cfg, int timeoutMs)
         {
-            string command = Stm32Protocol.BuildRtcResetEnabledWrite(enabled);
+            string command = Stm32Protocol.BuildRtcAllWrite(cfg.PeriodSec, cfg.UnitCode, cfg.ResetEnabled);
             string[] reply = await SendAndWaitReplyAsync(link, command, timeoutMs);
-            string[] v = StripTag(reply, "RTC_W_RST");
+            string[] v = StripTag(reply, "RTC_W_ALL");
 
             if (v.Length < 1 || v[0] != "OK")
             {
-                throw new InvalidOperationException("RTC_W_RST 실패: " + string.Join(",", reply));
+                throw new InvalidOperationException("RTC_W_ALL 실패: " + string.Join(",", reply));
             }
         }
     }

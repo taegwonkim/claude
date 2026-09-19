@@ -165,27 +165,28 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    `RESET_COUNT,<count>` 프레임을 1회 브로드캐스트합니다(누적 리셋 횟수 모니터링용 — 이
    패널 자체는 설정값 Read/Write만 다루며, `RESET_COUNT` 브로드캐스트는 별도로 확인하려면
    포트 설정 패널의 원시 수신 로그나 터미널 프로그램을 이용하세요).
-   - **`RESET_R_ALL`/`RESET_W_ALL` 커맨드는 쓰지 않습니다.** "리셋 주기" 값(초, 1~65536)은
-     항상 "단위"(시/분/초) 콤보박스에서 고른 것에 해당하는 `RTC_R_H`/`RTC_R_M`/`RTC_R_S`(읽기)
-     또는 `RTC_W_H`/`RTC_W_M`/`RTC_W_S`(쓰기)로만 주고받습니다 — 세 커맨드 모두 값의 의미는
-     완전히 같은 "리셋 주기 전체(초)"이며, 시/분/초로 쪼개서 보내지 않습니다(예: "단위"에서
-     "시"를 고르면 Read는 `RTC_R_H`, Write는 `RTC_W_H,<리셋 주기 값>`을 그대로 보냅니다).
-     "리셋 주기" 입력란과 "단위" 콤보박스, 그리고 전용 Read/Write 버튼(`_readButton`/
-     `_writeButton`)이 같은 "RTC 리셋 설정" 그룹 안에 함께 있습니다 — 클릭하면 그 순간
-     "단위"에서 선택된 커맨드 하나만 읽거나 씁니다.
-   - **"리셋 사용"**: 그 아래에 있는 YES/NO 콤보박스(`_resetEnabledBox`)로, 리셋 주기와는
-     완전히 별개로 `RTC_R_RST`(읽기)/`RTC_W_RST`(쓰기)로만 주고받습니다(값은 "YES"/"NO"
-     그대로 전송). **이 값도 자신만의 전용 Read/Write 버튼**(`_resetEnabledReadButton`/
-     `_resetEnabledWriteButton`)을 따로 가지고 있어, 위 "리셋 주기"/"단위" 버튼과는 서로
-     영향을 주지 않고 독립적으로 읽고 씁니다.
+   - **"리셋 주기"(초, 1~65536)/"단위"(시/분/초)/"리셋 사용"(YES/NO) 세 값은 한 프레임으로
+     묶어 `RTC_R_ALL`(읽기)/`RTC_W_ALL`(쓰기)로만 주고받습니다**(`RESET_R_ALL`/`RESET_W_ALL`,
+     그리고 한때 쓰였던 개별 `RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`·
+     `RTC_R_RST`/`RTC_W_RST` 커맨드는 더 이상 쓰지 않습니다). 필드 순서는
+     "리셋 주기,단위(H/M/S),리셋 사용(YES/NO)"입니다 — 예를 들어 리셋 주기 10초, 단위 "분",
+     리셋 사용 "YES"라면 Write는 `RTC_W_ALL,10,M,YES`를 보내고, Read는 MCU가 PC로부터
+     마지막으로 받아 현재 사용 중인 값을 `RTC_R_ALL,10,M,YES` 형태로 그대로 돌려줍니다.
+     "단위" 콤보박스는 화면 표시용 한글("시"/"분"/"초")이고 와이어 프로토콜의 "H"/"M"/"S"
+     코드와는 `Panels/RtcConfigPanel.cs`의 `UnitKinds`/`UnitCodes` 두 배열(인덱스로 1:1
+     대응)로 서로 변환합니다.
+   - "리셋 주기" 입력란, "단위"/"리셋 사용" 콤보박스, 그리고 이 패널의 유일한 Read/Write
+     버튼(`_readButton`/`_writeButton`)이 같은 "RTC 리셋 설정" 그룹 안에 함께 있습니다 —
+     클릭하면 세 값을 항상 함께 읽거나 씁니다. "Read"를 누르면 MCU 응답에 맞춰 "단위"/
+     "리셋 사용" 콤보박스도 함께 갱신됩니다(사용자가 미리 골라둔 값과 무관하게 MCU가
+     실제로 쓰고 있는 값으로 표시됨).
    - WiFi/Measurement 설정 패널과 마찬가지로 "명령 전송 채널"/"커맨드 타임아웃"을 별도로 갖고,
-     "Read" 값(리셋 주기, 리셋 사용)도 동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
-     마지막으로 선택했던 단위는 `AppSettings.RtcUnitKindCache`에, 리셋 사용 값은
-     `AppSettings.RtcResetEnabledCache`에 캐시됩니다.
-   - **`RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`/`RTC_R_RST`/`RTC_W_RST`는
-     이 PC 도구에서 새로 도입한 커맨드로, WIFI_R_ALL 계열과 마찬가지로
-     `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다**(아래 참고). 기존에
-     구현돼 있던 `RESET_R_ALL`/`RESET_W_ALL`은 더 이상 이 패널에서 쓰지 않습니다.
+     "Read" 값(리셋 주기, 단위, 리셋 사용)도 동일하게 로컬 캐시되어 다음 실행 시 미리
+     채워집니다(각각 `AppSettings.RtcPeriodSecCache`/`RtcUnitKindCache`/
+     `RtcResetEnabledCache`).
+   - **`RTC_R_ALL`/`RTC_W_ALL`은 이 PC 도구에서 새로 도입한 커맨드로, WIFI_R_ALL 계열과
+     마찬가지로 `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다**(아래 참고).
+     기존에 구현돼 있던 `RESET_R_ALL`/`RESET_W_ALL`은 더 이상 이 패널에서 쓰지 않습니다.
 
 5. **ESP32 상태 보기** (우상단, `Panels/EspStatusPanel.cs`)
    MCU가 2초 간격으로 자동 브로드캐스트하는 STATUS 프레임을 표시합니다. 측정값 프레임 전송
@@ -222,7 +223,7 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않았습니다), `STATUS,<번호>`/`STATUS:<번호>`,
      `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` / `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED`
      등 MCU의 비동기 알림, `RESET_COUNT,<count>`(RTC 리셋마다 1회, §6), 다른 패널이 보낸 커맨드에
-     대한 응답 프레임(`WIFI_R_ALL,...`/`MEAS_R_ALL,...`/`RTC_R_H,...`/`ERR,...` 등, 같은
+     대한 응답 프레임(`WIFI_R_ALL,...`/`MEAS_R_ALL,...`/`RTC_R_ALL,...`/`ERR,...` 등, 같은
      채널에 붙어 있는 모든 패널이 라인을 함께 받으므로)까지 모두 포함됩니다. ESP32 상태 번호
      자체는 4번 패널(ESP32 상태 보기)에서 큰 글씨로 별도로 보이므로, 여기서는 STATUS만을 위한
      별도 칸을 두지 않습니다(중복 방지). 각 줄에는 채널([USB]/[UART]) 표시를 붙이지 않습니다.
@@ -297,7 +298,7 @@ Stm32WifiConfigTool/
     PortSettingsPanel.cs / .Designer.cs
     WifiConfigPanel.cs / .Designer.cs
     MeasurementConfigPanel.cs / .Designer.cs  - Reference/Offset/Resistance/Interval Time 설정
-    RtcConfigPanel.cs / .Designer.cs      - RTC Wakeup Timer 리셋 주기(초) 설정 + 시/분/초 개별 설정 (신규)
+    RtcConfigPanel.cs / .Designer.cs      - RTC 리셋 주기(초)/단위(시/분/초)/리셋 사용(YES/NO) 설정 (신규)
     EspStatusPanel.cs / .Designer.cs      - ESP32 상태(STATUS,<번호>) 전용 패널
     MeasurementPanel.cs / .Designer.cs
   Services/
@@ -305,12 +306,13 @@ Stm32WifiConfigTool/
     SerialLinkService.cs    - 시리얼 연결 1개(연결/해제, 라인 단위 수신, 타임아웃)
     ConnectionManager.cs    - Usb/Uart SerialLinkService 2개를 앱 전체에서 공유
     Stm32Protocol.cs        - STX+CSV+CRLF 프레임 빌더/파서, 메시지 종류 분류(화이트리스트)
-    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_H/RTC_W_H/RTC_R_M/
-                              RTC_W_M/RTC_R_S/RTC_W_S async 요청-응답 헬퍼
+    Stm32Commands.cs        - WIFI_R_ALL/WIFI_W_ALL/MEAS_R_ALL/MEAS_W_ALL/RTC_R_ALL/RTC_W_ALL
+                              async 요청-응답 헬퍼
     AppSettingsStore.cs     - PC측 UI 설정 로드/저장 (%AppData%\Stm32WifiConfigTool\settings.ini)
   Models/
     NetConfig.cs
     MeasurementConfig.cs    - Reference/Offset/Resistance/Interval Time
+    RtcAllConfig.cs         - 리셋 주기(초)/단위(H/M/S)/리셋 사용 여부
     MeasurementRecord.cs    - DC IP/MAC + data1..N (개수 가변)
     AppSettings.cs          - 저장 대상 설정 모델 (ChannelSettings 등)
 ```
@@ -342,16 +344,13 @@ Stm32WifiConfigTool/
 MCU 측 `pc_comm.c`를 이 형식(태그 있는 응답이든 없는 응답이든 위 설명대로 둘 다 허용됨)에 맞춰
 구현하면 실제 통신이 됩니다(기존 SET/SAVE/GET,CONFIG/STATUS 커맨드 방식은 이 도구에서 제거되었습니다).
 `RESET_R_ALL`/`RESET_W_ALL`(§6)은 `firmware/`·`firmware-no-rtos/` 양쪽 `pc_comm.c`에 이미
-구현되어 있지만, **RTC 설정 패널은 더 이상 이 커맨드를 쓰지 않습니다** — 리셋 주기(초) 값은
-이제 항상 `RTC_R_H`/`RTC_W_H`/`RTC_R_M`/`RTC_W_M`/`RTC_R_S`/`RTC_W_S`("단위" 콤보박스에서
-고른 것 하나) 중 하나로만 읽고 씁니다. 이와는 별개로 "리셋 사용"(YES/NO)은
-`RTC_R_RST`/`RTC_W_RST`로만 읽고 씁니다. **이 커맨드들은 WIFI_R_ALL 계열과 마찬가지로 이 PC
-도구에서 새로 도입한 것으로, `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다**
-— 프레임 형태는 `Services/Stm32Protocol.cs`의 `BuildRtcHourWrite`/`BuildRtcMinuteWrite`/
-`BuildRtcSecondWrite`/`BuildRtcResetEnabledWrite` 및 `Stm32Commands.cs`의
-`GetRtcHourAsync`/`SetRtcHourAsync`/`GetRtcResetEnabledAsync`/`SetRtcResetEnabledAsync` 등의
-XML 주석에 정의되어 있습니다. 값의 의미는 세 커맨드(시/분/초) 모두 동일한 "리셋 주기
-전체(초)"이며, 시/분/초로 쪼개서 보내지 않습니다.
+구현되어 있지만, **RTC 설정 패널은 더 이상 이 커맨드를 쓰지 않습니다** — 리셋 주기(초)/
+단위(H/M/S)/리셋 사용(YES/NO) 세 값은 이제 항상 `RTC_R_ALL`(읽기)/`RTC_W_ALL`(쓰기) 한
+프레임으로 함께 주고받습니다(필드 순서: "리셋 주기,단위,리셋 사용" — 예:
+`RTC_W_ALL,10,M,YES`). **이 커맨드는 WIFI_R_ALL 계열과 마찬가지로 이 PC 도구에서 새로
+도입한 것으로, `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다** — 프레임
+형태는 `Services/Stm32Protocol.cs`의 `BuildRtcAllWrite` 및 `Stm32Commands.cs`의
+`GetRtcAllAsync`/`SetRtcAllAsync` 등의 XML 주석에 정의되어 있습니다.
 
 MCU 쪽 커맨드 파서는 `firmware/Core/Src/pc_comm.c`, 측정값 송신은 `firmware/Core/Src/fpga_link.c`,
 ESP32 상태 브로드캐스트/IP·MAC 조회는 `firmware/Core/Src/app_freertos.c`/`firmware/Core/Src/esp32_at.c`,

@@ -74,47 +74,18 @@ namespace Stm32WifiConfigTool.Services
                    intervalSec.ToString(CultureInfo.InvariantCulture);
         }
 
-        /// <summary>RTC 리셋 주기(초)를 "시" 단위 커맨드로 조회한다. 응답: RTC_R_H,seconds —
-        /// 값 자체는 시/분/초로 쪼갠 성분이 아니라 리셋 주기 전체(초)이며, RTC_R_M/RTC_R_S와
-        /// 완전히 동일한 값을 돌려준다(단지 조회에 쓰는 커맨드 이름만 다르다).</summary>
-        public static readonly string CmdRtcHourReadAll = Stx + "RTC_R_H";
+        /// <summary>RTC 리셋 주기(초)/단위(H/M/S)/리셋 사용(YES/NO) 전체를 한 번에 조회한다.
+        /// 응답: RTC_R_ALL,period_sec,unit,enabled - MCU가 PC로부터 마지막으로 받아 현재 사용
+        /// 중인 값을 그대로 돌려준다(예: RTC_R_ALL,10,M,YES).</summary>
+        public static readonly string CmdRtcAllReadAll = Stx + "RTC_R_ALL";
 
-        /// <summary>리셋 주기(초) 전체 값을 "시" 단위 커맨드로 MCU에 전달한다. 응답: RTC_W_H,OK
-        /// 또는 RTC_W_H,ERR,&lt;reason&gt;</summary>
-        public static string BuildRtcHourWrite(int periodSec)
+        /// <summary>리셋 주기(초)/단위(H/M/S)/리셋 사용(YES/NO) 전체를 한 프레임으로 MCU에
+        /// 전달한다. 응답: RTC_W_ALL,OK 또는 RTC_W_ALL,ERR,&lt;reason&gt; (예: 리셋 주기 10초,
+        /// 단위 "M", 리셋 사용 "YES"면 RTC_W_ALL,10,M,YES를 보낸다).</summary>
+        public static string BuildRtcAllWrite(int periodSec, string unitCode, bool resetEnabled)
         {
-            return Stx + "RTC_W_H," + periodSec.ToString(CultureInfo.InvariantCulture);
-        }
-
-        /// <summary>RTC 리셋 주기(초)를 "분" 단위 커맨드로 조회한다. 응답: RTC_R_M,seconds -
-        /// <see cref="CmdRtcHourReadAll"/> 참고(값의 의미는 동일, 커맨드 이름만 다름).</summary>
-        public static readonly string CmdRtcMinuteReadAll = Stx + "RTC_R_M";
-
-        /// <summary>리셋 주기(초) 전체 값을 "분" 단위 커맨드로 MCU에 전달한다. 응답: RTC_W_M,OK 또는
-        /// RTC_W_M,ERR,&lt;reason&gt;</summary>
-        public static string BuildRtcMinuteWrite(int periodSec)
-        {
-            return Stx + "RTC_W_M," + periodSec.ToString(CultureInfo.InvariantCulture);
-        }
-
-        /// <summary>RTC 리셋 주기(초)를 "초" 단위 커맨드로 조회한다. 응답: RTC_R_S,seconds -
-        /// <see cref="CmdRtcHourReadAll"/> 참고(값의 의미는 동일, 커맨드 이름만 다름).</summary>
-        public static readonly string CmdRtcSecondReadAll = Stx + "RTC_R_S";
-
-        /// <summary>리셋 주기(초) 전체 값을 "초" 단위 커맨드로 MCU에 전달한다. 응답: RTC_W_S,OK 또는
-        /// RTC_W_S,ERR,&lt;reason&gt;</summary>
-        public static string BuildRtcSecondWrite(int periodSec)
-        {
-            return Stx + "RTC_W_S," + periodSec.ToString(CultureInfo.InvariantCulture);
-        }
-
-        /// <summary>"리셋 사용" 여부(YES/NO)를 조회한다. 응답: RTC_R_RST,YES 또는 RTC_R_RST,NO.</summary>
-        public static readonly string CmdRtcResetEnabledReadAll = Stx + "RTC_R_RST";
-
-        /// <summary>"리셋 사용" 여부를 MCU에 전달한다. 응답: RTC_W_RST,OK 또는 RTC_W_RST,ERR,&lt;reason&gt;</summary>
-        public static string BuildRtcResetEnabledWrite(bool enabled)
-        {
-            return Stx + "RTC_W_RST," + (enabled ? "YES" : "NO");
+            return Stx + "RTC_W_ALL," + periodSec.ToString(CultureInfo.InvariantCulture) + "," +
+                   unitCode + "," + (resetEnabled ? "YES" : "NO");
         }
 
         /// <summary>SerialLinkService.LineReceived로 전달된 한 줄을 파싱한다. 맨 앞이 STX가 아니면
