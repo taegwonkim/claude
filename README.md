@@ -1,5 +1,8 @@
 # STM32L562RET6 — RTC WakeUp Timer 주기적 Software Reset + RS485 / USB CDC 보고
 
+> **다른 프로젝트**: ESP32-C3(ESP-AT) Wi-Fi AP / TCP 서버 접속 + 자동 재접속 (STM32L562CET6, 폴링 방식)
+> → [`STM32L562_ESP32C3_WiFi/`](STM32L562_ESP32C3_WiFi/README.md)
+
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
 스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
 USB CDC(가상 COM 포트) 양쪽으로 PC 에 전송**합니다.
