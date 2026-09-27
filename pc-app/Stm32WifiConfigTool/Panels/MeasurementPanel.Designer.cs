@@ -22,7 +22,6 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.DataGridViewTextBoxColumn _colTimeStamp;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colDcIp;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colMac;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colSamples;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colRawLine;
         private System.Windows.Forms.Label _countLabel;
         private System.Windows.Forms.TableLayoutPanel _rightLayout;
@@ -54,7 +53,6 @@ namespace Stm32WifiConfigTool.Panels
             this._colTimeStamp = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colDcIp = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colMac = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colSamples = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colRawLine = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._countLabel = new System.Windows.Forms.Label();
             this._rightLayout = new System.Windows.Forms.TableLayoutPanel();
@@ -264,12 +262,12 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._grid.AllowUserToAddRows = false;
             this._grid.AllowUserToDeleteRows = false;
+            this._grid.AllowUserToOrderColumns = true;
             this._grid.AutoGenerateColumns = false;
             this._grid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             this._colTimeStamp,
             this._colDcIp,
             this._colMac,
-            this._colSamples,
             this._colRawLine});
             this._grid.Dock = System.Windows.Forms.DockStyle.Fill;
             this._grid.Location = new System.Drawing.Point(3, 3);
@@ -284,7 +282,7 @@ namespace Stm32WifiConfigTool.Panels
             // _colTimeStamp
             //
             this._colTimeStamp.DataPropertyName = "TimeStamp";
-            this._colTimeStamp.DefaultCellStyle = new System.Windows.Forms.DataGridViewCellStyle() { Format = "HH:mm:ss.fff" };
+            this._colTimeStamp.DefaultCellStyle = new System.Windows.Forms.DataGridViewCellStyle() { Format = "HH:mm:ss:fff" };
             this._colTimeStamp.HeaderText = "TimeStamp";
             this._colTimeStamp.Name = "_colTimeStamp";
             this._colTimeStamp.ReadOnly = true;
@@ -306,16 +304,10 @@ namespace Stm32WifiConfigTool.Panels
             this._colMac.ReadOnly = true;
             this._colMac.Width = 130;
             //
-            // _colSamples
-            //
-            this._colSamples.DataPropertyName = "SamplesText";
-            this._colSamples.HeaderText = "Data1..N";
-            this._colSamples.Name = "_colSamples";
-            this._colSamples.ReadOnly = true;
-            this._colSamples.Width = 260;
-            //
             // _colRawLine (측정값 프레임의 원본 텍스트 전체 - 항상 마지막 열에 놓고, 남는 폭을
-            // 모두 채운다(AutoSizeMode.Fill))
+            // 모두 채운다(AutoSizeMode.Fill). "Data1..N"(SamplesText) 열은 이 원본 텍스트에
+            // 이미 포함된 정보라 중복이므로 그리드에서는 없앴다 - 모델의 SamplesText 프로퍼티
+            // 자체는 CSV 내보내기(MeasurementPanel.cs의 ExportButton_Click)에서 계속 쓰인다.)
             //
             this._colRawLine.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
             this._colRawLine.DataPropertyName = "RawLine";
