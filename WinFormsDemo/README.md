@@ -10,8 +10,9 @@
 
 ## 요구 사항
 - Windows 10 / 11
-- Visual Studio 2022 (17.8 이상), **.NET 데스크톱 개발** 워크로드
-- .NET 8 SDK
+- **Visual Studio 2022** (17.8 이상)
+  - Visual Studio Installer → **.NET 데스크톱 개발** 워크로드 설치
+  - .NET 8 SDK는 이 워크로드에 포함되어 있음
 
 ## 열기 / 실행
 1. `WinFormsDemo.sln`을 더블클릭해 Visual Studio에서 엽니다.
@@ -34,5 +35,6 @@ dotnet run --project WinFormsDemo
 | `WinFormsDemo.csproj` | .NET 8 WinForms, PerMonitorV2 고DPI 설정 |
 
 ## 참고
-- Visual Studio 2026 / .NET 10을 쓴다면 `WinFormsDemo.csproj`의
-  `<TargetFramework>`를 `net10.0-windows`로 바꾸면 됩니다.
+- 솔루션 파일은 Visual Studio 2022 형식(`.sln`, Format Version 12.00)입니다.
+- 대상 프레임워크는 `net8.0-windows`입니다. VS2022에서는 .NET 8 또는 .NET 9까지 사용할 수 있으며,
+  .NET 9로 바꾸려면 `WinFormsDemo.csproj`의 `<TargetFramework>`를 `net9.0-windows`로 수정합니다.
