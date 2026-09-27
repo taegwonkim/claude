@@ -54,10 +54,10 @@ namespace Stm32WifiConfigTool.Panels
             _showUart.Checked = settings.MeasurementDisplayChannel == "Uart";
             _autoScrollCheck.Checked = settings.MeasurementAutoScroll;
 
-            _colTimeStamp.Width = settings.MeasurementColTimeStampWidth;
-            _colDcIp.Width = settings.MeasurementColDcIpWidth;
-            _colMac.Width = settings.MeasurementColMacWidth;
-            _colSamples.Width = settings.MeasurementColSamplesWidth;
+            SetColumnWidthSafe(_colTimeStamp, settings.MeasurementColTimeStampWidth);
+            SetColumnWidthSafe(_colDcIp, settings.MeasurementColDcIpWidth);
+            SetColumnWidthSafe(_colMac, settings.MeasurementColMacWidth);
+            SetColumnWidthSafe(_colSamples, settings.MeasurementColSamplesWidth);
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
@@ -65,6 +65,19 @@ namespace Stm32WifiConfigTool.Panels
             /* MainForm의 상단 4개 스플리터와 동일한 이유로 BeginInvoke를 통해 지연 복원한다:
              * 생성 직후에는 SplitContainer의 Width가 아직 최종값으로 안정되지 않을 수 있다. */
             Load += (s, e) => BeginInvoke(new Action(ApplySavedSplitterDistance));
+        }
+
+        /// <summary>column이 null이면 조용히 건너뛴다 - Visual Studio 디자이너에서 DataGridView의
+        /// 열 편집(Edit Columns) 등을 통해 InitializeComponent()가 다시 저장될 때, 이 파일이
+        /// 손으로 작성된 탓에 특정 열의 생성 코드가 유실되는 경우가 있었다(실제로 이 문제로
+        /// _colTimeStamp가 null이 되어 NullReferenceException으로 시작 자체가 안 된 적이 있음).
+        /// 그런 손상이 있어도 앱 전체가 죽지 않고, 손상된 열의 폭 복원만 건너뛰도록 방어한다.</summary>
+        private static void SetColumnWidthSafe(DataGridViewColumn column, int width)
+        {
+            if (column != null)
+            {
+                column.Width = width;
+            }
         }
 
         private void ApplySavedSplitterDistance()
