@@ -26,6 +26,11 @@ namespace Stm32WifiConfigTool.Panels
     /// <c>_topRow</c>(FlowLayoutPanel)가 자동으로 다시 배치하는 것은 이 컨테이너
     /// (<c>_macAddressGroup</c>) 자체의 위치일 뿐이고, 그 안에 있는 두 컨트롤은 그 영향을
     /// 받지 않는다(<c>MeasurementPanel.Designer.cs</c>의 <c>_macAddressGroup</c> 주석 참고).
+    /// <c>_topRow</c> 자체의 높이는 <c>_root</c>(TableLayoutPanel)의 1행이 고정 높이(Absolute
+    /// 64px)로 못박혀 있어서, 이 안(특히 <c>_macAddressGroup</c>)의 컨트롤을 아무리 늘리거나
+    /// 옮겨도 아래쪽 측정값 그리드/로그 영역(<c>_splitDisplay</c>, 2행 Percent 100%)의 크기에는
+    /// 전혀 영향을 주지 않는다 - 예전에는 1행이 auto-size라 위쪽을 키우면 그만큼 아래쪽이
+    /// 줄어드는 부작용이 있었다(<c>MeasurementPanel.Designer.cs</c>의 <c>_root</c> 주석 참고).
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.

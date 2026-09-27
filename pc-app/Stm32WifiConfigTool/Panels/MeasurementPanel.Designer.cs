@@ -73,7 +73,14 @@ namespace Stm32WifiConfigTool.Panels
             this._rightLayout.SuspendLayout();
             this.SuspendLayout();
             //
-            // _root
+            // _root (1행: _topRow - 높이를 "Absolute"(고정 64px)로 못박아 둔다. 예전에는
+            // RowStyle()의 기본값(AutoSize처럼 동작)이라 _topRow의 필요 높이를 그대로 따라갔는데,
+            // _topRow 안(특히 _macAddressGroup)의 컨트롤을 디자이너에서 크게 늘리면 그 늘어난
+            // 높이가 그대로 이 행에 반영되어 2행(_splitDisplay, Percent 100%)이 차지할 수 있는
+            // 나머지 공간이 줄어들어 그 아래 측정값 그리드/로그 부분이 눈에 띄게 작아지는
+            // 부작용이 있었다. 이제는 1행 높이가 고정이라 위쪽 컨트롤을 아무리 조절해도 2행
+            // 크기에 영향을 주지 않는다 - 다만 1행에 담기엔 너무 큰 컨트롤을 넣으면 잘려 보일
+            // 수 있다.)
             //
             this._root.ColumnCount = 1;
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -84,14 +91,15 @@ namespace Stm32WifiConfigTool.Panels
             this._root.Name = "_root";
             this._root.Padding = new System.Windows.Forms.Padding(6);
             this._root.RowCount = 2;
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 64F));
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Size = new System.Drawing.Size(900, 400);
             this._root.TabIndex = 0;
             //
-            // _topRow
+            // _topRow (AutoSize를 껐다 - 위 _root 주석 참고. 이제 이 패널의 실제 높이는 항상
+            // _root의 고정 64px 행 높이를 그대로 따르며, 안에 있는 컨트롤 크기와 무관하다.)
             //
-            this._topRow.AutoSize = true;
+            this._topRow.AutoSize = false;
             this._topRow.Controls.Add(this._channelGroup);
             this._topRow.Controls.Add(this._clearButton);
             this._topRow.Controls.Add(this._exportButton);
@@ -100,7 +108,7 @@ namespace Stm32WifiConfigTool.Panels
             this._topRow.Dock = System.Windows.Forms.DockStyle.Top;
             this._topRow.Location = new System.Drawing.Point(9, 9);
             this._topRow.Name = "_topRow";
-            this._topRow.Size = new System.Drawing.Size(600, 56);
+            this._topRow.Size = new System.Drawing.Size(882, 64);
             this._topRow.TabIndex = 0;
             this._topRow.WrapContents = false;
             //
