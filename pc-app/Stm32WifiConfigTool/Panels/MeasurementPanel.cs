@@ -247,6 +247,13 @@ namespace Stm32WifiConfigTool.Panels
             _eventLogBox.Clear();
         }
 
+        /// <summary>CSV로 저장할 열을 화면 그리드와 완전히 동일하게 만들기 위해, 하드코딩된
+        /// 열 목록 대신 항상 <c>_grid.Columns</c>에서 그대로 뽑아 쓴다 - 그래서 그리드에서 열을
+        /// 뺐다 넣었다 하거나(현재는 TimeStamp/DC IP/MAC/RawLine 4개) 사용자가 열 머리글을
+        /// 드래그해 순서를 바꾸면(<c>MeasurementPanel.Designer.cs</c>의
+        /// <c>_grid.AllowUserToOrderColumns</c> 참고) CSV도 그 순서/구성 그대로 저장된다. 각
+        /// 셀 값도 <c>DataGridViewCell.FormattedValue</c>로 읽어서, TimeStamp 열의
+        /// "HH:mm:ss:fff" 형식 등 화면에 보이는 그대로가 CSV에도 쓰인다.</summary>
         private void ExportButton_Click(object sender, EventArgs e)
         {
             if (_records.Count == 0)
@@ -264,17 +271,26 @@ namespace Stm32WifiConfigTool.Panels
 
                 try
                 {
+                    DataGridViewColumn[] columns = GetColumnsInDisplayOrder();
+
                     using (var writer = new StreamWriter(dialog.FileName, false, Encoding.UTF8))
                     {
-                        writer.WriteLine("TimeStamp,Channel,DcIp,MacAddress,Samples");
-                        foreach (MeasurementRecord r in _records)
+                        var header = new string[columns.Length];
+                        for (int i = 0; i < columns.Length; i++)
                         {
-                            writer.WriteLine(
-                                r.TimeStamp.ToString("yyyy-MM-dd HH:mm:ss.fff") + "," +
-                                r.SourceChannel + "," +
-                                r.DcIp + "," +
-                                r.MacAddress + "," +
-                                "\"" + r.SamplesText + "\"");
+                            header[i] = columns[i].HeaderText;
+                        }
+                        writer.WriteLine(BuildCsvLine(header));
+
+                        foreach (DataGridViewRow row in _grid.Rows)
+                        {
+                            var fields = new string[columns.Length];
+                            for (int i = 0; i < columns.Length; i++)
+                            {
+                                object value = row.Cells[columns[i].Index].FormattedValue;
+                                fields[i] = value != null ? value.ToString() : string.Empty;
+                            }
+                            writer.WriteLine(BuildCsvLine(fields));
                         }
                     }
                     MessageBox.Show(this, "저장되었습니다:\n" + dialog.FileName, "CSV로 저장", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -284,6 +300,38 @@ namespace Stm32WifiConfigTool.Panels
                     MessageBox.Show(this, "저장 실패: " + ex.Message, "CSV로 저장", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
+        }
+
+        /// <summary>_grid.Columns를 사용자가 드래그로 바꿔놓았을 수 있는 현재 표시 순서
+        /// (DisplayIndex) 그대로 정렬해 반환한다.</summary>
+        private DataGridViewColumn[] GetColumnsInDisplayOrder()
+        {
+            var columns = new DataGridViewColumn[_grid.Columns.Count];
+            _grid.Columns.CopyTo(columns, 0);
+            Array.Sort(columns, (a, b) => a.DisplayIndex.CompareTo(b.DisplayIndex));
+            return columns;
+        }
+
+        /// <summary>필드 배열을 CSV 한 줄로 합친다(RFC4180과 유사하게, 콤마/따옴표/줄바꿈이
+        /// 포함된 필드만 큰따옴표로 감싸고 내부 따옴표는 두 번 반복). RawLine 열처럼 원본 값
+        /// 자체에 콤마가 여러 개 들어있는 필드도 안전하게 한 필드로 유지하기 위함이다.</summary>
+        private static string BuildCsvLine(string[] fields)
+        {
+            var escaped = new string[fields.Length];
+            for (int i = 0; i < fields.Length; i++)
+            {
+                escaped[i] = EscapeCsvField(fields[i]);
+            }
+            return string.Join(",", escaped);
+        }
+
+        private static string EscapeCsvField(string field)
+        {
+            if (field.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0)
+            {
+                return "\"" + field.Replace("\"", "\"\"") + "\"";
+            }
+            return field;
         }
 
         protected override void Dispose(bool disposing)

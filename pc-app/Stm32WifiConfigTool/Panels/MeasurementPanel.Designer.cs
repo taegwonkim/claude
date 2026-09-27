@@ -306,8 +306,10 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _colRawLine (측정값 프레임의 원본 텍스트 전체 - 항상 마지막 열에 놓고, 남는 폭을
             // 모두 채운다(AutoSizeMode.Fill). "Data1..N"(SamplesText) 열은 이 원본 텍스트에
-            // 이미 포함된 정보라 중복이므로 그리드에서는 없앴다 - 모델의 SamplesText 프로퍼티
-            // 자체는 CSV 내보내기(MeasurementPanel.cs의 ExportButton_Click)에서 계속 쓰인다.)
+            // 이미 포함된 정보라 중복이므로 그리드에서는 없앴다 - CSV 내보내기도 이제 그리드
+            // 열(_grid.Columns)을 그대로 따르므로 SamplesText는 CSV에도 나오지 않는다. 모델의
+            // SourceChannel/Samples/SamplesText 프로퍼티 자체는 그대로 남아있다(파싱된 데이터
+            // 보존용 - MeasurementPanel.cs의 ExportButton_Click 참고).)
             //
             this._colRawLine.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
             this._colRawLine.DataPropertyName = "RawLine";
