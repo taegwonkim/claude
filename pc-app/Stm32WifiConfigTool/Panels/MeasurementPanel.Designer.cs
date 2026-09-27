@@ -104,8 +104,14 @@ namespace Stm32WifiConfigTool.Panels
             //
             // 아래 컨트롤들은 AutoSize를 껐고(Dock도 없음) Location+Size를 직접 가지므로,
             // Visual Studio 디자이너에서 하나씩 선택해 크기 조절 핸들을 드래그해 폭/높이를
-            // 자유롭게 바꿀 수 있다. (FlowLayoutPanel인 _topRow 안에서도 각 컨트롤의 위치는
-            // 자동 배치되지만 크기는 자유롭게 바꿀 수 있다.)
+            // 자유롭게 바꿀 수 있다. (FlowLayoutPanel인 _topRow 안에서도 각 컨트롤의 "크기"는
+            // 자유롭게 바꿀 수 있지만, "위치"는 여전히 _topRow가 Controls.Add() 순서와 각
+            // 컨트롤의 Margin을 기준으로 매번 다시 계산해서 배치한다 - 즉 디자이너에서 드래그해
+            // 임의의 좌표로 옮겨도 실행 시점에는 그 Location이 무시되고 이 자동 배치 결과로
+            // 덮어써진다. 이 행 안에서 컨트롤 사이 간격/순서를 바꾸려면 Location이 아니라
+            // Margin 값이나 Controls.Add() 호출 순서를 바꿔야 한다. 정말 자유로운(행의 흐름과
+            // 무관한) 위치가 필요하면 RtcConfigPanel.Designer.cs의 "자유 배치" GroupBox처럼
+            // FlowLayoutPanel 밖으로 빼야 한다.)
             //
             // _channelGroup
             //
@@ -173,21 +179,32 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _macAddressCaptionLabel (MCU가 "<STX>MAC_<mac address><CR><LF>" 형식으로 보내면
             // MAC_ 뒤의 값만 여기 _macAddressValueLabel에 별도 표시한다. 수신 프레임 원본은
-            // 평소대로 우측 "그 외 수신값" 로그에도 그대로 남는다.)
+            // 평소대로 우측 "그 외 수신값" 로그에도 그대로 남는다.
+            // AutoSize=false로 꺼서 위 _channelGroup 등과 마찬가지로 Visual Studio 디자이너에서
+            // 크기 조절 핸들을 드래그해 상자 크기를 자유롭게 바꿀 수 있다 - AutoSize=true였다면
+            // Text/Font에 맞춰 크기가 자동으로 다시 계산되므로 직접 크기를 지정할 수 없었다.
+            // Font를 바꾸면(예: 크기를 키우면) 텍스트가 잘리지 않도록 이 Size도 함께 넉넉히
+            // 늘려줘야 한다.)
             //
-            this._macAddressCaptionLabel.AutoSize = true;
+            this._macAddressCaptionLabel.AutoSize = false;
             this._macAddressCaptionLabel.Location = new System.Drawing.Point(523, 20);
             this._macAddressCaptionLabel.Margin = new System.Windows.Forms.Padding(10, 20, 3, 3);
             this._macAddressCaptionLabel.Name = "_macAddressCaptionLabel";
-            this._macAddressCaptionLabel.Size = new System.Drawing.Size(75, 15);
+            this._macAddressCaptionLabel.Size = new System.Drawing.Size(90, 20);
             this._macAddressCaptionLabel.TabIndex = 4;
             this._macAddressCaptionLabel.Text = "MAC Address";
+            this._macAddressCaptionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _macAddressValueLabel (흰색 바탕의 읽기 전용 텍스트 박스로 표시)
+            // _macAddressValueLabel (흰색 바탕의 읽기 전용 텍스트 박스로 표시.
+            // Multiline=true로 켜서 높이도 자유롭게 조절할 수 있게 했다 - TextBox는 기본적으로
+            // (Multiline=false일 때) 높이가 Font 크기에 맞춰 자동으로 고정되어 디자이너에서
+            // 위/아래 크기 조절 핸들이 동작하지 않는다. ReadOnly라 사용자가 직접 여러 줄을 입력할
+            // 일은 없으므로 Multiline을 켜도 동작에는 영향이 없다.)
             //
             this._macAddressValueLabel.BackColor = System.Drawing.Color.White;
             this._macAddressValueLabel.Location = new System.Drawing.Point(611, 20);
             this._macAddressValueLabel.Margin = new System.Windows.Forms.Padding(6, 20, 3, 3);
+            this._macAddressValueLabel.Multiline = true;
             this._macAddressValueLabel.Name = "_macAddressValueLabel";
             this._macAddressValueLabel.ReadOnly = true;
             this._macAddressValueLabel.Size = new System.Drawing.Size(120, 23);
