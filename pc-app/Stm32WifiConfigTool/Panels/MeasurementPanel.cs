@@ -58,6 +58,7 @@ namespace Stm32WifiConfigTool.Panels
             SetColumnWidthSafe(_colTimeStamp, settings.MeasurementColTimeStampWidth);
             SetColumnWidthSafe(_colDcIp, settings.MeasurementColDcIpWidth);
             SetColumnWidthSafe(_colMac, settings.MeasurementColMacWidth);
+            SetColumnWidthSafe(_colSamples, settings.MeasurementColSamplesWidth);
 
             _conn.Usb.LineReceived += OnLineReceived;
             _conn.Uart.LineReceived += OnLineReceived;
@@ -129,6 +130,10 @@ namespace Stm32WifiConfigTool.Panels
             else if (e.Column == _colMac)
             {
                 _settings.MeasurementColMacWidth = e.Column.Width;
+            }
+            else if (e.Column == _colSamples)
+            {
+                _settings.MeasurementColSamplesWidth = e.Column.Width;
             }
             else
             {

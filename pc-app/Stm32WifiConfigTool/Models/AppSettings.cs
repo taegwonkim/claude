@@ -82,6 +82,7 @@ namespace Stm32WifiConfigTool.Models
         public int MeasurementColTimeStampWidth { get; set; } = 140;
         public int MeasurementColDcIpWidth { get; set; } = 110;
         public int MeasurementColMacWidth { get; set; } = 130;
+        public int MeasurementColSamplesWidth { get; set; } = 260;
 
         /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
         /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.EspStatusPanel.Initialize"/> 참고.)</summary>

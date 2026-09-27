@@ -211,14 +211,13 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      판별하도록 되어 있습니다. `docs/프로토콜_명세.md` §2가 문서화한 "태그 없음/6개 고정"
      포맷과는 실제 다르니 유의하세요). 열은 왼쪽부터 `TimeStamp`(`HH:mm:ss:fff` 형식, 밀리초
      앞도 마침표가 아니라 콜론으로 구분) / `DC IP`(이 장치(ESP32)의 station IP, `DC_` 접두어는
-     뗀 값) / `MAC`(같은 장치의 station MAC 주소) / `RawLine`(수신한 프레임 원본 전체, 항상
-     마지막 열이며 남는 폭을 모두 채웁니다) 순입니다. 채널(USB/UART) 열과 `Data1..N`(샘플 값,
-     `MeasurementRecord.SamplesText`)열은 없습니다 — 후자는 `RawLine`에 이미 포함된 정보라
-     중복이라 그리드에서는 뺐습니다(모델의 `SamplesText` 자체는 CSV 내보내기에서는 계속
-     쓰입니다). 그리드 열 머리글을 드래그하면 순서를 자유롭게 바꿀 수 있습니다
-     (`DataGridView.AllowUserToOrderColumns`). `TimeStamp`/`DC IP`/`MAC` 열의 폭은 경계선을
-     드래그해 조절할 수 있고, 조절한 폭은 각각 `AppSettings.MeasurementColTimeStampWidth`
-     / `MeasurementColDcIpWidth` / `MeasurementColMacWidth`로 저장되어 재시작 후에도
+     뗀 값) / `MAC`(같은 장치의 station MAC 주소) / `Data1..N`(`MeasurementRecord.SamplesText`,
+     샘플 값을 콤마로 이어붙인 문자열) / `RawLine`(수신한 프레임 원본 전체, 항상 마지막 열이며
+     남는 폭을 모두 채웁니다) 순입니다. 채널(USB/UART) 열은 없습니다. 그리드 열 머리글을
+     드래그하면 순서를 자유롭게 바꿀 수 있습니다(`DataGridView.AllowUserToOrderColumns`).
+     `TimeStamp`/`DC IP`/`MAC`/`Data1..N` 열의 폭은 경계선을 드래그해 조절할 수 있고, 조절한
+     폭은 각각 `AppSettings.MeasurementColTimeStampWidth` / `MeasurementColDcIpWidth` /
+     `MeasurementColMacWidth` / `MeasurementColSamplesWidth`로 저장되어 재시작 후에도
      유지됩니다(`RawLine` 열은 항상 남는 폭을 채우는 열이라 폭을 따로 저장하지 않고, 열 순서
      자체도 재시작 후 다시 기본 순서로 돌아갑니다 - 저장되지 않습니다).
    - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지를 한 로그에 원본
