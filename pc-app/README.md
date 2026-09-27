@@ -232,12 +232,13 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    - "MAC Address": "자동 스크롤" 체크박스 옆에 있는 별도 표시 영역입니다. MCU가
      `<STX>MAC_<mac address><CR><LF>` 형식(`Stm32Protocol.TryParseMacAddress` 참고)으로 보내면,
      그 원본 프레임은 평소대로 위 "그 외 모든 값" 로그에 그대로 남기면서, `MAC_` 뒤의 값만
-     추가로 이 영역에 별도 표시합니다. 캡션 라벨(`_macAddressCaptionLabel`)과 값 표시
-     텍스트박스(`_macAddressValueLabel`)는 Visual Studio 디자이너에서 글꼴 크기와 상자 크기를
-     자유롭게 바꿀 수 있도록 만들어져 있습니다(자세한 이유는 아래 "왜 어떤 컨트롤은 디자이너에서
-     자유롭게 옮기거나 크기를 바꿀 수 없나요?" 참고) — 다만 이 둘은 `_topRow`(가로로 나열되는
-     FlowLayoutPanel)의 일부라서, 화면상 "위치"는 디자이너에서 드래그한 좌표가 아니라
-     `_topRow`가 실행 시 자동으로 다시 계산해 배치합니다.
+     추가로 이 영역에 별도 표시합니다. 캡션 라벨(`_macAddressCaptionLabel`)과 값 표시용
+     한 줄(single-line) 텍스트박스(`_macAddressValueLabel`)는 `_macAddressGroup`이라는 별도의
+     "자유 배치" 컨테이너(`Panel`) 안에 들어 있어서, 둘 다 Visual Studio 디자이너에서 글꼴
+     크기·폭·높이·위치를 완전히 자유롭게 바꿀 수 있습니다(자세한 이유는 아래 "왜 어떤 컨트롤은
+     디자이너에서 자유롭게 옮기거나 크기를 바꿀 수 없나요?" 참고) — `_macAddressGroup` 자체는
+     `_topRow`(가로로 나열되는 FlowLayoutPanel)의 일부라서 그 "위치"만 실행 시 자동으로 다시
+     계산되지만, 그 안에 있는 라벨/텍스트박스 두 개는 이 제약과 무관하게 자유롭습니다.
    - "지우기": 그리드와 우측 로그를 모두 비웁니다.
    - "CSV로 저장": 현재까지 쌓인 측정값을 CSV 파일로 내보냅니다.
 
@@ -295,12 +296,15 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 따라 반드시 다시 계산돼야 하는 요소들) 창 크기를 바꾸거나 언어/글꼴이 달라졌을 때 레이아웃이
 깨질 수 있어 권장하지 않습니다. 반면 `MeasurementPanel`의 "MAC Address" 캡션 라벨/값
 텍스트박스처럼 **내용이 고정된 짧은 값(라벨 문구 + MAC 주소 하나)만 표시하고 다른 컨트롤이
-그 크기에 의존하지 않는 말단(leaf) 컨트롤**은 `AutoSize`/`Multiline`을 꺼서 글꼴·상자 크기를
-자유롭게 바꿔도 다른 부분이 깨질 위험이 없습니다 — 그래서 이 둘만 `AutoSize = false`
-(라벨)/`Multiline = true`(텍스트박스)로 바꿔 디자이너에서 자유롭게 조절할 수 있게 했습니다
-(`Panels/MeasurementPanel.Designer.cs`의 `_macAddressCaptionLabel`/`_macAddressValueLabel`
-주석 참고). 다만 위에서 설명했듯 이 둘은 여전히 `_topRow`(FlowLayoutPanel) 안에 있으므로
-"위치"만큼은 자동 배치를 따릅니다.
+그 크기에 의존하지 않는 말단(leaf) 컨트롤**은 자동 배치를 꺼도 다른 부분이 깨질 위험이
+없습니다 — 그래서 이 둘은 `_macAddressGroup`이라는 전용 "자유 배치" 컨테이너(`Panel`,
+`AutoSize=false`, `Dock`/`Anchor` 없음)로 한 번 감싸서, `_topRow`(FlowLayoutPanel)의 자동
+배치 영향에서 완전히 벗어나게 했습니다 — 라벨은 `AutoSize=false`, 텍스트박스는
+`Multiline=false`(한 줄 유지)인 채로 `AutoSize=false`만 꺼서, 두 컨트롤 모두 디자이너에서
+폭·높이·위치를 전부 자유롭게 조절할 수 있습니다(`Panels/MeasurementPanel.Designer.cs`의
+`_macAddressGroup`/`_macAddressCaptionLabel`/`_macAddressValueLabel` 주석 참고).
+`_macAddressGroup` 자체의 "위치"만 `_topRow`의 순서/`Margin` 기준 자동 배치를 그대로 따르고,
+그 안의 두 컨트롤은 이 제약과 완전히 무관합니다.
 
 ## 설정값 저장 (포트/보레이트/타임아웃 등)
 

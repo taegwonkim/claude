@@ -13,6 +13,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Button _clearButton;
         private System.Windows.Forms.Button _exportButton;
         private System.Windows.Forms.CheckBox _autoScrollCheck;
+        private System.Windows.Forms.Panel _macAddressGroup;
         private System.Windows.Forms.Label _macAddressCaptionLabel;
         private System.Windows.Forms.TextBox _macAddressValueLabel;
         private System.Windows.Forms.SplitContainer _splitDisplay;
@@ -44,6 +45,7 @@ namespace Stm32WifiConfigTool.Panels
             this._clearButton = new System.Windows.Forms.Button();
             this._exportButton = new System.Windows.Forms.Button();
             this._autoScrollCheck = new System.Windows.Forms.CheckBox();
+            this._macAddressGroup = new System.Windows.Forms.Panel();
             this._macAddressCaptionLabel = new System.Windows.Forms.Label();
             this._macAddressValueLabel = new System.Windows.Forms.TextBox();
             this._splitDisplay = new System.Windows.Forms.SplitContainer();
@@ -61,6 +63,7 @@ namespace Stm32WifiConfigTool.Panels
             this._root.SuspendLayout();
             this._topRow.SuspendLayout();
             this._channelGroup.SuspendLayout();
+            this._macAddressGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._splitDisplay)).BeginInit();
             this._splitDisplay.Panel1.SuspendLayout();
             this._splitDisplay.Panel2.SuspendLayout();
@@ -93,8 +96,7 @@ namespace Stm32WifiConfigTool.Panels
             this._topRow.Controls.Add(this._clearButton);
             this._topRow.Controls.Add(this._exportButton);
             this._topRow.Controls.Add(this._autoScrollCheck);
-            this._topRow.Controls.Add(this._macAddressCaptionLabel);
-            this._topRow.Controls.Add(this._macAddressValueLabel);
+            this._topRow.Controls.Add(this._macAddressGroup);
             this._topRow.Dock = System.Windows.Forms.DockStyle.Top;
             this._topRow.Location = new System.Drawing.Point(9, 9);
             this._topRow.Name = "_topRow";
@@ -177,38 +179,53 @@ namespace Stm32WifiConfigTool.Panels
             this._autoScrollCheck.Text = "자동 스크롤";
             this._autoScrollCheck.CheckedChanged += new System.EventHandler(this.AutoScrollCheck_CheckedChanged);
             //
+            // _macAddressGroup ("자유 배치" 컨테이너 - RtcConfigPanel의 "RTC 리셋 설정" 그룹과
+            // 같은 방식이다: 이 Panel 자체는 AutoSize=false에 Dock/Anchor가 없는 평범한
+            // Panel이라, FlowLayoutPanel인 _topRow 안에 있어도 내부의 두 자식(캡션 라벨 +
+            // 값 텍스트박스)은 _topRow의 자동 배치 영향을 전혀 받지 않는다 - Visual Studio
+            // 디자이너에서 이 Panel을 열어 두 자식을 하나씩 선택해 Location/Size를 완전히
+            // 자유롭게 옮기거나 크기를 바꿀 수 있다(폭/높이/위치 전부). _macAddressGroup 자체의
+            // "위치"만 위 주석대로 _topRow의 자동 배치를 따른다(순서/Margin 기준) - 그 안의
+            // 내용물은 그 제약과 무관하다.)
+            //
+            this._macAddressGroup.AutoSize = false;
+            this._macAddressGroup.Controls.Add(this._macAddressCaptionLabel);
+            this._macAddressGroup.Controls.Add(this._macAddressValueLabel);
+            this._macAddressGroup.Location = new System.Drawing.Point(523, 15);
+            this._macAddressGroup.Margin = new System.Windows.Forms.Padding(10, 15, 3, 3);
+            this._macAddressGroup.Name = "_macAddressGroup";
+            this._macAddressGroup.Size = new System.Drawing.Size(250, 30);
+            this._macAddressGroup.TabIndex = 4;
+            //
             // _macAddressCaptionLabel (MCU가 "<STX>MAC_<mac address><CR><LF>" 형식으로 보내면
-            // MAC_ 뒤의 값만 여기 _macAddressValueLabel에 별도 표시한다. 수신 프레임 원본은
+            // MAC_ 뒤의 값만 옆의 _macAddressValueLabel에 별도 표시한다. 수신 프레임 원본은
             // 평소대로 우측 "그 외 수신값" 로그에도 그대로 남는다.
-            // AutoSize=false로 꺼서 위 _channelGroup 등과 마찬가지로 Visual Studio 디자이너에서
-            // 크기 조절 핸들을 드래그해 상자 크기를 자유롭게 바꿀 수 있다 - AutoSize=true였다면
-            // Text/Font에 맞춰 크기가 자동으로 다시 계산되므로 직접 크기를 지정할 수 없었다.
-            // Font를 바꾸면(예: 크기를 키우면) 텍스트가 잘리지 않도록 이 Size도 함께 넉넉히
-            // 늘려줘야 한다.)
+            // AutoSize=false로 꺼서 Text/Font에 맞춰 크기가 자동으로 다시 계산되지 않으므로,
+            // 위 _macAddressGroup 안에서 Location/Size를 자유롭게 조절할 수 있다.)
             //
             this._macAddressCaptionLabel.AutoSize = false;
-            this._macAddressCaptionLabel.Location = new System.Drawing.Point(523, 20);
-            this._macAddressCaptionLabel.Margin = new System.Windows.Forms.Padding(10, 20, 3, 3);
+            this._macAddressCaptionLabel.Location = new System.Drawing.Point(0, 5);
             this._macAddressCaptionLabel.Name = "_macAddressCaptionLabel";
             this._macAddressCaptionLabel.Size = new System.Drawing.Size(90, 20);
-            this._macAddressCaptionLabel.TabIndex = 4;
+            this._macAddressCaptionLabel.TabIndex = 0;
             this._macAddressCaptionLabel.Text = "MAC Address";
             this._macAddressCaptionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _macAddressValueLabel (흰색 바탕의 읽기 전용 텍스트 박스로 표시.
-            // Multiline=true로 켜서 높이도 자유롭게 조절할 수 있게 했다 - TextBox는 기본적으로
-            // (Multiline=false일 때) 높이가 Font 크기에 맞춰 자동으로 고정되어 디자이너에서
-            // 위/아래 크기 조절 핸들이 동작하지 않는다. ReadOnly라 사용자가 직접 여러 줄을 입력할
-            // 일은 없으므로 Multiline을 켜도 동작에는 영향이 없다.)
+            // _macAddressValueLabel (흰색 바탕의 읽기 전용 한 줄(single-line) 텍스트박스로 표시.
+            // AutoSize=false로 꺼서 - TextBox는 기본적으로(Multiline=false일 때) 높이가 Font
+            // 크기에 맞춰 자동으로 고정되어 디자이너에서 위/아래 크기 조절 핸들이 동작하지
+            // 않는다 - 폭/높이를 모두 자유롭게 조절할 수 있게 했다(Multiline은 그대로 false라서
+            // 항상 한 줄로만 표시된다). 기본 폭(150)은 "AA:BB:CC:DD:EE:FF" 같은 MAC 주소
+            // 문자열이 잘리지 않고 다 보이도록 여유 있게 잡은 값이며, 필요하면 이보다 더
+            // 넓히거나 줄일 수 있다.)
             //
+            this._macAddressValueLabel.AutoSize = false;
             this._macAddressValueLabel.BackColor = System.Drawing.Color.White;
-            this._macAddressValueLabel.Location = new System.Drawing.Point(611, 20);
-            this._macAddressValueLabel.Margin = new System.Windows.Forms.Padding(6, 20, 3, 3);
-            this._macAddressValueLabel.Multiline = true;
+            this._macAddressValueLabel.Location = new System.Drawing.Point(95, 3);
             this._macAddressValueLabel.Name = "_macAddressValueLabel";
             this._macAddressValueLabel.ReadOnly = true;
-            this._macAddressValueLabel.Size = new System.Drawing.Size(120, 23);
-            this._macAddressValueLabel.TabIndex = 5;
+            this._macAddressValueLabel.Size = new System.Drawing.Size(150, 23);
+            this._macAddressValueLabel.TabIndex = 1;
             this._macAddressValueLabel.Text = "-";
             //
             // _splitDisplay (좌: 측정값 그리드 | 우: STATUS + 그 외 수신값 로그.
@@ -369,6 +386,8 @@ namespace Stm32WifiConfigTool.Panels
             this._topRow.PerformLayout();
             this._channelGroup.ResumeLayout(false);
             this._channelGroup.PerformLayout();
+            this._macAddressGroup.ResumeLayout(false);
+            this._macAddressGroup.PerformLayout();
             this._splitDisplay.Panel1.ResumeLayout(false);
             this._splitDisplay.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this._splitDisplay)).EndInit();

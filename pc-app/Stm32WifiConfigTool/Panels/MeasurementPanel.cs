@@ -20,11 +20,12 @@ namespace Stm32WifiConfigTool.Panels
     /// <see cref="Stm32Protocol.TryParseMacAddress"/> 참고)인 경우에는 원본 프레임을 위 로그에
     /// 그대로 남기는 것과 별도로, "MAC_" 뒤의 값만 상단 "자동 스크롤" 체크박스 옆의
     /// MAC Address 표시 영역에도 갱신한다. 이 캡션 라벨(<c>_macAddressCaptionLabel</c>)과
-    /// 값 표시 텍스트박스(<c>_macAddressValueLabel</c>)는 AutoSize를 꺼두어(라벨) /
-    /// Multiline을 켜두어(텍스트박스) Visual Studio 디자이너에서 Font/Size를 자유롭게
-    /// 바꿀 수 있다(<c>MeasurementPanel.Designer.cs</c>의 해당 컨트롤 주석 참고) - 다만 위치는
-    /// 이 둘이 속한 <c>_topRow</c>(FlowLayoutPanel)가 실행 시 자동으로 다시 배치하므로,
-    /// 디자이너에서 드래그한 좌표 자체는 실제 위치에 반영되지 않는다.
+    /// 값 표시 텍스트박스(<c>_macAddressValueLabel</c>, 한 줄짜리 single-line TextBox)는
+    /// <c>_macAddressGroup</c>이라는 "자유 배치" 컨테이너(Panel) 안에 들어 있어서, 둘 다
+    /// Visual Studio 디자이너에서 폭/높이/위치를 완전히 자유롭게 조절할 수 있다 -
+    /// <c>_topRow</c>(FlowLayoutPanel)가 자동으로 다시 배치하는 것은 이 컨테이너
+    /// (<c>_macAddressGroup</c>) 자체의 위치일 뿐이고, 그 안에 있는 두 컨트롤은 그 영향을
+    /// 받지 않는다(<c>MeasurementPanel.Designer.cs</c>의 <c>_macAddressGroup</c> 주석 참고).
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
