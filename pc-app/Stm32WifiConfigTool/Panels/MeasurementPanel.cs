@@ -50,34 +50,52 @@ namespace Stm32WifiConfigTool.Panels
             _grid.DataSource = _records;
         }
 
-        /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.</summary>
+        /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.
+        /// 여기 있는 컨트롤 참조들은 모두 InitializeComponent()가 만든 것인데, 이 파일이 손으로
+        /// 작성된 탓에 Visual Studio 디자이너가 InitializeComponent()를 다시 쓸 때 특정 컨트롤의
+        /// 생성 코드가 유실되는 사고가 실제로 있었다(예: 그리드 열 하나가 통째로 null이 되어
+        /// NullReferenceException으로 앱 시작 자체가 막힘). 그런 손상이 다시 있어도 앱 전체가
+        /// 죽지 않도록, 컨트롤 하나하나를 SafeSet 계열 헬퍼로 감싸 null이면 그 항목만 조용히
+        /// 건너뛴다 - 화면 일부가 설정을 못 불러올 뿐 나머지는 정상 동작한다.</summary>
         public void Initialize(ConnectionManager conn, AppSettings settings)
         {
             _conn = conn;
             _settings = settings;
 
-            _showUsb.Checked = settings.MeasurementDisplayChannel != "Uart";
-            _showUart.Checked = settings.MeasurementDisplayChannel == "Uart";
-            _autoScrollCheck.Checked = settings.MeasurementAutoScroll;
+            SafeSetChecked(_showUsb, settings.MeasurementDisplayChannel != "Uart");
+            SafeSetChecked(_showUart, settings.MeasurementDisplayChannel == "Uart");
+            SafeSetChecked(_autoScrollCheck, settings.MeasurementAutoScroll);
 
             SetColumnWidthSafe(_colTimeStamp, settings.MeasurementColTimeStampWidth);
             SetColumnWidthSafe(_colDcIp, settings.MeasurementColDcIpWidth);
             SetColumnWidthSafe(_colMac, settings.MeasurementColMacWidth);
             SetColumnWidthSafe(_colSamples, settings.MeasurementColSamplesWidth);
 
-            _conn.Usb.LineReceived += OnLineReceived;
-            _conn.Uart.LineReceived += OnLineReceived;
+            if (_conn != null)
+            {
+                _conn.Usb.LineReceived += OnLineReceived;
+                _conn.Uart.LineReceived += OnLineReceived;
+            }
 
             /* MainForm의 상단 4개 스플리터와 동일한 이유로 BeginInvoke를 통해 지연 복원한다:
              * 생성 직후에는 SplitContainer의 Width가 아직 최종값으로 안정되지 않을 수 있다. */
             Load += (s, e) => BeginInvoke(new Action(ApplySavedSplitterDistance));
         }
 
-        /// <summary>column이 null이면 조용히 건너뛴다 - Visual Studio 디자이너에서 DataGridView의
-        /// 열 편집(Edit Columns) 등을 통해 InitializeComponent()가 다시 저장될 때, 이 파일이
-        /// 손으로 작성된 탓에 특정 열의 생성 코드가 유실되는 경우가 있었다(실제로 이 문제로
-        /// _colTimeStamp가 null이 되어 NullReferenceException으로 시작 자체가 안 된 적이 있음).
-        /// 그런 손상이 있어도 앱 전체가 죽지 않고, 손상된 열의 폭 복원만 건너뛰도록 방어한다.</summary>
+        /// <summary>control이 null이면 조용히 건너뛴다(<see cref="Initialize"/> 주석 참고).</summary>
+        private static void SafeSetChecked(ButtonBase control, bool value)
+        {
+            if (control is RadioButton radioButton)
+            {
+                radioButton.Checked = value;
+            }
+            else if (control is CheckBox checkBox)
+            {
+                checkBox.Checked = value;
+            }
+        }
+
+        /// <summary>column이 null이면 조용히 건너뛴다(<see cref="Initialize"/> 주석 참고).</summary>
         private static void SetColumnWidthSafe(DataGridViewColumn column, int width)
         {
             if (column != null)
