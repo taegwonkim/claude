@@ -31,6 +31,10 @@ namespace Stm32WifiConfigTool.Panels
     /// 옮겨도 아래쪽 측정값 그리드/로그 영역(<c>_splitDisplay</c>, 2행 Percent 100%)의 크기에는
     /// 전혀 영향을 주지 않는다 - 예전에는 1행이 auto-size라 위쪽을 키우면 그만큼 아래쪽이
     /// 줄어드는 부작용이 있었다(<c>MeasurementPanel.Designer.cs</c>의 <c>_root</c> 주석 참고).
+    /// 이 행 높이 고정, 그리드의 "Data1..N" 헤더/열 순서 변경 허용 등은 Visual Studio
+    /// 디자이너가 <c>InitializeComponent()</c>를 다시 쓸 때 조용히 원래 상태로 되돌아간 사례가
+    /// 있어서, 이 생성자(디자이너가 건드리지 않는 곳)에서 한 번 더 강제로 재적용한다 - 자세한
+    /// 이유는 생성자 안의 주석 참고.
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -48,6 +52,23 @@ namespace Stm32WifiConfigTool.Panels
         {
             InitializeComponent();
             _grid.DataSource = _records;
+
+            /* Visual Studio 디자이너에서 MeasurementPanel을 열고 아무 속성이나(예: MAC Address
+             * 라벨/텍스트박스의 크기나 위치) 바꿔 저장하면 InitializeComponent() 전체가 다시
+             * 생성되는데, 이 파일이 손으로 작성된 탓에 완전한 라운드트립이 보장되지 않아 아래
+             * 속성들이 조용히 원래 상태(디자이너 기본값)로 되돌아간 사례가 실제로 있었다(예:
+             * "SourceChannel" 열 제거/"Data1..N" 헤더/열 순서 변경 허용이 원래대로 돌아가 보이는
+             * 문제, 그리고 _root 1행 높이가 다시 auto-size로 바뀌어 MAC Address 쪽을 조절하면
+             * 아래 측정값 그리드/로그 영역이 줄어드는 문제). 디자이너가 InitializeComponent()에
+             * 무엇을 써놓든, 이 생성자(Designer.cs가 아닌 이 파일 - 디자이너가 절대 건드리지
+             * 않는 곳)에서 마지막에 다시 한번 강제로 맞춰 두면, InitializeComponent()의 실제
+             * 내용과 무관하게 항상 아래 상태가 보장된다. */
+            _grid.AllowUserToOrderColumns = true;
+            _colSamples.HeaderText = "Data1..N";
+
+            _root.RowStyles[0] = new RowStyle(SizeType.Absolute, 64F);
+            _root.RowStyles[1] = new RowStyle(SizeType.Percent, 100F);
+            _topRow.AutoSize = false;
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.
