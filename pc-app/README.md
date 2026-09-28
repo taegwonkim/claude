@@ -337,7 +337,10 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 비하인드)** 쪽으로 옮겼습니다:
 - 측정값 그리드의 5개 열은 `Panels/MeasurementPanel.Designer.cs`에 있지 않고,
   `Panels/MeasurementPanel.cs`의 `BuildGridColumns()`에서 코드로 직접 만들어 `_grid`에
-  추가합니다 — 이제 이 필드들이 `null`이 되는 경우는 원천적으로 없습니다.
+  추가합니다 — 이제 이 필드들이 `null`이 되는 경우는 원천적으로 없습니다. 같은 메서드에서
+  `_grid.AutoGenerateColumns = false`도 한 번 더 강제로 재적용합니다 — 이 값이 디자이너에
+  의해 `true`로 되돌아가면 `MeasurementRecord`의 나머지 프로퍼티(`SourceChannel` 등, 화면에
+  두지 않기로 한 것들)까지 열로 자동 생성되어 다시 나타나 보이는 문제가 있었습니다.
 - `_root` 1행의 고정 높이(Absolute 64px)는 생성자에서 한 번 더 강제로 재적용해, 디자이너가
   이 값을 되돌려도 실제 동작에는 영향이 없습니다.
 

@@ -139,6 +139,15 @@ namespace Stm32WifiConfigTool.Panels
 
             _grid.Columns.AddRange(_colTimeStamp, _colDcIp, _colMac, _colSamples, _colRawLine);
             _grid.AllowUserToOrderColumns = true;
+
+            /* AutoGenerateColumns가 true면 DataSource(_records, MeasurementRecord 목록)에
+             * 바인딩되는 순간 위 5개 열 외에 MeasurementRecord의 나머지 공개 프로퍼티
+             * (SourceChannel/Samples 등, 화면에 두지 않기로 한 것들)까지 전부 열로 자동
+             * 생성되어 "SourceChannel" 같은 열이 다시 나타난다. Designer.cs에도 이미
+             * AutoGenerateColumns = false가 있지만, 디자이너가 InitializeComponent()를 다시
+             * 쓸 때 이 값이 되돌아갈 수 있다는 게 이미 여러 번 확인된 터라, 디자이너가 건드리지
+             * 않는 여기서도 다시 한번 false로 못박아 둔다. */
+            _grid.AutoGenerateColumns = false;
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.
