@@ -245,11 +245,15 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      `_topRow`가 속한 `_root`(TableLayoutPanel)의 1행은 고정 높이(Absolute 64px)로 못박혀
      있어서, 이 라벨/텍스트박스를 아무리 늘리거나 옮겨도 아래쪽 측정값 그리드/로그 영역
      (2행, Percent 100%)의 크기에는 영향을 주지 않습니다(예전에는 1행이 auto-size라 위쪽을
-     키우면 그만큼 아래쪽이 줄어드는 부작용이 있었습니다). 이 고정 높이 설정과 그리드의
-     "Data1..N" 헤더/열 순서 변경 허용은, Visual Studio 디자이너가 `InitializeComponent()`를
-     다시 쓸 때 조용히 원래 상태로 되돌아간 사례가 있어서 `MeasurementPanel.cs`의 생성자
-     (디자이너가 절대 건드리지 않는 곳)에서 한 번 더 강제로 재적용합니다 - 그래서 디자이너에서
-     무엇을 바꿔 저장하든 이 세 가지는 항상 보장됩니다.
+     키우면 그만큼 아래쪽이 줄어드는 부작용이 있었습니다). 이 고정 높이 설정은 Visual Studio
+     디자이너가 `InitializeComponent()`를 다시 쓸 때 조용히 원래 상태(auto-size)로 되돌아간
+     사례가 있어서, `MeasurementPanel.cs`의 생성자(디자이너가 절대 건드리지 않는 곳)에서
+     한 번 더 강제로 재적용합니다 - 디자이너에서 무엇을 바꿔 저장하든 항상 고정 높이가
+     보장됩니다. 측정값 그리드의 열(`_colTimeStamp`/`DC IP`/`MAC`/`Data1..N`/`RawLine`)도
+     같은 이유로 `Designer.cs`가 아니라 `MeasurementPanel.cs`의 `BuildGridColumns()`에서
+     코드로 직접 만듭니다 — `Designer.cs`에 있을 때는 디자이너가 다시 쓸 때 열 정의 자체가
+     통째로 유실되어(`_colTimeStamp`, 그다음 `_colSamples`가 차례로 null이 되어)
+     `NullReferenceException`으로 앱 시작이 막히는 사고가 실제로 있었습니다.
    - "지우기": 그리드와 우측 로그를 모두 비웁니다.
    - "CSV로 저장": 현재까지 쌓인 측정값을 CSV 파일로 내보냅니다. 열 목록/순서/서식은 하드코딩된
      값이 아니라 **화면 그리드 그대로**(`_grid.Columns`, `DataGridViewCell.FormattedValue`)를
@@ -321,6 +325,24 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 `_macAddressGroup`/`_macAddressCaptionLabel`/`_macAddressValueLabel` 주석 참고).
 `_macAddressGroup` 자체의 "위치"만 `_topRow`의 순서/`Margin` 기준 자동 배치를 그대로 따르고,
 그 안의 두 컨트롤은 이 제약과 완전히 무관합니다.
+
+**손으로 작성한 `Designer.cs`는 Visual Studio 디자이너와 완전한 라운드트립이 보장되지
+않습니다.** 이 저장소의 `*.Designer.cs` 파일들은 (Visual Studio 없는 환경에서 개발되어)
+디자이너가 아니라 사람이 직접 작성했습니다. 디자이너 자체로 열고 편집하는 것은 문제없지만,
+**MeasurementPanel에서 실제로 두 번**(그리드의 `_colTimeStamp` 열, 그다음 `_colSamples`
+열) 디자이너가 `InitializeComponent()`를 다시 쓰는 과정에서 열 정의 코드 자체가 통째로
+유실되어 그 필드가 `null`이 되고, 그 결과 `NullReferenceException`으로 앱 시작 자체가 막히는
+사고가 있었습니다. 그래서 `MeasurementPanel`에서는 이렇게 반복적으로 손상되기 쉬운 부분들을
+`Designer.cs`가 아니라 **디자이너가 절대 건드리지 않는 `MeasurementPanel.cs`(코드
+비하인드)** 쪽으로 옮겼습니다:
+- 측정값 그리드의 5개 열은 `Panels/MeasurementPanel.Designer.cs`에 있지 않고,
+  `Panels/MeasurementPanel.cs`의 `BuildGridColumns()`에서 코드로 직접 만들어 `_grid`에
+  추가합니다 — 이제 이 필드들이 `null`이 되는 경우는 원천적으로 없습니다.
+- `_root` 1행의 고정 높이(Absolute 64px)는 생성자에서 한 번 더 강제로 재적용해, 디자이너가
+  이 값을 되돌려도 실제 동작에는 영향이 없습니다.
+
+새 패널을 만들 때도, DataGridView의 열 정의처럼 디자이너의 "컬렉션 편집기"를 거치는 부분은
+가능하면 이 패턴(코드 비하인드에서 직접 생성)을 따르는 것을 권장합니다.
 
 ## 설정값 저장 (포트/보레이트/타임아웃 등)
 

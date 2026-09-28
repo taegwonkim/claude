@@ -31,10 +31,12 @@ namespace Stm32WifiConfigTool.Panels
     /// 옮겨도 아래쪽 측정값 그리드/로그 영역(<c>_splitDisplay</c>, 2행 Percent 100%)의 크기에는
     /// 전혀 영향을 주지 않는다 - 예전에는 1행이 auto-size라 위쪽을 키우면 그만큼 아래쪽이
     /// 줄어드는 부작용이 있었다(<c>MeasurementPanel.Designer.cs</c>의 <c>_root</c> 주석 참고).
-    /// 이 행 높이 고정, 그리드의 "Data1..N" 헤더/열 순서 변경 허용 등은 Visual Studio
-    /// 디자이너가 <c>InitializeComponent()</c>를 다시 쓸 때 조용히 원래 상태로 되돌아간 사례가
-    /// 있어서, 이 생성자(디자이너가 건드리지 않는 곳)에서 한 번 더 강제로 재적용한다 - 자세한
-    /// 이유는 생성자 안의 주석 참고.
+    /// 이 행 높이 고정은 Visual Studio 디자이너가 <c>InitializeComponent()</c>를 다시 쓸 때
+    /// 조용히 원래 상태(auto-size)로 되돌아간 사례가 있어서, 생성자(디자이너가 건드리지 않는
+    /// 곳)에서 한 번 더 강제로 재적용한다. 측정값 그리드의 열(<c>_colTimeStamp</c> 등)도 같은
+    /// 이유로 <c>Designer.cs</c>가 아니라 <see cref="BuildGridColumns"/>에서 코드로 직접
+    /// 만든다 - Designer.cs에 있을 때는 이 열 정의 자체가 통째로 유실되어 앱 시작이 막히는
+    /// 사고가 있었다.
     /// UI 레이아웃은 <c>MeasurementPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집
     /// 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후
     /// <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을 연결해야 한다.
@@ -48,36 +50,105 @@ namespace Stm32WifiConfigTool.Panels
         private ConnectionManager _conn;
         private AppSettings _settings;
 
+        /* 측정값 그리드의 열들 - Visual Studio 디자이너가 InitializeComponent()를 다시 쓸 때
+         * DataGridView의 열 정의(_colTimeStamp, 그다음 _colSamples)가 통째로 유실되어
+         * NullReferenceException으로 앱 시작이 막힌 사고가 두 번 있었다. 그래서 이 열들은
+         * Designer.cs가 아니라 여기(디자이너가 절대 건드리지 않는 코드 비하인드)에서
+         * BuildGridColumns()로 직접 만든다 - 이제 이 필드들이 null이 되는 경우는 원천적으로
+         * 없다. */
+        private DataGridViewTextBoxColumn _colTimeStamp;
+        private DataGridViewTextBoxColumn _colDcIp;
+        private DataGridViewTextBoxColumn _colMac;
+        private DataGridViewTextBoxColumn _colSamples;
+        private DataGridViewTextBoxColumn _colRawLine;
+
         public MeasurementPanel()
         {
             InitializeComponent();
+            BuildGridColumns();
             _grid.DataSource = _records;
 
             /* Visual Studio 디자이너에서 MeasurementPanel을 열고 아무 속성이나(예: MAC Address
              * 라벨/텍스트박스의 크기나 위치) 바꿔 저장하면 InitializeComponent() 전체가 다시
-             * 생성되는데, 이 파일이 손으로 작성된 탓에 완전한 라운드트립이 보장되지 않아 아래
-             * 속성들이 조용히 원래 상태(디자이너 기본값)로 되돌아간 사례가 실제로 있었다(예:
-             * "SourceChannel" 열 제거/"Data1..N" 헤더/열 순서 변경 허용이 원래대로 돌아가 보이는
-             * 문제, 그리고 _root 1행 높이가 다시 auto-size로 바뀌어 MAC Address 쪽을 조절하면
-             * 아래 측정값 그리드/로그 영역이 줄어드는 문제). 디자이너가 InitializeComponent()에
-             * 무엇을 써놓든, 이 생성자(Designer.cs가 아닌 이 파일 - 디자이너가 절대 건드리지
-             * 않는 곳)에서 마지막에 다시 한번 강제로 맞춰 두면, InitializeComponent()의 실제
-             * 내용과 무관하게 항상 아래 상태가 보장된다. */
-            _grid.AllowUserToOrderColumns = true;
-            _colSamples.HeaderText = "Data1..N";
+             * 생성되는데, 이 파일이 손으로 작성된 탓에 완전한 라운드트립이 보장되지 않아 _root
+             * 1행 높이가 다시 auto-size로 바뀌어 MAC Address 쪽을 조절하면 아래 측정값
+             * 그리드/로그 영역이 줄어드는 문제가 실제로 있었다. 디자이너가 InitializeComponent()에
+             * 무엇을 써놓든, 이 생성자(디자이너가 건드리지 않는 곳)에서 마지막에 다시 한번
+             * 강제로 맞춰 두면 항상 고정 높이가 보장된다. */
+            if (_root != null && _root.RowStyles.Count >= 2)
+            {
+                _root.RowStyles[0] = new RowStyle(SizeType.Absolute, 64F);
+                _root.RowStyles[1] = new RowStyle(SizeType.Percent, 100F);
+            }
+            if (_topRow != null)
+            {
+                _topRow.AutoSize = false;
+            }
+        }
 
-            _root.RowStyles[0] = new RowStyle(SizeType.Absolute, 64F);
-            _root.RowStyles[1] = new RowStyle(SizeType.Percent, 100F);
-            _topRow.AutoSize = false;
+        /// <summary>측정값 그리드의 열을 만들어 _grid에 연결한다 - 위 필드 주석 참고. TimeStamp는
+        /// "HH:mm:ss:fff" 형식(밀리초 앞도 콜론)으로 표시하고, RawLine은 항상 마지막 열에 놓고
+        /// 남는 폭을 모두 채운다(AutoSizeMode.Fill). CSV 내보내기(ExportButton_Click)는 이
+        /// _grid.Columns를 그대로 따르므로, 여기 있는 열 구성/순서가 CSV에도 똑같이 반영된다.
+        /// AllowUserToOrderColumns를 켜서 열 머리글을 드래그해 순서를 바꿀 수 있게 한다(폭과
+        /// 달리 순서 자체는 저장/복원하지 않는다).</summary>
+        private void BuildGridColumns()
+        {
+            _colTimeStamp = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "TimeStamp",
+                DefaultCellStyle = new DataGridViewCellStyle { Format = "HH:mm:ss:fff" },
+                HeaderText = "TimeStamp",
+                Name = "_colTimeStamp",
+                ReadOnly = true,
+                Width = 140
+            };
+            _colDcIp = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "DcIp",
+                HeaderText = "DC IP",
+                Name = "_colDcIp",
+                ReadOnly = true,
+                Width = 110
+            };
+            _colMac = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "MacAddress",
+                HeaderText = "MAC",
+                Name = "_colMac",
+                ReadOnly = true,
+                Width = 130
+            };
+            _colSamples = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "SamplesText",
+                HeaderText = "Data1..N",
+                Name = "_colSamples",
+                ReadOnly = true,
+                Width = 260
+            };
+            _colRawLine = new DataGridViewTextBoxColumn
+            {
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                DataPropertyName = "RawLine",
+                HeaderText = "RawLine",
+                MinimumWidth = 150,
+                Name = "_colRawLine",
+                ReadOnly = true
+            };
+
+            _grid.Columns.AddRange(_colTimeStamp, _colDcIp, _colMac, _colSamples, _colRawLine);
+            _grid.AllowUserToOrderColumns = true;
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.
-        /// 여기 있는 컨트롤 참조들은 모두 InitializeComponent()가 만든 것인데, 이 파일이 손으로
-        /// 작성된 탓에 Visual Studio 디자이너가 InitializeComponent()를 다시 쓸 때 특정 컨트롤의
-        /// 생성 코드가 유실되는 사고가 실제로 있었다(예: 그리드 열 하나가 통째로 null이 되어
-        /// NullReferenceException으로 앱 시작 자체가 막힘). 그런 손상이 다시 있어도 앱 전체가
-        /// 죽지 않도록, 컨트롤 하나하나를 SafeSet 계열 헬퍼로 감싸 null이면 그 항목만 조용히
-        /// 건너뛴다 - 화면 일부가 설정을 못 불러올 뿐 나머지는 정상 동작한다.</summary>
+        /// _showUsb/_showUart/_autoScrollCheck는 InitializeComponent()가 만든 것인데, 이 파일이
+        /// 손으로 작성된 탓에 Visual Studio 디자이너가 InitializeComponent()를 다시 쓸 때 특정
+        /// 컨트롤의 생성 코드가 유실되는 사고가 실제로 있었다. 그런 손상이 다시 있어도 앱 전체가
+        /// 죽지 않도록, SafeSetChecked로 감싸 null이면 그 항목만 조용히 건너뛴다 - 화면 일부가
+        /// 설정을 못 불러올 뿐 나머지는 정상 동작한다. 그리드 열(_colTimeStamp 등)은
+        /// BuildGridColumns()에서 코드로 직접 만들어 이런 손상 자체가 불가능하므로 null 체크가
+        /// 필요 없다.</summary>
         public void Initialize(ConnectionManager conn, AppSettings settings)
         {
             _conn = conn;
@@ -87,10 +158,10 @@ namespace Stm32WifiConfigTool.Panels
             SafeSetChecked(_showUart, settings.MeasurementDisplayChannel == "Uart");
             SafeSetChecked(_autoScrollCheck, settings.MeasurementAutoScroll);
 
-            SetColumnWidthSafe(_colTimeStamp, settings.MeasurementColTimeStampWidth);
-            SetColumnWidthSafe(_colDcIp, settings.MeasurementColDcIpWidth);
-            SetColumnWidthSafe(_colMac, settings.MeasurementColMacWidth);
-            SetColumnWidthSafe(_colSamples, settings.MeasurementColSamplesWidth);
+            _colTimeStamp.Width = settings.MeasurementColTimeStampWidth;
+            _colDcIp.Width = settings.MeasurementColDcIpWidth;
+            _colMac.Width = settings.MeasurementColMacWidth;
+            _colSamples.Width = settings.MeasurementColSamplesWidth;
 
             if (_conn != null)
             {
@@ -113,15 +184,6 @@ namespace Stm32WifiConfigTool.Panels
             else if (control is CheckBox checkBox)
             {
                 checkBox.Checked = value;
-            }
-        }
-
-        /// <summary>column이 null이면 조용히 건너뛴다(<see cref="Initialize"/> 주석 참고).</summary>
-        private static void SetColumnWidthSafe(DataGridViewColumn column, int width)
-        {
-            if (column != null)
-            {
-                column.Width = width;
             }
         }
 
