@@ -15,7 +15,7 @@ namespace Stm32WifiConfigTool.Panels
     /// 기록하지 않는다 - 대신 "[RESET]"로 시작하는 소프트웨어 리셋 로그 줄(예: "[RESET]
     /// Software Reset Count: 0", <see cref="Stm32Protocol.IsResetLogText"/> 참고)이 오면
     /// 그 원본 텍스트를 그대로 수신 이력에 기록한다. 수신 이력에는 더 이상 채널([USB]/[UART])
-    /// 표시를 붙이지 않는다.
+    /// 표시를 붙이지 않는다. 각 줄 맨 앞의 시각은 "yyyy-MM-dd HH:mm:ss"(24시간제) 형식이다.
     /// UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
     /// 디자이너로 편집 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는
     /// 생성 직후 <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을
@@ -121,7 +121,7 @@ namespace Stm32WifiConfigTool.Panels
             /* 수신 이력에는 대신 소프트웨어 리셋 로그("[RESET] ...")를 기록한다. */
             if (Stm32Protocol.IsResetLogText(payload))
             {
-                AppendLog(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload);
+                AppendLog(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + payload);
             }
         }
 
