@@ -31,10 +31,6 @@ namespace Stm32WifiConfigTool.Panels
             _conn = conn;
             _settings = settings;
 
-            bool useUart = settings.MeasConfigCommandChannel == "Uart";
-            _channelUsb.Checked = !useUart;
-            _channelUart.Checked = useUart;
-
             _cmdTimeoutBox.Value = ClampDecimal(settings.MeasConfigCommandTimeoutMs, _cmdTimeoutBox.Minimum, _cmdTimeoutBox.Maximum);
 
             /* 마지막으로 "Read"에 성공했던 값을 화면에 미리 채운다 - MCU를 다시 조회하기 전까지
@@ -55,7 +51,7 @@ namespace Stm32WifiConfigTool.Panels
             return value;
         }
 
-        private SerialLinkService SelectedLink => _channelUsb.Checked ? _conn.Usb : _conn.Uart;
+        private SerialLinkService SelectedLink => _conn.Uart;
 
         private void Log(string text)
         {
@@ -68,7 +64,7 @@ namespace Stm32WifiConfigTool.Panels
             {
                 return true;
             }
-            MessageBox.Show(this, "선택한 채널(" + (_channelUsb.Checked ? "USB" : "UART") + ")이 연결되어 있지 않습니다.\n포트 설정에서 먼저 연결하세요.",
+            MessageBox.Show(this, "UART가 연결되어 있지 않습니다.\n포트 설정에서 먼저 연결하세요.",
                 "Measurement 설정", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
@@ -116,22 +112,6 @@ namespace Stm32WifiConfigTool.Panels
                 ResistanceMOhm = (double)_resistanceBox.Value,
                 IntervalSec = (double)_intervalBox.Value
             };
-        }
-
-        private void ChannelUsb_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_channelUsb.Checked && _settings != null)
-            {
-                _settings.MeasConfigCommandChannel = "Usb";
-            }
-        }
-
-        private void ChannelUart_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_channelUart.Checked && _settings != null)
-            {
-                _settings.MeasConfigCommandChannel = "Uart";
-            }
         }
 
         private void CmdTimeoutBox_ValueChanged(object sender, EventArgs e)

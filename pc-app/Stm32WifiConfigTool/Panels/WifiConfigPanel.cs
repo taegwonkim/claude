@@ -77,10 +77,6 @@ namespace Stm32WifiConfigTool.Panels
             _conn = conn;
             _settings = settings;
 
-            bool useUart = settings.WifiCommandChannel == "Uart";
-            _channelUsb.Checked = !useUart;
-            _channelUart.Checked = useUart;
-
             _cmdTimeoutBox.Value = ClampDecimal(settings.WifiCommandTimeoutMs, _cmdTimeoutBox.Minimum, _cmdTimeoutBox.Maximum);
 
             /* 비밀번호는 내부망 전용 환경이라는 전제로 캐시된 값을 먼저 채워둔다 - 아래
@@ -108,7 +104,7 @@ namespace Stm32WifiConfigTool.Panels
             return value;
         }
 
-        private SerialLinkService SelectedLink => _channelUsb.Checked ? _conn.Usb : _conn.Uart;
+        private SerialLinkService SelectedLink => _conn.Uart;
 
         private void Log(string text)
         {
@@ -121,7 +117,7 @@ namespace Stm32WifiConfigTool.Panels
             {
                 return true;
             }
-            MessageBox.Show(this, "선택한 채널(" + (_channelUsb.Checked ? "USB" : "UART") + ")이 연결되어 있지 않습니다.\n포트 설정에서 먼저 연결하세요.",
+            MessageBox.Show(this, "UART가 연결되어 있지 않습니다.\n포트 설정에서 먼저 연결하세요.",
                 "WiFi 설정", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
@@ -181,22 +177,6 @@ namespace Stm32WifiConfigTool.Panels
                 Gateway = _gatewayBox.Text.Trim(),
                 Netmask = _maskBox.Text.Trim()
             };
-        }
-
-        private void ChannelUsb_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_channelUsb.Checked && _settings != null)
-            {
-                _settings.WifiCommandChannel = "Usb";
-            }
-        }
-
-        private void ChannelUart_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_channelUart.Checked && _settings != null)
-            {
-                _settings.WifiCommandChannel = "Uart";
-            }
         }
 
         private void ChangePasswordCheck_CheckedChanged(object sender, EventArgs e)

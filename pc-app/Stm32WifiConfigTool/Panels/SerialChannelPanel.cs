@@ -9,7 +9,7 @@ using Stm32WifiConfigTool.Services;
 namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
-    /// 채널 하나(USB 또는 UART)의 포트/보레이트/타임아웃/연결 UI. PortSettingsPanel에서 2개(USB/UART) 사용.
+    /// UART 채널의 포트/보레이트/타임아웃/연결 UI. PortSettingsPanel에서 사용한다.
     /// UI 레이아웃은 <c>SerialChannelPanel.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는 생성 직후 <see cref="Initialize"/>를
     /// 호출해 런타임 의존성(SerialLinkService, ChannelSettings)을 연결해야 한다.

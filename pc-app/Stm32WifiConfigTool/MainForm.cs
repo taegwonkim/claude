@@ -14,7 +14,7 @@ namespace Stm32WifiConfigTool
     /// 사용자가 패널 사이 경계선을 마우스로 드래그해 각 패널의 폭을 자유롭게 조절할 수 있다
     /// (드래그 중 실시간으로 <see cref="AppSettings"/>에 반영되고, 앱 재시작 후에도 유지된다).
     /// UI 레이아웃은 <c>MainForm.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
-    /// USB/UART 연결(ConnectionManager)은 이 창이 소유하며, 6개 패널이 모두 공유한다.
+    /// UART 연결(ConnectionManager)은 이 창이 소유하며, 6개 패널이 모두 공유한다.
     /// 포트/보레이트/타임아웃 등 UI 설정은 시작 시 AppSettingsStore.Load()로 복원하고,
     /// 종료 시 Save()로 저장해 다음 실행에도 그대로 유지된다.
     /// </summary>

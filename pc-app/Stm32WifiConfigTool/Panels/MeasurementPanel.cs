@@ -10,8 +10,7 @@ namespace Stm32WifiConfigTool.Panels
 {
     /// <summary>
     /// FPGA 측정값("DC_&lt;dc_ip&gt;,&lt;mac&gt;,data1,...,dataN" 프레임, 첫 필드 "DC_" 접두어로 식별,
-    /// 샘플 개수는 고정이 아님) 표시 패널. USB/UART 채널을
-    /// 선택해 어느 쪽 라인을 화면에 표시할지 고를 수 있다. 화면은 좌/우로 나뉘어
+    /// 샘플 개수는 고정이 아님) 표시 패널. UART로 수신한 라인을 화면에 표시한다. 화면은 좌/우로 나뉘어
     /// 있다: 좌측은 측정값 그리드, 우측은 그 외 모든 프레임(EVENT/RESET_COUNT/커맨드 응답/STATUS
     /// 등)을 한 로그에 원본 그대로 모아 보여준다 — ESP32 상태(STATUS)는 별도 EspStatusPanel의
     /// "현재 ESP32 상태"에 이미 크게 표시되므로 여기서는 별도 칸을 두지 않는다. 측정값이 아닌
@@ -151,7 +150,7 @@ namespace Stm32WifiConfigTool.Panels
         }
 
         /// <summary>디자이너가 만든 컨트롤에 실제 동작을 연결한다. MainForm이 생성 직후 1회 호출.
-        /// _showUsb/_showUart/_autoScrollCheck는 InitializeComponent()가 만든 것인데, 이 파일이
+        /// _autoScrollCheck는 InitializeComponent()가 만든 것인데, 이 파일이
         /// 손으로 작성된 탓에 Visual Studio 디자이너가 InitializeComponent()를 다시 쓸 때 특정
         /// 컨트롤의 생성 코드가 유실되는 사고가 실제로 있었다. 그런 손상이 다시 있어도 앱 전체가
         /// 죽지 않도록, SafeSetChecked로 감싸 null이면 그 항목만 조용히 건너뛴다 - 화면 일부가
@@ -163,8 +162,6 @@ namespace Stm32WifiConfigTool.Panels
             _conn = conn;
             _settings = settings;
 
-            SafeSetChecked(_showUsb, settings.MeasurementDisplayChannel != "Uart");
-            SafeSetChecked(_showUart, settings.MeasurementDisplayChannel == "Uart");
             SafeSetChecked(_autoScrollCheck, settings.MeasurementAutoScroll);
 
             _colTimeStamp.Width = settings.MeasurementColTimeStampWidth;
@@ -174,7 +171,6 @@ namespace Stm32WifiConfigTool.Panels
 
             if (_conn != null)
             {
-                _conn.Usb.LineReceived += OnLineReceived;
                 _conn.Uart.LineReceived += OnLineReceived;
             }
 
@@ -265,22 +261,6 @@ namespace Stm32WifiConfigTool.Panels
             }
         }
 
-        private void ShowUsb_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_showUsb.Checked && _settings != null)
-            {
-                _settings.MeasurementDisplayChannel = "Usb";
-            }
-        }
-
-        private void ShowUart_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_showUart.Checked && _settings != null)
-            {
-                _settings.MeasurementDisplayChannel = "Uart";
-            }
-        }
-
         private void AutoScrollCheck_CheckedChanged(object sender, EventArgs e)
         {
             if (_settings != null)
@@ -288,13 +268,6 @@ namespace Stm32WifiConfigTool.Panels
                 _settings.MeasurementAutoScroll = _autoScrollCheck.Checked;
             }
         }
-
-        private bool IsChannelSelected(LinkChannel channel)
-        {
-            return (channel == LinkChannel.Usb && _showUsb.Checked) || (channel == LinkChannel.Uart && _showUart.Checked);
-        }
-
-        private static string ChannelLabel(LinkChannel channel) => channel == LinkChannel.Usb ? "USB" : "UART";
 
         // SerialLinkService.LineReceived는 백그라운드 읽기 스레드에서 호출되므로 반드시 UI 스레드로 마샬링한다.
         private void OnLineReceived(LinkChannel channel, string line)
@@ -316,11 +289,6 @@ namespace Stm32WifiConfigTool.Panels
 
         private void HandleLineOnUiThread(LinkChannel channel, string line)
         {
-            if (!IsChannelSelected(channel))
-            {
-                return;
-            }
-
             /* STX 유무와 관계없이 처리한다(실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않음) -
              * DisplayText는 STX가 있으면 떼고, 없으면 원본 그대로 돌려준다. */
             string payload = Stm32Protocol.DisplayText(line);
@@ -330,7 +298,7 @@ namespace Stm32WifiConfigTool.Panels
             }
             string[] fields = payload.Split(',');
 
-            if (Stm32Protocol.TryParseMeasurementRecord(fields, ChannelLabel(channel), out MeasurementRecord record))
+            if (Stm32Protocol.TryParseMeasurementRecord(fields, "UART", out MeasurementRecord record))
             {
                 _records.Add(record);
                 while (_records.Count > MaxRows)
@@ -347,8 +315,7 @@ namespace Stm32WifiConfigTool.Panels
             else
             {
                 /* 측정값이 아닌 나머지 전부(STATUS/EVENT/RESET_COUNT/커맨드 응답 및 STX 없이 오는
-                 * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다(채널([USB]/[UART]) 표시는
-                 * 붙이지 않는다). */
+                 * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다. */
                 _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload + Environment.NewLine);
 
                 /* "MAC_<mac address>" 형식이면 그 값만 별도로 MAC Address 표시 영역에도 갱신한다
@@ -460,7 +427,6 @@ namespace Stm32WifiConfigTool.Panels
             {
                 if (_conn != null)
                 {
-                    _conn.Usb.LineReceived -= OnLineReceived;
                     _conn.Uart.LineReceived -= OnLineReceived;
                 }
                 components?.Dispose();

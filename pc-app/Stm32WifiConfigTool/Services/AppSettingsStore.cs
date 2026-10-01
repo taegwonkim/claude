@@ -30,10 +30,8 @@ namespace Stm32WifiConfigTool.Services
             {
                 Dictionary<string, string> map = ReadKeyValues(FilePath);
 
-                ApplyChannel(map, "Usb", settings.Usb);
                 ApplyChannel(map, "Uart", settings.Uart);
 
-                settings.WifiCommandChannel = GetString(map, "WifiCommandChannel", settings.WifiCommandChannel);
                 settings.WifiCommandTimeoutMs = GetInt(map, "WifiCommandTimeoutMs", settings.WifiCommandTimeoutMs);
                 settings.WifiSsidCache = GetString(map, "WifiSsidCache", settings.WifiSsidCache);
                 settings.WifiServerIpCache = GetString(map, "WifiServerIpCache", settings.WifiServerIpCache);
@@ -43,25 +41,21 @@ namespace Stm32WifiConfigTool.Services
                 settings.WifiGatewayCache = GetString(map, "WifiGatewayCache", settings.WifiGatewayCache);
                 settings.WifiNetmaskCache = GetString(map, "WifiNetmaskCache", settings.WifiNetmaskCache);
                 settings.WifiPasswordCache = GetString(map, "WifiPasswordCache", settings.WifiPasswordCache);
-                settings.MeasConfigCommandChannel = GetString(map, "MeasConfigCommandChannel", settings.MeasConfigCommandChannel);
                 settings.MeasConfigCommandTimeoutMs = GetInt(map, "MeasConfigCommandTimeoutMs", settings.MeasConfigCommandTimeoutMs);
                 settings.MeasReferenceMvCache = GetDouble(map, "MeasReferenceMvCache", settings.MeasReferenceMvCache);
                 settings.MeasOffsetMvCache = GetDouble(map, "MeasOffsetMvCache", settings.MeasOffsetMvCache);
                 settings.MeasResistanceMOhmCache = GetDouble(map, "MeasResistanceMOhmCache", settings.MeasResistanceMOhmCache);
                 settings.MeasIntervalSecCache = GetDouble(map, "MeasIntervalSecCache", settings.MeasIntervalSecCache);
-                settings.RtcConfigCommandChannel = GetString(map, "RtcConfigCommandChannel", settings.RtcConfigCommandChannel);
                 settings.RtcConfigCommandTimeoutMs = GetInt(map, "RtcConfigCommandTimeoutMs", settings.RtcConfigCommandTimeoutMs);
                 settings.RtcPeriodSecCache = GetInt(map, "RtcPeriodSecCache", settings.RtcPeriodSecCache);
                 settings.RtcUnitKindCache = GetString(map, "RtcUnitKindCache", settings.RtcUnitKindCache);
                 settings.RtcResetEnabledCache = GetBool(map, "RtcResetEnabledCache", settings.RtcResetEnabledCache);
-                settings.MeasurementDisplayChannel = GetString(map, "MeasurementDisplayChannel", settings.MeasurementDisplayChannel);
                 settings.MeasurementAutoScroll = GetBool(map, "MeasurementAutoScroll", settings.MeasurementAutoScroll);
                 settings.MeasurementGridWidth = GetInt(map, "MeasurementGridWidth", settings.MeasurementGridWidth);
                 settings.MeasurementColTimeStampWidth = GetInt(map, "MeasurementColTimeStampWidth", settings.MeasurementColTimeStampWidth);
                 settings.MeasurementColDcIpWidth = GetInt(map, "MeasurementColDcIpWidth", settings.MeasurementColDcIpWidth);
                 settings.MeasurementColMacWidth = GetInt(map, "MeasurementColMacWidth", settings.MeasurementColMacWidth);
                 settings.MeasurementColSamplesWidth = GetInt(map, "MeasurementColSamplesWidth", settings.MeasurementColSamplesWidth);
-                settings.EspStatusDisplayChannel = GetString(map, "EspStatusDisplayChannel", settings.EspStatusDisplayChannel);
                 settings.PortPanelWidth = GetInt(map, "PortPanelWidth", settings.PortPanelWidth);
                 settings.WifiPanelWidth = GetInt(map, "WifiPanelWidth", settings.WifiPanelWidth);
                 settings.MeasConfigPanelWidth = GetInt(map, "MeasConfigPanelWidth", settings.MeasConfigPanelWidth);
@@ -90,15 +84,10 @@ namespace Stm32WifiConfigTool.Services
             var lines = new List<string>
             {
                 "# Stm32WifiConfigTool 설정 파일 - 프로그램이 종료 시 자동 저장합니다.",
-                "Usb.PortName=" + settings.Usb.PortName,
-                "Usb.BaudRate=" + settings.Usb.BaudRate,
-                "Usb.ReadTimeoutMs=" + settings.Usb.ReadTimeoutMs,
-                "Usb.WriteTimeoutMs=" + settings.Usb.WriteTimeoutMs,
                 "Uart.PortName=" + settings.Uart.PortName,
                 "Uart.BaudRate=" + settings.Uart.BaudRate,
                 "Uart.ReadTimeoutMs=" + settings.Uart.ReadTimeoutMs,
                 "Uart.WriteTimeoutMs=" + settings.Uart.WriteTimeoutMs,
-                "WifiCommandChannel=" + settings.WifiCommandChannel,
                 "WifiCommandTimeoutMs=" + settings.WifiCommandTimeoutMs,
                 "WifiSsidCache=" + settings.WifiSsidCache,
                 "WifiServerIpCache=" + settings.WifiServerIpCache,
@@ -108,25 +97,21 @@ namespace Stm32WifiConfigTool.Services
                 "WifiGatewayCache=" + settings.WifiGatewayCache,
                 "WifiNetmaskCache=" + settings.WifiNetmaskCache,
                 "WifiPasswordCache=" + settings.WifiPasswordCache,
-                "MeasConfigCommandChannel=" + settings.MeasConfigCommandChannel,
                 "MeasConfigCommandTimeoutMs=" + settings.MeasConfigCommandTimeoutMs,
                 "MeasReferenceMvCache=" + settings.MeasReferenceMvCache.ToString(CultureInfo.InvariantCulture),
                 "MeasOffsetMvCache=" + settings.MeasOffsetMvCache.ToString(CultureInfo.InvariantCulture),
                 "MeasResistanceMOhmCache=" + settings.MeasResistanceMOhmCache.ToString(CultureInfo.InvariantCulture),
                 "MeasIntervalSecCache=" + settings.MeasIntervalSecCache.ToString(CultureInfo.InvariantCulture),
-                "RtcConfigCommandChannel=" + settings.RtcConfigCommandChannel,
                 "RtcConfigCommandTimeoutMs=" + settings.RtcConfigCommandTimeoutMs,
                 "RtcPeriodSecCache=" + settings.RtcPeriodSecCache,
                 "RtcUnitKindCache=" + settings.RtcUnitKindCache,
                 "RtcResetEnabledCache=" + settings.RtcResetEnabledCache,
-                "MeasurementDisplayChannel=" + settings.MeasurementDisplayChannel,
                 "MeasurementAutoScroll=" + settings.MeasurementAutoScroll,
                 "MeasurementGridWidth=" + settings.MeasurementGridWidth,
                 "MeasurementColTimeStampWidth=" + settings.MeasurementColTimeStampWidth,
                 "MeasurementColDcIpWidth=" + settings.MeasurementColDcIpWidth,
                 "MeasurementColMacWidth=" + settings.MeasurementColMacWidth,
                 "MeasurementColSamplesWidth=" + settings.MeasurementColSamplesWidth,
-                "EspStatusDisplayChannel=" + settings.EspStatusDisplayChannel,
                 "PortPanelWidth=" + settings.PortPanelWidth,
                 "WifiPanelWidth=" + settings.WifiPanelWidth,
                 "MeasConfigPanelWidth=" + settings.MeasConfigPanelWidth,

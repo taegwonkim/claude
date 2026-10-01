@@ -7,9 +7,6 @@ namespace Stm32WifiConfigTool.Panels
 
         private System.Windows.Forms.TableLayoutPanel _root;
         private System.Windows.Forms.FlowLayoutPanel _topRow;
-        private System.Windows.Forms.GroupBox _channelGroup;
-        private System.Windows.Forms.RadioButton _showUsb;
-        private System.Windows.Forms.RadioButton _showUart;
         private System.Windows.Forms.Button _clearButton;
         private System.Windows.Forms.Button _exportButton;
         private System.Windows.Forms.CheckBox _autoScrollCheck;
@@ -34,9 +31,6 @@ namespace Stm32WifiConfigTool.Panels
         {
             this._root = new System.Windows.Forms.TableLayoutPanel();
             this._topRow = new System.Windows.Forms.FlowLayoutPanel();
-            this._channelGroup = new System.Windows.Forms.GroupBox();
-            this._showUsb = new System.Windows.Forms.RadioButton();
-            this._showUart = new System.Windows.Forms.RadioButton();
             this._clearButton = new System.Windows.Forms.Button();
             this._exportButton = new System.Windows.Forms.Button();
             this._autoScrollCheck = new System.Windows.Forms.CheckBox();
@@ -52,7 +46,6 @@ namespace Stm32WifiConfigTool.Panels
             this._eventLogBox = new System.Windows.Forms.TextBox();
             this._root.SuspendLayout();
             this._topRow.SuspendLayout();
-            this._channelGroup.SuspendLayout();
             this._macAddressGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._splitDisplay)).BeginInit();
             this._splitDisplay.Panel1.SuspendLayout();
@@ -90,7 +83,6 @@ namespace Stm32WifiConfigTool.Panels
             // _root의 고정 64px 행 높이를 그대로 따르며, 안에 있는 컨트롤 크기와 무관하다.)
             //
             this._topRow.AutoSize = false;
-            this._topRow.Controls.Add(this._channelGroup);
             this._topRow.Controls.Add(this._clearButton);
             this._topRow.Controls.Add(this._exportButton);
             this._topRow.Controls.Add(this._autoScrollCheck);
@@ -113,54 +105,24 @@ namespace Stm32WifiConfigTool.Panels
             // 무관한) 위치가 필요하면 RtcConfigPanel.Designer.cs의 "자유 배치" GroupBox처럼
             // FlowLayoutPanel 밖으로 빼야 한다.)
             //
-            // _channelGroup
-            //
-            this._channelGroup.Controls.Add(this._showUsb);
-            this._channelGroup.Controls.Add(this._showUart);
-            this._channelGroup.Location = new System.Drawing.Point(3, 3);
-            this._channelGroup.Name = "_channelGroup";
-            this._channelGroup.Size = new System.Drawing.Size(150, 50);
-            this._channelGroup.TabIndex = 0;
-            this._channelGroup.TabStop = false;
-            this._channelGroup.Text = "표시 채널";
-            //
-            // _showUsb
-            //
-            this._showUsb.Checked = true;
-            this._showUsb.Location = new System.Drawing.Point(10, 20);
-            this._showUsb.Name = "_showUsb";
-            this._showUsb.Size = new System.Drawing.Size(55, 22);
-            this._showUsb.TabIndex = 0;
-            this._showUsb.Text = "USB";
-            this._showUsb.CheckedChanged += new System.EventHandler(this.ShowUsb_CheckedChanged);
-            //
-            // _showUart
-            //
-            this._showUart.Location = new System.Drawing.Point(70, 20);
-            this._showUart.Name = "_showUart";
-            this._showUart.Size = new System.Drawing.Size(60, 22);
-            this._showUart.TabIndex = 1;
-            this._showUart.Text = "UART";
-            this._showUart.CheckedChanged += new System.EventHandler(this.ShowUart_CheckedChanged);
-            //
             // _clearButton
             //
-            this._clearButton.Location = new System.Drawing.Point(229, 15);
-            this._clearButton.Margin = new System.Windows.Forms.Padding(10, 15, 3, 3);
+            this._clearButton.Location = new System.Drawing.Point(3, 15);
+            this._clearButton.Margin = new System.Windows.Forms.Padding(3, 15, 3, 3);
             this._clearButton.Name = "_clearButton";
             this._clearButton.Size = new System.Drawing.Size(75, 25);
-            this._clearButton.TabIndex = 1;
+            this._clearButton.TabIndex = 0;
             this._clearButton.Text = "지우기";
             this._clearButton.UseVisualStyleBackColor = true;
             this._clearButton.Click += new System.EventHandler(this.ClearButton_Click);
             //
             // _exportButton
             //
-            this._exportButton.Location = new System.Drawing.Point(310, 15);
+            this._exportButton.Location = new System.Drawing.Point(84, 15);
             this._exportButton.Margin = new System.Windows.Forms.Padding(3, 15, 3, 3);
             this._exportButton.Name = "_exportButton";
             this._exportButton.Size = new System.Drawing.Size(90, 25);
-            this._exportButton.TabIndex = 2;
+            this._exportButton.TabIndex = 1;
             this._exportButton.Text = "CSV로 저장";
             this._exportButton.UseVisualStyleBackColor = true;
             this._exportButton.Click += new System.EventHandler(this.ExportButton_Click);
@@ -169,11 +131,11 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._autoScrollCheck.Checked = true;
             this._autoScrollCheck.CheckState = System.Windows.Forms.CheckState.Checked;
-            this._autoScrollCheck.Location = new System.Drawing.Point(413, 20);
+            this._autoScrollCheck.Location = new System.Drawing.Point(187, 20);
             this._autoScrollCheck.Margin = new System.Windows.Forms.Padding(10, 20, 3, 3);
             this._autoScrollCheck.Name = "_autoScrollCheck";
             this._autoScrollCheck.Size = new System.Drawing.Size(100, 22);
-            this._autoScrollCheck.TabIndex = 3;
+            this._autoScrollCheck.TabIndex = 2;
             this._autoScrollCheck.Text = "자동 스크롤";
             this._autoScrollCheck.CheckedChanged += new System.EventHandler(this.AutoScrollCheck_CheckedChanged);
             //
@@ -189,11 +151,11 @@ namespace Stm32WifiConfigTool.Panels
             this._macAddressGroup.AutoSize = false;
             this._macAddressGroup.Controls.Add(this._macAddressCaptionLabel);
             this._macAddressGroup.Controls.Add(this._macAddressValueLabel);
-            this._macAddressGroup.Location = new System.Drawing.Point(523, 15);
+            this._macAddressGroup.Location = new System.Drawing.Point(297, 15);
             this._macAddressGroup.Margin = new System.Windows.Forms.Padding(10, 15, 3, 3);
             this._macAddressGroup.Name = "_macAddressGroup";
             this._macAddressGroup.Size = new System.Drawing.Size(250, 30);
-            this._macAddressGroup.TabIndex = 4;
+            this._macAddressGroup.TabIndex = 3;
             //
             // _macAddressCaptionLabel (MCU가 "<STX>MAC_<mac address><CR><LF>" 형식으로 보내면
             // MAC_ 뒤의 값만 옆의 _macAddressValueLabel에 별도 표시한다. 수신 프레임 원본은
@@ -341,8 +303,6 @@ namespace Stm32WifiConfigTool.Panels
             this._root.PerformLayout();
             this._topRow.ResumeLayout(false);
             this._topRow.PerformLayout();
-            this._channelGroup.ResumeLayout(false);
-            this._channelGroup.PerformLayout();
             this._macAddressGroup.ResumeLayout(false);
             this._macAddressGroup.PerformLayout();
             this._splitDisplay.Panel1.ResumeLayout(false);

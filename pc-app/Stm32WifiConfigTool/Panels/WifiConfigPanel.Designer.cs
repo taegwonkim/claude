@@ -16,9 +16,6 @@ namespace Stm32WifiConfigTool.Panels
         }
 
         private System.Windows.Forms.TableLayoutPanel _root;
-        private System.Windows.Forms.GroupBox _channelGroup;
-        private System.Windows.Forms.RadioButton _channelUsb;
-        private System.Windows.Forms.RadioButton _channelUart;
         private System.Windows.Forms.GroupBox _fieldsGroup;
         private System.Windows.Forms.Label _ssidLabel;
         private System.Windows.Forms.TextBox _ssidBox;
@@ -54,9 +51,6 @@ namespace Stm32WifiConfigTool.Panels
         private void InitializeComponent()
         {
             this._root = new System.Windows.Forms.TableLayoutPanel();
-            this._channelGroup = new System.Windows.Forms.GroupBox();
-            this._channelUsb = new System.Windows.Forms.RadioButton();
-            this._channelUart = new System.Windows.Forms.RadioButton();
             this._fieldsGroup = new System.Windows.Forms.GroupBox();
             this._ssidLabel = new System.Windows.Forms.Label();
             this._ssidBox = new System.Windows.Forms.TextBox();
@@ -83,7 +77,6 @@ namespace Stm32WifiConfigTool.Panels
             this._cmdTimeoutBox = new System.Windows.Forms.NumericUpDown();
             this._logBox = new System.Windows.Forms.TextBox();
             this._root.SuspendLayout();
-            this._channelGroup.SuspendLayout();
             this._fieldsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._serverPortBox)).BeginInit();
             this._bottomLayout.SuspendLayout();
@@ -96,51 +89,17 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._root.ColumnCount = 1;
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._root.Controls.Add(this._channelGroup, 0, 0);
-            this._root.Controls.Add(this._fieldsGroup, 0, 1);
-            this._root.Controls.Add(this._bottomLayout, 0, 2);
+            this._root.Controls.Add(this._fieldsGroup, 0, 0);
+            this._root.Controls.Add(this._bottomLayout, 0, 1);
             this._root.Dock = System.Windows.Forms.DockStyle.Fill;
             this._root.Location = new System.Drawing.Point(0, 0);
             this._root.Name = "_root";
             this._root.Padding = new System.Windows.Forms.Padding(6);
-            this._root.RowCount = 3;
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._root.RowCount = 2;
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Size = new System.Drawing.Size(640, 520);
             this._root.TabIndex = 0;
-            //
-            // _channelGroup
-            //
-            this._channelGroup.Controls.Add(this._channelUsb);
-            this._channelGroup.Controls.Add(this._channelUart);
-            this._channelGroup.Dock = System.Windows.Forms.DockStyle.Top;
-            this._channelGroup.Location = new System.Drawing.Point(9, 9);
-            this._channelGroup.Name = "_channelGroup";
-            this._channelGroup.Size = new System.Drawing.Size(622, 55);
-            this._channelGroup.TabIndex = 0;
-            this._channelGroup.TabStop = false;
-            this._channelGroup.Text = "명령 전송 채널";
-            //
-            // _channelUsb
-            //
-            this._channelUsb.AutoSize = true;
-            this._channelUsb.Location = new System.Drawing.Point(15, 22);
-            this._channelUsb.Name = "_channelUsb";
-            this._channelUsb.Size = new System.Drawing.Size(48, 19);
-            this._channelUsb.TabIndex = 0;
-            this._channelUsb.Text = "USB";
-            this._channelUsb.CheckedChanged += new System.EventHandler(this.ChannelUsb_CheckedChanged);
-            //
-            // _channelUart
-            //
-            this._channelUart.AutoSize = true;
-            this._channelUart.Location = new System.Drawing.Point(100, 22);
-            this._channelUart.Name = "_channelUart";
-            this._channelUart.Size = new System.Drawing.Size(52, 19);
-            this._channelUart.TabIndex = 1;
-            this._channelUart.Text = "UART";
-            this._channelUart.CheckedChanged += new System.EventHandler(this.ChannelUart_CheckedChanged);
             //
             // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
             // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
@@ -163,7 +122,7 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup.Controls.Add(this._maskLabel);
             this._fieldsGroup.Controls.Add(this._maskBox);
             this._fieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
-            this._fieldsGroup.Location = new System.Drawing.Point(9, 64);
+            this._fieldsGroup.Location = new System.Drawing.Point(9, 9);
             this._fieldsGroup.Name = "_fieldsGroup";
             this._fieldsGroup.Size = new System.Drawing.Size(622, 330);
             this._fieldsGroup.TabIndex = 1;
@@ -329,7 +288,7 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.Controls.Add(this._timeoutRow, 0, 1);
             this._bottomLayout.Controls.Add(this._logBox, 0, 2);
             this._bottomLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._bottomLayout.Location = new System.Drawing.Point(9, 397);
+            this._bottomLayout.Location = new System.Drawing.Point(9, 342);
             this._bottomLayout.Name = "_bottomLayout";
             this._bottomLayout.RowCount = 3;
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -374,8 +333,7 @@ namespace Stm32WifiConfigTool.Panels
             this._writeButton.Click += new System.EventHandler(this.WriteButton_Click);
             //
             // _timeoutRow (Read/Write 버튼 아래 별도 행 - _fieldsGroup과 같은 라벨(x=15)/입력란(x=150)
-            // 열에 맞춰 자유 배치한다 - 위 채널 선택 그룹(_channelUsb도 x=15에서 시작)과도 열이
-            // 일치해, 패널 전체에서 라벨/입력란 시작 위치가 한 줄로 정렬된다.)
+            // 열에 맞춰 자유 배치해, 패널 전체에서 라벨/입력란 시작 위치가 한 줄로 정렬된다.)
             //
             this._timeoutRow.Controls.Add(this._cmdTimeoutCaptionLabel);
             this._timeoutRow.Controls.Add(this._cmdTimeoutBox);
@@ -424,8 +382,6 @@ namespace Stm32WifiConfigTool.Panels
             this.Name = "WifiConfigPanel";
             this.Size = new System.Drawing.Size(640, 520);
             this._root.ResumeLayout(false);
-            this._channelGroup.ResumeLayout(false);
-            this._channelGroup.PerformLayout();
             this._fieldsGroup.ResumeLayout(false);
             this._fieldsGroup.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._serverPortBox)).EndInit();

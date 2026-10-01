@@ -16,9 +16,6 @@ namespace Stm32WifiConfigTool.Panels
         }
 
         private System.Windows.Forms.TableLayoutPanel _root;
-        private System.Windows.Forms.GroupBox _channelGroup;
-        private System.Windows.Forms.RadioButton _channelUsb;
-        private System.Windows.Forms.RadioButton _channelUart;
         private System.Windows.Forms.GroupBox _fieldsGroup;
         private System.Windows.Forms.Label _periodLabel;
         private System.Windows.Forms.NumericUpDown _periodBox;
@@ -44,9 +41,6 @@ namespace Stm32WifiConfigTool.Panels
         private void InitializeComponent()
         {
             this._root = new System.Windows.Forms.TableLayoutPanel();
-            this._channelGroup = new System.Windows.Forms.GroupBox();
-            this._channelUsb = new System.Windows.Forms.RadioButton();
-            this._channelUart = new System.Windows.Forms.RadioButton();
             this._fieldsGroup = new System.Windows.Forms.GroupBox();
             this._periodLabel = new System.Windows.Forms.Label();
             this._periodBox = new System.Windows.Forms.NumericUpDown();
@@ -63,7 +57,6 @@ namespace Stm32WifiConfigTool.Panels
             this._cmdTimeoutBox = new System.Windows.Forms.NumericUpDown();
             this._logBox = new System.Windows.Forms.TextBox();
             this._root.SuspendLayout();
-            this._channelGroup.SuspendLayout();
             this._fieldsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).BeginInit();
             this._unitButtonRow.SuspendLayout();
@@ -76,51 +69,17 @@ namespace Stm32WifiConfigTool.Panels
             //
             this._root.ColumnCount = 1;
             this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._root.Controls.Add(this._channelGroup, 0, 0);
-            this._root.Controls.Add(this._fieldsGroup, 0, 1);
-            this._root.Controls.Add(this._bottomLayout, 0, 2);
+            this._root.Controls.Add(this._fieldsGroup, 0, 0);
+            this._root.Controls.Add(this._bottomLayout, 0, 1);
             this._root.Dock = System.Windows.Forms.DockStyle.Fill;
             this._root.Location = new System.Drawing.Point(0, 0);
             this._root.Name = "_root";
             this._root.Padding = new System.Windows.Forms.Padding(6);
-            this._root.RowCount = 3;
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this._root.RowCount = 2;
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this._root.Size = new System.Drawing.Size(260, 520);
             this._root.TabIndex = 0;
-            //
-            // _channelGroup
-            //
-            this._channelGroup.Controls.Add(this._channelUsb);
-            this._channelGroup.Controls.Add(this._channelUart);
-            this._channelGroup.Dock = System.Windows.Forms.DockStyle.Top;
-            this._channelGroup.Location = new System.Drawing.Point(9, 9);
-            this._channelGroup.Name = "_channelGroup";
-            this._channelGroup.Size = new System.Drawing.Size(242, 55);
-            this._channelGroup.TabIndex = 0;
-            this._channelGroup.TabStop = false;
-            this._channelGroup.Text = "명령 전송 채널";
-            //
-            // _channelUsb
-            //
-            this._channelUsb.AutoSize = true;
-            this._channelUsb.Location = new System.Drawing.Point(15, 22);
-            this._channelUsb.Name = "_channelUsb";
-            this._channelUsb.Size = new System.Drawing.Size(48, 19);
-            this._channelUsb.TabIndex = 0;
-            this._channelUsb.Text = "USB";
-            this._channelUsb.CheckedChanged += new System.EventHandler(this.ChannelUsb_CheckedChanged);
-            //
-            // _channelUart
-            //
-            this._channelUart.AutoSize = true;
-            this._channelUart.Location = new System.Drawing.Point(100, 22);
-            this._channelUart.Name = "_channelUart";
-            this._channelUart.Size = new System.Drawing.Size(52, 19);
-            this._channelUart.TabIndex = 1;
-            this._channelUart.Text = "UART";
-            this._channelUart.CheckedChanged += new System.EventHandler(this.ChannelUart_CheckedChanged);
             //
             // _fieldsGroup (자유 배치 - 아래 라벨/입력란은 Dock/TableLayoutPanel을 쓰지 않고
             // 각각 Location+Size를 직접 가지므로, Visual Studio 디자이너에서 하나씩 선택해
@@ -139,7 +98,7 @@ namespace Stm32WifiConfigTool.Panels
             this._fieldsGroup.Controls.Add(this._resetEnabledBox);
             this._fieldsGroup.Controls.Add(this._unitButtonRow);
             this._fieldsGroup.Dock = System.Windows.Forms.DockStyle.Top;
-            this._fieldsGroup.Location = new System.Drawing.Point(9, 64);
+            this._fieldsGroup.Location = new System.Drawing.Point(9, 9);
             this._fieldsGroup.Name = "_fieldsGroup";
             this._fieldsGroup.Size = new System.Drawing.Size(242, 164);
             this._fieldsGroup.TabIndex = 1;
@@ -249,7 +208,7 @@ namespace Stm32WifiConfigTool.Panels
             this._bottomLayout.Controls.Add(this._buttonRow, 0, 0);
             this._bottomLayout.Controls.Add(this._logBox, 0, 1);
             this._bottomLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._bottomLayout.Location = new System.Drawing.Point(9, 197);
+            this._bottomLayout.Location = new System.Drawing.Point(9, 142);
             this._bottomLayout.Name = "_bottomLayout";
             this._bottomLayout.RowCount = 2;
             this._bottomLayout.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -311,8 +270,6 @@ namespace Stm32WifiConfigTool.Panels
             this.Name = "RtcConfigPanel";
             this.Size = new System.Drawing.Size(260, 520);
             this._root.ResumeLayout(false);
-            this._channelGroup.ResumeLayout(false);
-            this._channelGroup.PerformLayout();
             this._fieldsGroup.ResumeLayout(false);
             this._fieldsGroup.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._periodBox)).EndInit();

@@ -1,6 +1,6 @@
 namespace Stm32WifiConfigTool.Models
 {
-    /// <summary>USB 또는 UART 채널 1개의 연결 설정(포트/보레이트/타임아웃).</summary>
+    /// <summary>UART 채널의 연결 설정(포트/보레이트/타임아웃).</summary>
     public class ChannelSettings
     {
         public string PortName { get; set; } = string.Empty;
@@ -19,11 +19,8 @@ namespace Stm32WifiConfigTool.Models
     /// </summary>
     public class AppSettings
     {
-        public ChannelSettings Usb { get; set; } = new ChannelSettings();
         public ChannelSettings Uart { get; set; } = new ChannelSettings();
 
-        /// <summary>WiFi 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
-        public string WifiCommandChannel { get; set; } = "Usb";
         public int WifiCommandTimeoutMs { get; set; } = 3000;
 
         /// <summary>WiFi 설정 패널에서 마지막으로 "Read"한 값.</summary>
@@ -41,8 +38,6 @@ namespace Stm32WifiConfigTool.Models
         /// 전제로 캐시한다 - 공유 PC 등 다수가 접근 가능한 환경에서는 주의할 것.</summary>
         public string WifiPasswordCache { get; set; } = string.Empty;
 
-        /// <summary>Measurement 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
-        public string MeasConfigCommandChannel { get; set; } = "Usb";
         public int MeasConfigCommandTimeoutMs { get; set; } = 3000;
 
         /// <summary>Measurement 설정 패널에서 마지막으로 "Read"한 값.</summary>
@@ -51,8 +46,6 @@ namespace Stm32WifiConfigTool.Models
         public double MeasResistanceMOhmCache { get; set; } = 0;
         public double MeasIntervalSecCache { get; set; } = 1;
 
-        /// <summary>RTC(리셋 주기) 설정 패널에서 커맨드를 보낼 채널: "Usb" 또는 "Uart".</summary>
-        public string RtcConfigCommandChannel { get; set; } = "Usb";
         public int RtcConfigCommandTimeoutMs { get; set; } = 3000;
 
         /// <summary>RTC 설정 패널에서 마지막으로 "Read"한 리셋 주기(초) 값.</summary>
@@ -67,9 +60,6 @@ namespace Stm32WifiConfigTool.Models
         /// false=NO.</summary>
         public bool RtcResetEnabledCache { get; set; } = false;
 
-        /// <summary>측정값 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
-        /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.MeasurementPanel.Initialize"/> 참고.)</summary>
-        public string MeasurementDisplayChannel { get; set; } = "Usb";
         public bool MeasurementAutoScroll { get; set; } = true;
 
         /// <summary>측정값 보기 패널 내부의 좌(측정값 그리드)/우(STATUS + 그 외 수신값 로그) 스플리터
@@ -83,10 +73,6 @@ namespace Stm32WifiConfigTool.Models
         public int MeasurementColDcIpWidth { get; set; } = 110;
         public int MeasurementColMacWidth { get; set; } = 130;
         public int MeasurementColSamplesWidth { get; set; } = 260;
-
-        /// <summary>ESP32 상태 보기 패널의 표시 채널: "Usb" / "Uart". ("Both"였던 예전 설정 파일이
-        /// 남아 있어도 "Usb"로 취급된다 - <see cref="Panels.EspStatusPanel.Initialize"/> 참고.)</summary>
-        public string EspStatusDisplayChannel { get; set; } = "Usb";
 
         /// <summary>상단 5개 패널 사이 스플리터 위치(px). 사용자가 경계선을 드래그해 각 패널의
         /// 폭을 조절하면 실시간으로 갱신되고, 앱 재시작 후에도 유지된다.
