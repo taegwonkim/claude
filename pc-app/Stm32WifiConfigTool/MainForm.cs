@@ -33,7 +33,7 @@ namespace Stm32WifiConfigTool
             Resize += MainForm_Resize;
             ResizeEnd += MainForm_ResizeEnd;
 
-            _portPanel.Initialize(_conn, _settings);
+            _uartPanel.Initialize("UART (USART3)", _conn.Uart, _settings.Uart);
             _wifiPanel.Initialize(_conn, _settings);
             _measConfigPanel.Initialize(_conn, _settings);
             _rtcConfigPanel.Initialize(_conn, _settings);

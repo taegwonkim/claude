@@ -24,7 +24,7 @@ namespace Stm32WifiConfigTool
         private System.Windows.Forms.SplitContainer _splitWifiMeas;
         private System.Windows.Forms.SplitContainer _splitMeasStatus;
         private System.Windows.Forms.SplitContainer _splitRtcStatus;
-        private Stm32WifiConfigTool.Panels.PortSettingsPanel _portPanel;
+        private Stm32WifiConfigTool.Panels.SerialChannelPanel _uartPanel;
         private Stm32WifiConfigTool.Panels.WifiConfigPanel _wifiPanel;
         private Stm32WifiConfigTool.Panels.MeasurementConfigPanel _measConfigPanel;
         private Stm32WifiConfigTool.Panels.RtcConfigPanel _rtcConfigPanel;
@@ -44,7 +44,7 @@ namespace Stm32WifiConfigTool
             this._splitWifiMeas = new System.Windows.Forms.SplitContainer();
             this._splitMeasStatus = new System.Windows.Forms.SplitContainer();
             this._splitRtcStatus = new System.Windows.Forms.SplitContainer();
-            this._portPanel = new Stm32WifiConfigTool.Panels.PortSettingsPanel();
+            this._uartPanel = new Stm32WifiConfigTool.Panels.SerialChannelPanel();
             this._wifiPanel = new Stm32WifiConfigTool.Panels.WifiConfigPanel();
             this._measConfigPanel = new Stm32WifiConfigTool.Panels.MeasurementConfigPanel();
             this._rtcConfigPanel = new Stm32WifiConfigTool.Panels.RtcConfigPanel();
@@ -90,7 +90,7 @@ namespace Stm32WifiConfigTool
             this._splitPortWifi.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             this._splitPortWifi.Location = new System.Drawing.Point(0, 0);
             this._splitPortWifi.Name = "_splitPortWifi";
-            this._splitPortWifi.Panel1.Controls.Add(this._portPanel);
+            this._splitPortWifi.Panel1.Controls.Add(this._uartPanel);
             this._splitPortWifi.Panel1MinSize = 280;
             this._splitPortWifi.Panel2.Controls.Add(this._splitWifiMeas);
             this._splitPortWifi.Panel2MinSize = 898;
@@ -148,13 +148,13 @@ namespace Stm32WifiConfigTool
             this._splitRtcStatus.TabIndex = 0;
             this._splitRtcStatus.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitRtcStatus_SplitterMoved);
             //
-            // _portPanel
+            // _uartPanel
             //
-            this._portPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._portPanel.Location = new System.Drawing.Point(0, 0);
-            this._portPanel.Name = "_portPanel";
-            this._portPanel.Size = new System.Drawing.Size(460, 520);
-            this._portPanel.TabIndex = 0;
+            this._uartPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._uartPanel.Location = new System.Drawing.Point(0, 0);
+            this._uartPanel.Name = "_uartPanel";
+            this._uartPanel.Size = new System.Drawing.Size(460, 520);
+            this._uartPanel.TabIndex = 0;
             //
             // _wifiPanel
             //

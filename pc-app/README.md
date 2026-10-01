@@ -75,9 +75,12 @@ MCU가 보내는 비동기 메시지는 **측정값 프레임과 ESP32 상태 �
 `Stm32Protocol.cs`의 화이트리스트 방식으로 분류합니다). 측정값 보기 패널 우측에는 이 둘 외에도
 STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레임이 한데 모여 표시됩니다.
 
-1. **포트 설정** (좌상단, `Panels/PortSettingsPanel.cs`)
+1. **포트 설정** (좌상단, `Panels/SerialChannelPanel.cs`, `MainForm`에 직접 도킹)
    UART COM 포트, Baud Rate, 읽기/쓰기 타임아웃(ms)을 설정하고 연결/해제합니다.
-   다른 패널에서 명령을 보내거나 데이터를 받으려면 먼저 여기서 연결해야 합니다.
+   다른 패널에서 명령을 보내거나 데이터를 받으려면 먼저 여기서 연결해야 합니다. 예전에는
+   USB/UART 각 채널을 재사용 가능한 `SerialChannelPanel` 2개로 감싸는 `PortSettingsPanel`이란
+   얇은 래퍼가 하나 더 있었지만, USB를 없애면서 채널이 UART 하나만 남아 래퍼의 의미가 없어져
+   제거했습니다 — 지금은 `SerialChannelPanel`이 `MainForm`에 바로 도킹됩니다.
    - "새로고침": OS에 연결된 COM 포트 목록을 다시 읽어옵니다. 실행 중인 PC에 Windows 11의
      "Segoe Fluent Icons" 폰트(또는 Windows 10의 "Segoe MDL2 Assets")가 설치되어 있으면
      `SerialChannelPanel.ApplyRefreshButtonIcon()`이 텍스트 "새로고침" 대신 그 폰트의 새로고침
@@ -92,17 +95,18 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      > 값이 행 높이보다 크지 않은 한 겹치지 않습니다. 아이콘 폰트가 없어 텍스트 "새로고침"을
      > 그대로 쓰는 환경은 원래대로 AutoSize를 유지합니다.
    - "연결"/"연결 해제": 포트를 열고 닫습니다.
-   - **각 행(포트/Baud Rate/타임아웃/연결/상태) 오른쪽 여백을 조절하려면**: `SerialChannelPanel.cs`의
-     `FieldRightMargin` 상수(px) 하나만 바꾸면 됩니다(WiFi 설정 패널의 `FieldRightMargin`과 같은
-     방식). 포트 콤보박스와 그 오른쪽 "새로고침" 버튼 사이 간격은 `RefreshButtonGap` 상수로
-     조절합니다 - 포트 콤보박스는 Anchor=Left|Right로 늘어나고 "새로고침" 버튼은 Anchor=Right로
-     오른쪽 끝에 고정되어 따라갑니다(WiFi 설정 패널의 비밀번호 입력란/"비밀번호 변경" 체크박스와
-     같은 방식).
-   - **왼쪽 라벨(포트/Baud Rate/타임아웃/상태) 폭과 그 옆 입력란 시작 위치를 조절하려면**:
-     `SerialChannelPanel.cs`의 `LabelWidth`(라벨 폭)와 `LabelFieldGap`(라벨과 입력란 사이 간격)
-     상수를 바꾸면 됩니다 - `ApplyLabelLayout()`이 이 두 값으로 각 라벨의 폭과 입력란(포트
-     콤보박스/Baud Rate/타임아웃/연결 버튼/상태 텍스트)의 시작 x좌표를 함께 계산해 적용하므로,
-     라벨 폭을 늘리거나 줄이면 입력란 시작 위치도 자동으로 따라 옮겨집니다.
+   - **라벨/포트 콤보박스/Baud Rate/타임아웃/연결 버튼/상태 텍스트 모두 Visual Studio 디자이너에서
+     자유롭게 위치와 크기를 조절할 수 있습니다**: `_groupBox`(`SerialChannelPanel.Designer.cs`) 안의
+     각 컨트롤은 Dock/TableLayoutPanel을 쓰지 않고 각자 `Location`+`Size`를 직접 가지는 자유 배치라,
+     디자이너에서 하나씩 선택해 드래그로 옮기거나 크기 조절 핸들로 늘리고 줄일 수 있습니다(이전에는
+     `FieldRightMargin`/`LabelWidth`/`LabelFieldGap` 같은 상수로 실행 시점에 디자이너가 잡아둔
+     위치/크기를 다시 계산해 덮어썼는데, 이 때문에 디자이너에서 아무리 조절해도 실행하면 값이
+     되돌아갔습니다 — 이제 이런 재계산 없이 디자이너가 정한 값을 그대로 씁니다). 포트 콤보박스와
+     Baud Rate/타임아웃/연결 버튼/상태 텍스트에는 `Anchor=Top|Left|Right`가 걸려 있어 패널 폭이
+     바뀌면 각자 디자이너에서 정해둔 오른쪽 여백을 유지한 채 함께 늘어나거나 줄어듭니다. "새로고침"
+     버튼만은 예외로, 아이콘 폰트가 설치된 환경에서 정사각형 아이콘으로 바뀔 때
+     `ApplyRefreshButtonIcon()`이 그 시점의 `_portRow` 크기를 기준으로 오른쪽 끝에 붙여 재배치합니다
+     (그 외 컨트롤에는 이런 실행 시점 재배치가 없습니다).
 
 2. **WiFi 설정** (중앙상단, `Panels/WifiConfigPanel.cs`)
    SSID/비밀번호, 서버 IP·Port, DHCP on/off, DHCP off일 때의 정적 IP/Gateway/Netmask를 설정합니다.
@@ -260,18 +264,20 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
 
 ## Visual Studio 디자이너로 폼/패널 편집하기
 
-6개 패널(`PortSettingsPanel`, `WifiConfigPanel`, `MeasurementConfigPanel`, `RtcConfigPanel`,
-`EspStatusPanel`, `MeasurementPanel`)과 `SerialChannelPanel`(UART 채널 UI), `MainForm`은
-모두 **표준 WinForms 디자이너
-구조**(`<이름>.cs` + `<이름>.Designer.cs`)로 되어 있어 Visual Studio에서 더블클릭하면 디자이너
-화면이 뜨고 드래그 앤 드롭/속성 창으로 편집할 수 있습니다.
+`SerialChannelPanel`(포트 설정, UART 채널 UI), `WifiConfigPanel`, `MeasurementConfigPanel`,
+`RtcConfigPanel`, `EspStatusPanel`, `MeasurementPanel`, 그리고 `MainForm`은 모두 **표준 WinForms
+디자이너 구조**(`<이름>.cs` + `<이름>.Designer.cs`)로 되어 있어 Visual Studio에서 더블클릭하면
+디자이너 화면이 뜨고 드래그 앤 드롭/속성 창으로 편집할 수 있습니다.
 
 - **`<이름>.Designer.cs`**: `InitializeComponent()`와 컨트롤 필드 선언만 있습니다. 디자이너가
   자동으로 다시 쓰는 영역이므로 보통 직접 편집하지 않고 디자이너 화면에서 조작합니다.
-- **`<이름>.cs`**: 실제 동작(이벤트 핸들러, 비즈니스 로직)이 있습니다. 여기서
-  `public Xxx() { InitializeComponent(); }`(매개변수 없는 생성자, 디자이너 전용)와
+- **`<이름>.cs`**: 실제 동작(이벤트 핸들러, 비즈니스 로직)이 있습니다. `WifiConfigPanel` 등
+  5개 패널은 `public Xxx() { InitializeComponent(); }`(매개변수 없는 생성자, 디자이너 전용)와
   `public void Initialize(ConnectionManager conn, AppSettings settings) { ... }`
-  (런타임 의존성 연결용, `MainForm`이 생성 직후 1회 호출)를 볼 수 있습니다.
+  (런타임 의존성 연결용, `MainForm`이 생성 직후 1회 호출)를 갖습니다. `SerialChannelPanel`은
+  `MainForm`에 직접 도킹되는 패널이라 `Initialize(string title, SerialLinkService link,
+  ChannelSettings settings)`를 대신 받습니다(`MainForm.cs` 생성자에서
+  `_uartPanel.Initialize("UART (USART3)", _conn.Uart, _settings.Uart);`로 호출).
 
 **왜 `Initialize()`가 따로 있나요?** WinForms 디자이너는 컨트롤을 화면에 그리기 위해 항상
 매개변수 없는 생성자로 인스턴스를 만듭니다. 그런데 이 패널들은 실제로는 `ConnectionManager`,
@@ -371,8 +377,7 @@ Stm32WifiConfigTool/
   Program.cs               - 진입점
   MainForm.cs / .Designer.cs  - 단일 메인 창, 6개 패널을 도킹 배치 + ConnectionManager/설정 소유
   Panels/                   - UserControl(디자이너 지원), MainForm에 모두 도킹되어 표시
-    SerialChannelPanel.cs / .Designer.cs  - UART 채널의 연결 UI (PortSettingsPanel이 사용)
-    PortSettingsPanel.cs / .Designer.cs
+    SerialChannelPanel.cs / .Designer.cs  - UART 채널의 연결 UI (MainForm에 직접 도킹, 좌상단 "포트 설정")
     WifiConfigPanel.cs / .Designer.cs
     MeasurementConfigPanel.cs / .Designer.cs  - Reference/Offset/Resistance/Interval Time 설정
     RtcConfigPanel.cs / .Designer.cs      - RTC 리셋 주기(초)/단위(시/분/초)/리셋 사용(YES/NO) 설정 (신규)
