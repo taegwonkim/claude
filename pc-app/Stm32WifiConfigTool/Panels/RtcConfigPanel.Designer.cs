@@ -23,11 +23,11 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.ComboBox _unitKindBox;
         private System.Windows.Forms.Label _resetEnabledLabel;
         private System.Windows.Forms.ComboBox _resetEnabledBox;
-        private System.Windows.Forms.FlowLayoutPanel _unitButtonRow;
+        private System.Windows.Forms.Panel _unitButtonRow;
         private System.Windows.Forms.Button _readButton;
         private System.Windows.Forms.Button _writeButton;
         private System.Windows.Forms.TableLayoutPanel _bottomLayout;
-        private System.Windows.Forms.FlowLayoutPanel _buttonRow;
+        private System.Windows.Forms.Panel _buttonRow;
         private System.Windows.Forms.Label _cmdTimeoutCaptionLabel;
         private System.Windows.Forms.NumericUpDown _cmdTimeoutBox;
         private System.Windows.Forms.TextBox _logBox;
@@ -48,11 +48,11 @@ namespace Stm32WifiConfigTool.Panels
             this._unitKindBox = new System.Windows.Forms.ComboBox();
             this._resetEnabledLabel = new System.Windows.Forms.Label();
             this._resetEnabledBox = new System.Windows.Forms.ComboBox();
-            this._unitButtonRow = new System.Windows.Forms.FlowLayoutPanel();
+            this._unitButtonRow = new System.Windows.Forms.Panel();
             this._readButton = new System.Windows.Forms.Button();
             this._writeButton = new System.Windows.Forms.Button();
             this._bottomLayout = new System.Windows.Forms.TableLayoutPanel();
-            this._buttonRow = new System.Windows.Forms.FlowLayoutPanel();
+            this._buttonRow = new System.Windows.Forms.Panel();
             this._cmdTimeoutCaptionLabel = new System.Windows.Forms.Label();
             this._cmdTimeoutBox = new System.Windows.Forms.NumericUpDown();
             this._logBox = new System.Windows.Forms.TextBox();
@@ -168,20 +168,23 @@ namespace Stm32WifiConfigTool.Panels
             this._resetEnabledBox.SelectedIndexChanged += new System.EventHandler(this.ResetEnabledBox_SelectedIndexChanged);
             //
             // _unitButtonRow (이 패널의 유일한 Read/Write - 리셋 주기/단위/리셋 사용 세 값을
-            // RTC_R_ALL/RTC_W_ALL로 항상 함께 읽고 쓴다)
+            // RTC_R_ALL/RTC_W_ALL로 항상 함께 읽고 쓴다. 자유 배치 - FlowLayoutPanel이 아니라
+            // 이 평범한 Panel 안에 _readButton/_writeButton이 각자 Location+Size를 직접 가지므로,
+            // Visual Studio 디자이너에서 하나씩 선택해 위치/크기를 자유롭게 바꿀 수 있다 -
+            // FlowLayoutPanel(AutoSize=true)이었을 때는 자신의 크기도, 자식들의 위치도 매번
+            // Controls.Add() 순서와 Margin 기준으로 다시 계산되어, 디자이너에서 아무리 조절해도
+            // 실행하면 항상 원래 자리로 되돌아갔다.)
             //
-            this._unitButtonRow.AutoSize = true;
             this._unitButtonRow.Controls.Add(this._readButton);
             this._unitButtonRow.Controls.Add(this._writeButton);
             this._unitButtonRow.Location = new System.Drawing.Point(12, 123);
             this._unitButtonRow.Name = "_unitButtonRow";
             this._unitButtonRow.Size = new System.Drawing.Size(220, 31);
             this._unitButtonRow.TabIndex = 6;
-            this._unitButtonRow.WrapContents = false;
             //
             // _readButton
             //
-            this._readButton.AutoSize = true;
+            this._readButton.AutoSize = false;
             this._readButton.Location = new System.Drawing.Point(3, 3);
             this._readButton.Name = "_readButton";
             this._readButton.Size = new System.Drawing.Size(90, 25);
@@ -192,7 +195,7 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _writeButton
             //
-            this._writeButton.AutoSize = true;
+            this._writeButton.AutoSize = false;
             this._writeButton.Location = new System.Drawing.Point(99, 3);
             this._writeButton.Name = "_writeButton";
             this._writeButton.Size = new System.Drawing.Size(90, 25);
@@ -218,9 +221,9 @@ namespace Stm32WifiConfigTool.Panels
             //
             // _buttonRow (Read/Write 버튼은 삭제되었다 - _fieldsGroup 안의 _readButton/
             // _writeButton이 이 패널의 유일한 Read/Write이며, 이제 이 행에는 커맨드 타임아웃만
-            // 남는다.)
+            // 남는다. 자유 배치 - FlowLayoutPanel이 아니라 이 평범한 Panel 안에 라벨/입력란이
+            // 각자 Location+Size를 직접 가지므로, 디자이너에서 자유롭게 위치/크기를 바꿀 수 있다.)
             //
-            this._buttonRow.AutoSize = true;
             this._buttonRow.Controls.Add(this._cmdTimeoutCaptionLabel);
             this._buttonRow.Controls.Add(this._cmdTimeoutBox);
             this._buttonRow.Dock = System.Windows.Forms.DockStyle.Top;
@@ -229,16 +232,16 @@ namespace Stm32WifiConfigTool.Panels
             this._buttonRow.Name = "_buttonRow";
             this._buttonRow.Size = new System.Drawing.Size(242, 29);
             this._buttonRow.TabIndex = 0;
-            this._buttonRow.WrapContents = false;
             //
             // _cmdTimeoutCaptionLabel
             //
-            this._cmdTimeoutCaptionLabel.AutoSize = true;
-            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(3, 6);
+            this._cmdTimeoutCaptionLabel.AutoSize = false;
+            this._cmdTimeoutCaptionLabel.Location = new System.Drawing.Point(3, 3);
             this._cmdTimeoutCaptionLabel.Name = "_cmdTimeoutCaptionLabel";
-            this._cmdTimeoutCaptionLabel.Size = new System.Drawing.Size(120, 15);
+            this._cmdTimeoutCaptionLabel.Size = new System.Drawing.Size(120, 23);
             this._cmdTimeoutCaptionLabel.TabIndex = 2;
             this._cmdTimeoutCaptionLabel.Text = "커맨드 타임아웃(ms)";
+            this._cmdTimeoutCaptionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // _cmdTimeoutBox
             //

@@ -171,6 +171,13 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    - "Write": 입력값 전체를 `MEAS_W_ALL` 한 프레임에 담아 MCU에 전달합니다.
    - WiFi 설정 패널과 마찬가지로 "커맨드 타임아웃"을 별도로 갖고, "Read" 값도
      동일하게 로컬 캐시되어 다음 실행 시 미리 채워집니다.
+     > **알려진 버그 수정**: "Read"/"Write" 버튼과 "커맨드 타임아웃" 라벨/입력란은 한때
+     > `FlowLayoutPanel`(`AutoSize=true`) 안에 들어 있었는데, 이 컨트롤은 자신의 크기도
+     > 자식들의 위치도 매번 `Controls.Add()` 순서와 `Margin` 기준으로 다시 계산해서 배치하므로,
+     > Visual Studio 디자이너에서 폭·높이·위치를 아무리 조절해도 실행하면 항상 원래 자리로
+     > 되돌아갔습니다(버튼 자체도 `AutoSize=true`라 크기 조절이 막혀 있었습니다). 이 영역을
+     > 평범한 `Panel` 안에 각 컨트롤이 `Location`+`Size`를 직접 갖는 자유 배치로 바꿔서,
+     > 이제 디자이너에서 자유롭게 위치/크기를 바꿀 수 있습니다.
 
 4. **RTC 설정** (Measurement 설정 오른쪽, `Panels/RtcConfigPanel.cs`, 신규)
    RTC Wakeup Timer 기반 주기적 리셋 간격(초)을 설정합니다(`docs/프로토콜_명세.md` §6).
@@ -197,6 +204,11 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      "Read" 값(리셋 주기, 단위, 리셋 사용)도 동일하게 로컬 캐시되어 다음 실행 시 미리
      채워집니다(각각 `AppSettings.RtcPeriodSecCache`/`RtcUnitKindCache`/
      `RtcResetEnabledCache`).
+     > **알려진 버그 수정**: Measurement 설정 패널과 마찬가지로, "Read"/"Write" 버튼
+     > (`_unitButtonRow`)과 "커맨드 타임아웃" 라벨/입력란(`_buttonRow`)도 한때
+     > `FlowLayoutPanel`(`AutoSize=true`)에 들어 있어 디자이너에서 폭·높이·위치를 조절해도
+     > 실행하면 원래 자리로 되돌아갔습니다. 둘 다 평범한 `Panel` 안의 자유 배치로 바꿔서
+     > 이제 디자이너에서 자유롭게 조절할 수 있습니다.
    - **`RTC_R_ALL`/`RTC_W_ALL`은 이 PC 도구에서 새로 도입한 커맨드로, WIFI_R_ALL 계열과
      마찬가지로 `firmware/`·`firmware-no-rtos/`에는 아직 구현되어 있지 않습니다**(아래 참고).
      기존에 구현돼 있던 `RESET_R_ALL`/`RESET_W_ALL`은 더 이상 이 패널에서 쓰지 않습니다.
