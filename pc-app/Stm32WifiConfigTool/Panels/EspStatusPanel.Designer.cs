@@ -9,6 +9,7 @@ namespace Stm32WifiConfigTool.Panels
         private System.Windows.Forms.Label _currentStatusLabel;
         private System.Windows.Forms.Label _lastUpdateLabel;
         private System.Windows.Forms.Button _clearButton;
+        private System.Windows.Forms.Button _exportButton;
         private System.Windows.Forms.Label _logLabel;
         private System.Windows.Forms.TextBox _logBox;
 
@@ -24,6 +25,7 @@ namespace Stm32WifiConfigTool.Panels
             this._currentStatusLabel = new System.Windows.Forms.Label();
             this._lastUpdateLabel = new System.Windows.Forms.Label();
             this._clearButton = new System.Windows.Forms.Button();
+            this._exportButton = new System.Windows.Forms.Button();
             this._logLabel = new System.Windows.Forms.Label();
             this._logBox = new System.Windows.Forms.TextBox();
             this._currentGroup.SuspendLayout();
@@ -75,12 +77,22 @@ namespace Stm32WifiConfigTool.Panels
             this._clearButton.UseVisualStyleBackColor = true;
             this._clearButton.Click += new System.EventHandler(this.ClearButton_Click);
             //
+            // _exportButton (수신 이력(_logRecords)을 CSV 파일로 내보낸다 - ExportButton_Click 참고)
+            //
+            this._exportButton.Location = new System.Drawing.Point(95, 107);
+            this._exportButton.Name = "_exportButton";
+            this._exportButton.Size = new System.Drawing.Size(90, 25);
+            this._exportButton.TabIndex = 3;
+            this._exportButton.Text = "CSV로 저장";
+            this._exportButton.UseVisualStyleBackColor = true;
+            this._exportButton.Click += new System.EventHandler(this.ExportButton_Click);
+            //
             // _logLabel
             //
             this._logLabel.Location = new System.Drawing.Point(9, 139);
             this._logLabel.Name = "_logLabel";
             this._logLabel.Size = new System.Drawing.Size(160, 21);
-            this._logLabel.TabIndex = 3;
+            this._logLabel.TabIndex = 4;
             this._logLabel.Text = "수신 이력";
             //
             // _logBox
@@ -93,12 +105,13 @@ namespace Stm32WifiConfigTool.Panels
             this._logBox.ReadOnly = true;
             this._logBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this._logBox.Size = new System.Drawing.Size(282, 348);
-            this._logBox.TabIndex = 4;
+            this._logBox.TabIndex = 5;
             //
             // EspStatusPanel
             //
             this.Controls.Add(this._currentGroup);
             this.Controls.Add(this._clearButton);
+            this.Controls.Add(this._exportButton);
             this.Controls.Add(this._logLabel);
             this.Controls.Add(this._logBox);
             this.Name = "EspStatusPanel";

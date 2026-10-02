@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
+using System.Text;
 using System.Windows.Forms;
 using Stm32WifiConfigTool.Models;
 using Stm32WifiConfigTool.Services;
@@ -15,7 +18,8 @@ namespace Stm32WifiConfigTool.Panels
     /// 기록하지 않는다 - 대신 "[RESET]"로 시작하는 소프트웨어 리셋 로그 줄(예: "[RESET]
     /// Software Reset Count: 0", <see cref="Stm32Protocol.IsResetLogText"/> 참고)이 오면
     /// 그 원본 텍스트를 그대로 수신 이력에 기록한다. 각 줄 맨 앞의 시각은
-    /// "yyyy-MM-dd HH:mm:ss"(24시간제) 형식이다.
+    /// "yyyy-MM-dd HH:mm:ss"(24시간제) 형식이다. "CSV로 저장"으로 지금까지 쌓인 수신 이력
+    /// (TimeStamp/Message 두 열)을 CSV 파일로 내보낼 수 있다(<see cref="ExportButton_Click"/> 참고).
     /// UI 레이아웃은 <c>EspStatusPanel.Designer.cs</c>에 있으며 Visual Studio
     /// 디자이너로 편집 가능하다. 매개변수 없는 생성자는 디자이너 전용이며, 실제 사용 시에는
     /// 생성 직후 <see cref="Initialize"/>를 호출해 런타임 의존성(ConnectionManager, AppSettings)을
@@ -28,6 +32,12 @@ namespace Stm32WifiConfigTool.Panels
         private ConnectionManager _conn;
         private AppSettings _settings;
         private int _logLineCount;
+
+        /// <summary>_logBox에 쌓인 "[RESET]" 수신 이력과 1:1로 대응하는 구조화된 기록 - CSV로
+        /// 저장할 때 이 목록을 그대로 쓴다(<see cref="ExportButton_Click"/> 참고). _logBox가
+        /// MaxLogLines를 넘겨 오래된 줄을 잘라낼 때 이 목록의 맨 앞도 함께 제거해 항상 화면에
+        /// 보이는 줄과 동일한 내용을 유지한다.</summary>
+        private readonly List<(string TimeStamp, string Message)> _logRecords = new List<(string, string)>();
 
         public EspStatusPanel()
         {
@@ -91,23 +101,30 @@ namespace Stm32WifiConfigTool.Panels
             /* 수신 이력에는 대신 소프트웨어 리셋 로그("[RESET] ...")를 기록한다. */
             if (Stm32Protocol.IsResetLogText(payload))
             {
-                AppendLog(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + payload);
+                AppendLog(payload);
             }
         }
 
-        private void AppendLog(string text)
+        private void AppendLog(string message)
         {
-            _logBox.AppendText(text + Environment.NewLine);
+            string timeStamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            _logBox.AppendText(timeStamp + "  " + message + Environment.NewLine);
+            _logRecords.Add((timeStamp, message));
             _logLineCount++;
 
             if (_logLineCount > MaxLogLines)
             {
-                /* 오래된 줄부터 잘라내 메모리를 보호한다 */
+                /* 오래된 줄부터 잘라내 메모리를 보호한다 - _logRecords도 화면과 같은 줄만
+                 * 남도록 맨 앞을 함께 제거한다. */
                 int cut = _logBox.Text.IndexOf('\n');
                 if (cut >= 0)
                 {
                     _logBox.Text = _logBox.Text.Substring(cut + 1);
                     _logLineCount--;
+                }
+                if (_logRecords.Count > 0)
+                {
+                    _logRecords.RemoveAt(0);
                 }
             }
         }
@@ -115,10 +132,68 @@ namespace Stm32WifiConfigTool.Panels
         private void ClearButton_Click(object sender, EventArgs e)
         {
             _logBox.Clear();
+            _logRecords.Clear();
             _logLineCount = 0;
             _currentStatusLabel.Text = "-";
             _currentStatusLabel.ForeColor = Color.Gray;
             _lastUpdateLabel.Text = "수신 대기 중...";
+        }
+
+        /// <summary>지금까지 쌓인 "[RESET]" 수신 이력(<see cref="_logRecords"/>)을 CSV 파일로
+        /// 내보낸다. 열은 TimeStamp/Message 두 개이며, 콤마/따옴표/줄바꿈이 포함된 값(예: Message)은
+        /// MeasurementPanel의 CSV 내보내기와 같은 방식으로(RFC4180과 유사하게) 큰따옴표로
+        /// 감싼다.</summary>
+        private void ExportButton_Click(object sender, EventArgs e)
+        {
+            if (_logRecords.Count == 0)
+            {
+                MessageBox.Show(this, "저장할 수신 이력이 없습니다.", "CSV로 저장", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dialog = new SaveFileDialog { Filter = "CSV 파일|*.csv", FileName = "esp_status_log_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".csv" })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                try
+                {
+                    using (var writer = new StreamWriter(dialog.FileName, false, Encoding.UTF8))
+                    {
+                        writer.WriteLine(BuildCsvLine(new[] { "TimeStamp", "Message" }));
+                        foreach ((string timeStamp, string message) in _logRecords)
+                        {
+                            writer.WriteLine(BuildCsvLine(new[] { timeStamp, message }));
+                        }
+                    }
+                    MessageBox.Show(this, "저장되었습니다:\n" + dialog.FileName, "CSV로 저장", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "저장 실패: " + ex.Message, "CSV로 저장", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private static string BuildCsvLine(string[] fields)
+        {
+            var escaped = new string[fields.Length];
+            for (int i = 0; i < fields.Length; i++)
+            {
+                escaped[i] = EscapeCsvField(fields[i]);
+            }
+            return string.Join(",", escaped);
+        }
+
+        private static string EscapeCsvField(string field)
+        {
+            if (field.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0)
+            {
+                return "\"" + field.Replace("\"", "\"\"") + "\"";
+            }
+            return field;
         }
 
         protected override void Dispose(bool disposing)
