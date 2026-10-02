@@ -7,7 +7,6 @@ namespace Stm32WifiConfigTool.Panels
 
         private System.Windows.Forms.GroupBox _groupBox;
         private System.Windows.Forms.Label _portLabel;
-        private System.Windows.Forms.Panel _portRow;
         private System.Windows.Forms.ComboBox _portCombo;
         private System.Windows.Forms.Button _refreshButton;
         private System.Windows.Forms.Label _baudLabel;
@@ -32,7 +31,6 @@ namespace Stm32WifiConfigTool.Panels
             this.components = new System.ComponentModel.Container();
             this._groupBox = new System.Windows.Forms.GroupBox();
             this._portLabel = new System.Windows.Forms.Label();
-            this._portRow = new System.Windows.Forms.Panel();
             this._portCombo = new System.Windows.Forms.ComboBox();
             this._refreshButton = new System.Windows.Forms.Button();
             this._baudLabel = new System.Windows.Forms.Label();
@@ -46,7 +44,6 @@ namespace Stm32WifiConfigTool.Panels
             this._statusLabel = new System.Windows.Forms.Label();
             this._refreshButtonTip = new System.Windows.Forms.ToolTip(this.components);
             this._groupBox.SuspendLayout();
-            this._portRow.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this._writeTimeout)).BeginInit();
             this.SuspendLayout();
@@ -56,7 +53,8 @@ namespace Stm32WifiConfigTool.Panels
             // 크기 조절 핸들을 드래그해 폭/높이를 자유롭게 바꿀 수 있다.)
             //
             this._groupBox.Controls.Add(this._portLabel);
-            this._groupBox.Controls.Add(this._portRow);
+            this._groupBox.Controls.Add(this._portCombo);
+            this._groupBox.Controls.Add(this._refreshButton);
             this._groupBox.Controls.Add(this._baudLabel);
             this._groupBox.Controls.Add(this._baudCombo);
             this._groupBox.Controls.Add(this._readTimeoutLabel);
@@ -84,25 +82,20 @@ namespace Stm32WifiConfigTool.Panels
             this._portLabel.Text = "포트";
             this._portLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // _portRow (자유 배치 - _portCombo는 Anchor=Left|Right로 늘어나고, _refreshButton은
-            // Anchor=Right로 오른쪽 끝에 고정된 채 따라간다.)
-            //
-            this._portRow.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this._portRow.Controls.Add(this._portCombo);
-            this._portRow.Controls.Add(this._refreshButton);
-            this._portRow.Location = new System.Drawing.Point(125, 22);
-            this._portRow.Name = "_portRow";
-            this._portRow.Size = new System.Drawing.Size(300, 30);
-            this._portRow.TabIndex = 1;
-            //
-            // _portCombo
+            // _portCombo (다른 입력란들과 같은 레벨로 _groupBox에 바로 속한다 - 전에는 _portCombo와
+            // _refreshButton을 _portRow라는 별도 Panel로 감싸 그 안에서만 Anchor로 배치했는데,
+            // _portRow 자체의 고정 폭(Designer.cs의 Size.Width)이 _groupBox의 실제 폭과 무관하게
+            // 300px로 못박혀 있어서, _groupBox가 아무리 넓어져도(또는 디자이너에서 _portCombo를
+            // 직접 넓혀도) 그 바깥(_portRow 밖)으로는 그려지지 않고 잘리는 문제가 있었다. 두
+            // 컨트롤을 _portRow 없이 _groupBox에 직접 두면 다른 입력란(_baudCombo 등)과 똑같이
+            // _groupBox 폭까지 자유롭게 넓힐 수 있다.)
             //
             this._portCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this._portCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this._portCombo.Location = new System.Drawing.Point(0, 3);
+            this._portCombo.Location = new System.Drawing.Point(125, 25);
             this._portCombo.Name = "_portCombo";
             this._portCombo.Size = new System.Drawing.Size(130, 23);
-            this._portCombo.TabIndex = 0;
+            this._portCombo.TabIndex = 1;
             //
             // _refreshButton (기본은 텍스트 "새로고침" - Windows 11 아이콘 폰트(Segoe Fluent
             // Icons/Segoe MDL2 Assets)가 설치되어 있으면 실행 시 ApplyRefreshButtonIcon()이
@@ -111,11 +104,11 @@ namespace Stm32WifiConfigTool.Panels
             this._refreshButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this._refreshButton.AccessibleName = "새로고침";
             this._refreshButton.AutoSize = true;
-            this._refreshButton.Location = new System.Drawing.Point(136, 3);
+            this._refreshButton.Location = new System.Drawing.Point(261, 25);
             this._refreshButton.Name = "_refreshButton";
             this._refreshButton.Padding = new System.Windows.Forms.Padding(6, 3, 6, 3);
             this._refreshButton.Size = new System.Drawing.Size(90, 25);
-            this._refreshButton.TabIndex = 1;
+            this._refreshButton.TabIndex = 2;
             this._refreshButton.Text = "새로고침";
             this._refreshButton.UseVisualStyleBackColor = true;
             this._refreshButtonTip.SetToolTip(this._refreshButton, "새로고침");
@@ -126,7 +119,7 @@ namespace Stm32WifiConfigTool.Panels
             this._baudLabel.Location = new System.Drawing.Point(15, 59);
             this._baudLabel.Name = "_baudLabel";
             this._baudLabel.Size = new System.Drawing.Size(100, 23);
-            this._baudLabel.TabIndex = 2;
+            this._baudLabel.TabIndex = 3;
             this._baudLabel.Text = "Baud Rate";
             this._baudLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
@@ -137,14 +130,14 @@ namespace Stm32WifiConfigTool.Panels
             this._baudCombo.Location = new System.Drawing.Point(125, 56);
             this._baudCombo.Name = "_baudCombo";
             this._baudCombo.Size = new System.Drawing.Size(300, 23);
-            this._baudCombo.TabIndex = 3;
+            this._baudCombo.TabIndex = 4;
             //
             // _readTimeoutLabel
             //
             this._readTimeoutLabel.Location = new System.Drawing.Point(15, 93);
             this._readTimeoutLabel.Name = "_readTimeoutLabel";
             this._readTimeoutLabel.Size = new System.Drawing.Size(100, 23);
-            this._readTimeoutLabel.TabIndex = 4;
+            this._readTimeoutLabel.TabIndex = 5;
             this._readTimeoutLabel.Text = "읽기 타임아웃(ms)";
             this._readTimeoutLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
@@ -157,7 +150,7 @@ namespace Stm32WifiConfigTool.Panels
             this._readTimeout.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
             this._readTimeout.Name = "_readTimeout";
             this._readTimeout.Size = new System.Drawing.Size(300, 23);
-            this._readTimeout.TabIndex = 5;
+            this._readTimeout.TabIndex = 6;
             this._readTimeout.Value = new decimal(new int[] { 3000, 0, 0, 0 });
             //
             // _writeTimeoutLabel
@@ -165,7 +158,7 @@ namespace Stm32WifiConfigTool.Panels
             this._writeTimeoutLabel.Location = new System.Drawing.Point(15, 127);
             this._writeTimeoutLabel.Name = "_writeTimeoutLabel";
             this._writeTimeoutLabel.Size = new System.Drawing.Size(100, 23);
-            this._writeTimeoutLabel.TabIndex = 6;
+            this._writeTimeoutLabel.TabIndex = 7;
             this._writeTimeoutLabel.Text = "쓰기 타임아웃(ms)";
             this._writeTimeoutLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
@@ -178,7 +171,7 @@ namespace Stm32WifiConfigTool.Panels
             this._writeTimeout.Minimum = new decimal(new int[] { 100, 0, 0, 0 });
             this._writeTimeout.Name = "_writeTimeout";
             this._writeTimeout.Size = new System.Drawing.Size(300, 23);
-            this._writeTimeout.TabIndex = 7;
+            this._writeTimeout.TabIndex = 8;
             this._writeTimeout.Value = new decimal(new int[] { 2000, 0, 0, 0 });
             //
             // _connectButton
@@ -187,7 +180,7 @@ namespace Stm32WifiConfigTool.Panels
             this._connectButton.Location = new System.Drawing.Point(125, 161);
             this._connectButton.Name = "_connectButton";
             this._connectButton.Size = new System.Drawing.Size(300, 30);
-            this._connectButton.TabIndex = 8;
+            this._connectButton.TabIndex = 9;
             this._connectButton.Text = "연결";
             this._connectButton.UseVisualStyleBackColor = true;
             this._connectButton.Click += new System.EventHandler(this.ConnectButton_Click);
@@ -197,7 +190,7 @@ namespace Stm32WifiConfigTool.Panels
             this._statusCaptionLabel.Location = new System.Drawing.Point(15, 199);
             this._statusCaptionLabel.Name = "_statusCaptionLabel";
             this._statusCaptionLabel.Size = new System.Drawing.Size(100, 30);
-            this._statusCaptionLabel.TabIndex = 9;
+            this._statusCaptionLabel.TabIndex = 10;
             this._statusCaptionLabel.Text = "상태";
             this._statusCaptionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
@@ -208,7 +201,7 @@ namespace Stm32WifiConfigTool.Panels
             this._statusLabel.Location = new System.Drawing.Point(125, 199);
             this._statusLabel.Name = "_statusLabel";
             this._statusLabel.Size = new System.Drawing.Size(300, 30);
-            this._statusLabel.TabIndex = 10;
+            this._statusLabel.TabIndex = 11;
             this._statusLabel.Text = "연결 안됨";
             this._statusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
@@ -218,8 +211,6 @@ namespace Stm32WifiConfigTool.Panels
             this.Name = "SerialChannelPanel";
             this.Size = new System.Drawing.Size(440, 250);
             this._groupBox.ResumeLayout(false);
-            this._portRow.ResumeLayout(false);
-            this._portRow.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._readTimeout)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this._writeTimeout)).EndInit();
             this.ResumeLayout(false);
