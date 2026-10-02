@@ -36,12 +36,6 @@ namespace Stm32WifiConfigTool.Panels
         /// 포함되어 있다.</summary>
         private static readonly string[] IconFontCandidates = { "Segoe Fluent Icons", "Segoe MDL2 Assets" };
 
-        /// <summary>아이콘 폰트로 바뀔 때 새로고침 버튼의 폭/높이(정사각형, px). 아이콘 폰트는
-        /// 줄 높이가 커서 AutoSize에 맡기면 버튼이 디자이너가 잡아둔 높이보다 커져 아래 Baud Rate
-        /// 행과 겹치므로, 이 값으로 고정한다(<see cref="ApplyRefreshButtonIcon"/> 참고) - 디자이너의
-        /// <c>_refreshButton</c> 높이보다 크지 않게 유지할 것.</summary>
-        private const int RefreshButtonIconSize = 26;
-
         public SerialChannelPanel()
         {
             InitializeComponent();
@@ -50,14 +44,15 @@ namespace Stm32WifiConfigTool.Panels
 
         /// <summary>설치된 폰트 중에 <see cref="IconFontCandidates"/>가 있으면 "새로고침" 텍스트
         /// 대신 그 폰트로 렌더링한 새로고침 글리프(<see cref="RefreshGlyph"/>)를 버튼에 표시한다
-        /// (툴팁으로 "새로고침"을 계속 알려주므로 뜻은 그대로 전달된다). 이때 AutoSize를 끄고
-        /// <see cref="RefreshButtonIconSize"/> 정사각형으로 크기를 고정하는데, 아이콘 폰트의 줄
-        /// 높이가 커서 AutoSize에 맡기면 버튼이 디자이너가 잡아둔 높이보다 커져 아래 Baud Rate
-        /// 행과 겹치기 때문이다. 크기가 줄어드는 만큼 디자이너가 정해둔 오른쪽 끝(<c>Right</c>)
-        /// 위치는 그대로 유지한 채 왼쪽 끝만 당겨오고, 세로는 원래 높이 안에서 가운데로 맞춘다 -
-        /// 그래서 디자이너에서 <c>_refreshButton</c>의 위치/크기를 자유롭게 바꿔도 이 계산이 항상
-        /// 그 최신 값을 기준으로 다시 맞춰진다. 아이콘 폰트가 없는 환경(예: 일부 서버 코어)에서는
-        /// 디자이너가 잡아둔 "새로고침" 텍스트(AutoSize 유지, 디자이너가 정한 위치)를 그대로 둔다.</summary>
+        /// (툴팁으로 "새로고침"을 계속 알려주므로 뜻은 그대로 전달된다). <c>_refreshButton</c>의
+        /// 크기/위치는 전혀 건드리지 않고 <c>SerialChannelPanel.Designer.cs</c>가 정해둔(또는
+        /// 사용자가 디자이너에서 그 이후 자유롭게 바꾼) 값을 그대로 쓴다 - 예전에는 여기서 폭/높이를
+        /// 정사각형 상수로 강제로 덮어썼는데, 그 탓에 디자이너에서 버튼을 아무리 좁게 줄여도
+        /// 실행하면 그 상수 크기로 되돌아가 포트 콤보박스를 그 이상 넓힐 수 없었다. AutoSize만
+        /// 꺼서(아이콘 폰트는 줄 높이가 커 AutoSize에 맡기면 버튼이 디자이너가 잡아둔 크기보다
+        /// 커져 아래 Baud Rate 행과 겹친다) 디자이너의 크기가 그대로 유지되게 한다. 아이콘 폰트가
+        /// 없는 환경(예: 일부 서버 코어)에서는 디자이너가 잡아둔 "새로고침" 텍스트를 그대로 둔다 -
+        /// 다만 디자이너에서 버튼을 아주 좁게 줄여두면 이 환경에서는 텍스트가 잘려 보일 수 있다.</summary>
         private void ApplyRefreshButtonIcon()
         {
             using (var installed = new InstalledFontCollection())
@@ -70,12 +65,8 @@ namespace Stm32WifiConfigTool.Panels
                     {
                         continue;
                     }
-                    int right = _refreshButton.Right;
-                    int verticalCenter = _refreshButton.Top + _refreshButton.Height / 2;
                     _refreshButton.AutoSize = false;
                     _refreshButton.TextAlign = ContentAlignment.MiddleCenter;
-                    _refreshButton.Size = new Size(RefreshButtonIconSize, RefreshButtonIconSize);
-                    _refreshButton.Location = new Point(right - RefreshButtonIconSize, verticalCenter - RefreshButtonIconSize / 2);
                     _refreshButton.Font = new Font(candidate, 12F, FontStyle.Regular);
                     _refreshButton.Text = RefreshGlyph;
                     return;

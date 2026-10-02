@@ -94,20 +94,24 @@ namespace Stm32WifiConfigTool.Panels
             this._portCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this._portCombo.Location = new System.Drawing.Point(125, 25);
             this._portCombo.Name = "_portCombo";
-            this._portCombo.Size = new System.Drawing.Size(130, 23);
+            this._portCombo.Size = new System.Drawing.Size(272, 23);
             this._portCombo.TabIndex = 1;
             //
-            // _refreshButton (기본은 텍스트 "새로고침" - Windows 11 아이콘 폰트(Segoe Fluent
-            // Icons/Segoe MDL2 Assets)가 설치되어 있으면 실행 시 ApplyRefreshButtonIcon()이
-            // 새로고침 글리프로 바꿔치기한다. 아이콘만 남아도 뜻을 알 수 있도록 툴팁을 단다.)
+            // _refreshButton (기본은 아이콘 폰트(Windows 11 Segoe Fluent Icons/Windows 10 Segoe
+            // MDL2 Assets)가 설치되어 있으면 실행 시 ApplyRefreshButtonIcon()이 텍스트 "새로고침"
+            // 대신 새로고침 글리프로 바꿔치기한다 - 아이콘만 남아도 뜻을 알 수 있도록 툴팁을 단다.
+            // AutoSize를 꺼서 디자이너에서 하나씩 선택해 크기 조절 핸들로 폭/높이를 자유롭게(아주
+            // 좁게도) 바꿀 수 있다 - ApplyRefreshButtonIcon()은 이 크기/위치를 그대로 쓰고 건드리지
+            // 않는다. 콤보박스 폭을 최대한 넓히고 싶으면 이 버튼을 좁히고 그만큼 _portCombo.Width를
+            // 늘리면 된다(둘 다 자유롭게 조절 가능).)
             //
             this._refreshButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this._refreshButton.AccessibleName = "새로고침";
-            this._refreshButton.AutoSize = true;
-            this._refreshButton.Location = new System.Drawing.Point(261, 25);
+            this._refreshButton.AutoSize = false;
+            this._refreshButton.Location = new System.Drawing.Point(403, 26);
             this._refreshButton.Name = "_refreshButton";
-            this._refreshButton.Padding = new System.Windows.Forms.Padding(6, 3, 6, 3);
-            this._refreshButton.Size = new System.Drawing.Size(90, 25);
+            this._refreshButton.Padding = new System.Windows.Forms.Padding(0);
+            this._refreshButton.Size = new System.Drawing.Size(22, 22);
             this._refreshButton.TabIndex = 2;
             this._refreshButton.Text = "새로고침";
             this._refreshButton.UseVisualStyleBackColor = true;
