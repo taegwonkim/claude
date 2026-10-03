@@ -93,14 +93,17 @@ namespace Stm32WifiConfigTool
             this._splitTopBottom.TabIndex = 0;
             this._splitTopBottom.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitTopBottom_SplitterMoved);
             //
-            // _splitPortWifi (좌: 포트 설정 | 우: 나머지 전부 - 사용자가 스플리터를 드래그해 폭 조절 가능)
+            // _splitPortWifi (좌: 포트 설정 | 우: 나머지 전부 - 사용자가 스플리터를 드래그해 폭 조절 가능.
+            // Panel1MinSize는 내부 컨트롤이 잘리지 않는 "권장" 최소값이 아니라 그냥 최소한의
+            // 안전값(60)으로 낮춰둔다 - 이보다 더 좁히면 SerialChannelPanel 내부 라벨/입력란이
+            // 겹치거나 잘려 보일 수 있지만, 그 이상으로 좁히고 싶은 사용자의 선택을 막지 않는다.)
             //
             this._splitPortWifi.Dock = System.Windows.Forms.DockStyle.Fill;
             this._splitPortWifi.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             this._splitPortWifi.Location = new System.Drawing.Point(0, 0);
             this._splitPortWifi.Name = "_splitPortWifi";
             this._splitPortWifi.Panel1.Controls.Add(this._uartPanel);
-            this._splitPortWifi.Panel1MinSize = 280;
+            this._splitPortWifi.Panel1MinSize = 60;
             this._splitPortWifi.Panel2.Controls.Add(this._splitWifiMeas);
             this._splitPortWifi.Panel2MinSize = 898;
             this._splitPortWifi.Size = new System.Drawing.Size(2166, 520);
