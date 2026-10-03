@@ -19,6 +19,16 @@ MCU는 **UART(USART3, 보통 USB-시리얼 변환기 경유)** 로 통신하며,
 패널을 항상 동시에** 볼 수 있게 도킹 배치했습니다: 좌상단 포트 설정, 중앙상단 WiFi 설정,
 그 오른쪽 Measurement 설정, 그 오른쪽 RTC 설정, 우상단 ESP32 상태, 하단 전체 폭 측정값/상태 보기.
 
+**패널 높이 조절(상단 설정 영역 ↕ 하단 측정값 보기 영역)**: 위 5개 설정 패널이 모여 있는 상단
+영역과 하단 측정값/상태 보기 영역 사이의 가로 경계선에 마우스를 올리면 커서가 ↕ 모양으로
+바뀝니다 — 그 상태로 드래그하면 상단 영역의 높이를 원하는 대로 조절할 수 있습니다
+(`_splitTopBottom`, `SplitContainer`를 가로 분할(`Orientation = Horizontal`)로 사용, 너무
+좁아져 내부 컨트롤이 잘리지 않도록 최소 높이가 걸려 있습니다 — 상단 300px / 하단 150px). 조절한
+높이는 아래 "패널 폭 조절"과 똑같은 방식으로 **드래그를 놓는 즉시 설정 파일에 저장**되고
+(`AppSettings.TopAreaHeight`), 창을 세로로 늘리거나 줄일 때는 상단 영역이 고정 높이를 유지하고
+하단(측정값 보기)이 나머지 공간을 모두 흡수합니다(좌우 폭 조절용 스플리터들과 같은
+`FixedPanel = Panel1` 방식).
+
 **패널 폭 조절**: 상단 5개 패널(포트/WiFi/Measurement 설정/RTC 설정/ESP32 상태) 사이 경계선에
 마우스를 올리면 커서가 ↔ 모양으로 바뀝니다 — 그 상태로 드래그하면 각 패널의 폭을 원하는 대로
 조절할 수 있습니다(`SplitContainer` 4개를 중첩해 구현, 너무 좁아져 내부 컨트롤이 잘리지 않도록
@@ -58,13 +68,13 @@ MCU는 **UART(USART3, 보통 USB-시리얼 변환기 경유)** 로 통신하며,
 Visual Studio 디자이너의 드래그 크기 조절 핸들을 막지 않으므로, 여전히 디자이너에서 위치/크기를
 자유롭게 편집할 수 있습니다.
 
-**폭이 복원되지 않을 때 확인할 것**: 폭을 조절한 뒤 `%AppData%\Stm32WifiConfigTool\settings.ini`
-파일을 열어 `PortPanelWidth`/`WifiPanelWidth`/`MeasConfigPanelWidth`/`RtcPanelWidth` 값이 실제로
-조절한 값으로 바뀌었는지 확인하세요. 바뀌어 있는데도 다음 실행 시 반영되지 않는다면 복원 로직
-(`MainForm.MainForm_Load` → `ApplySavedSplitterDistances()`) 쪽 문제이고, 값 자체가 바뀌지 않는다면
-저장이 안 되는 것이므로 원인이 다릅니다. 또한 Visual Studio에서 코드만 바꾸고 **다시 빌드하지
-않은 채** 이전 실행 파일을 그대로 실행 중인 경우에도 같은 증상으로 보일 수 있으니, 솔루션을
-완전히 다시 빌드한 뒤 테스트하세요.
+**폭/높이가 복원되지 않을 때 확인할 것**: 조절한 뒤 `%AppData%\Stm32WifiConfigTool\settings.ini`
+파일을 열어 `TopAreaHeight`/`PortPanelWidth`/`WifiPanelWidth`/`MeasConfigPanelWidth`/`RtcPanelWidth`
+값이 실제로 조절한 값으로 바뀌었는지 확인하세요. 바뀌어 있는데도 다음 실행 시 반영되지 않는다면
+복원 로직(`MainForm.MainForm_Load` → `ApplySavedSplitterDistances()`) 쪽 문제이고, 값 자체가
+바뀌지 않는다면 저장이 안 되는 것이므로 원인이 다릅니다. 또한 Visual Studio에서 코드만 바꾸고
+**다시 빌드하지 않은 채** 이전 실행 파일을 그대로 실행 중인 경우에도 같은 증상으로 보일 수 있으니,
+솔루션을 완전히 다시 빌드한 뒤 테스트하세요.
 
 하단 **측정값 보기** 패널(6번, 전체 폭) 내부에도 별도의 좌/우 스플리터가 하나 더 있습니다(좌:
 측정값 그리드, 우: 그 외 값 로그, `Panels/MeasurementPanel.cs`의 `_splitDisplay`) — 위

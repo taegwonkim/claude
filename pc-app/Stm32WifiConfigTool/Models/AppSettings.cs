@@ -74,6 +74,11 @@ namespace Stm32WifiConfigTool.Models
         public int MeasurementColMacWidth { get; set; } = 130;
         public int MeasurementColSamplesWidth { get; set; } = 260;
 
+        /// <summary>상단(포트/WiFi/Measurement/RTC 설정 + ESP32 상태) 영역과 하단(측정값 보기) 영역을
+        /// 나누는 가로 스플리터의 상단 영역 높이(px). 사용자가 그 경계선을 드래그하면 실시간으로
+        /// 갱신되고, 앱 재시작 후에도 유지된다.</summary>
+        public int TopAreaHeight { get; set; } = 520;
+
         /// <summary>상단 5개 패널 사이 스플리터 위치(px). 사용자가 경계선을 드래그해 각 패널의
         /// 폭을 조절하면 실시간으로 갱신되고, 앱 재시작 후에도 유지된다.
         /// PortPanelWidth: 포트 설정 패널 폭. WifiPanelWidth: (전체 폭 - 포트 폭) 중 WiFi 설정이

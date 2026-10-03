@@ -19,7 +19,7 @@ namespace Stm32WifiConfigTool
             base.Dispose(disposing);
         }
 
-        private System.Windows.Forms.TableLayoutPanel _root;
+        private System.Windows.Forms.SplitContainer _splitTopBottom;
         private System.Windows.Forms.SplitContainer _splitPortWifi;
         private System.Windows.Forms.SplitContainer _splitWifiMeas;
         private System.Windows.Forms.SplitContainer _splitMeasStatus;
@@ -39,7 +39,7 @@ namespace Stm32WifiConfigTool
         /// </summary>
         private void InitializeComponent()
         {
-            this._root = new System.Windows.Forms.TableLayoutPanel();
+            this._splitTopBottom = new System.Windows.Forms.SplitContainer();
             this._splitPortWifi = new System.Windows.Forms.SplitContainer();
             this._splitWifiMeas = new System.Windows.Forms.SplitContainer();
             this._splitMeasStatus = new System.Windows.Forms.SplitContainer();
@@ -50,7 +50,10 @@ namespace Stm32WifiConfigTool
             this._rtcConfigPanel = new Stm32WifiConfigTool.Panels.RtcConfigPanel();
             this._espStatusPanel = new Stm32WifiConfigTool.Panels.EspStatusPanel();
             this._measurementPanel = new Stm32WifiConfigTool.Panels.MeasurementPanel();
-            this._root.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._splitTopBottom)).BeginInit();
+            this._splitTopBottom.Panel1.SuspendLayout();
+            this._splitTopBottom.Panel2.SuspendLayout();
+            this._splitTopBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._splitPortWifi)).BeginInit();
             this._splitPortWifi.Panel1.SuspendLayout();
             this._splitPortWifi.Panel2.SuspendLayout();
@@ -69,20 +72,26 @@ namespace Stm32WifiConfigTool
             this._splitRtcStatus.SuspendLayout();
             this.SuspendLayout();
             //
-            // _root
+            // _splitTopBottom (위: 포트/WiFi/Measurement/RTC 설정 + ESP32 상태 | 아래: 측정값/상태
+            // 보기 - 사용자가 가로 경계선을 드래그해 위/아래 영역의 높이를 조절할 수 있다. 창을
+            // 세로로 늘리거나 줄일 때는 위쪽(설정 영역)이 고정 높이를 유지하고 아래쪽(측정값 보기)이
+            // 나머지 공간을 모두 흡수한다(FixedPanel = Panel1, 좌우 폭 조절용 스플리터들과 같은
+            // 방식).)
             //
-            this._root.ColumnCount = 1;
-            this._root.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._root.Controls.Add(this._splitPortWifi, 0, 0);
-            this._root.Controls.Add(this._measurementPanel, 0, 1);
-            this._root.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._root.Location = new System.Drawing.Point(0, 0);
-            this._root.Name = "_root";
-            this._root.RowCount = 2;
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 520F));
-            this._root.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this._root.Size = new System.Drawing.Size(2166, 940);
-            this._root.TabIndex = 0;
+            this._splitTopBottom.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._splitTopBottom.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
+            this._splitTopBottom.Location = new System.Drawing.Point(0, 0);
+            this._splitTopBottom.Name = "_splitTopBottom";
+            this._splitTopBottom.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            this._splitTopBottom.Panel1.Controls.Add(this._splitPortWifi);
+            this._splitTopBottom.Panel1MinSize = 300;
+            this._splitTopBottom.Panel2.Controls.Add(this._measurementPanel);
+            this._splitTopBottom.Panel2MinSize = 150;
+            this._splitTopBottom.Size = new System.Drawing.Size(2166, 940);
+            this._splitTopBottom.SplitterDistance = 520;
+            this._splitTopBottom.SplitterWidth = 6;
+            this._splitTopBottom.TabIndex = 0;
+            this._splitTopBottom.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.SplitTopBottom_SplitterMoved);
             //
             // _splitPortWifi (좌: 포트 설정 | 우: 나머지 전부 - 사용자가 스플리터를 드래그해 폭 조절 가능)
             //
@@ -191,20 +200,23 @@ namespace Stm32WifiConfigTool
             // _measurementPanel
             //
             this._measurementPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this._measurementPanel.Location = new System.Drawing.Point(0, 520);
+            this._measurementPanel.Location = new System.Drawing.Point(0, 0);
             this._measurementPanel.Name = "_measurementPanel";
-            this._measurementPanel.Size = new System.Drawing.Size(2166, 420);
-            this._measurementPanel.TabIndex = 1;
+            this._measurementPanel.Size = new System.Drawing.Size(2166, 414);
+            this._measurementPanel.TabIndex = 0;
             //
             // MainForm
             //
             this.ClientSize = new System.Drawing.Size(2166, 940);
-            this.Controls.Add(this._root);
+            this.Controls.Add(this._splitTopBottom);
             this.MinimumSize = new System.Drawing.Size(1220, 700);
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "STM32L562C WiFi 계측 브릿지 도구";
-            this._root.ResumeLayout(false);
+            this._splitTopBottom.Panel1.ResumeLayout(false);
+            this._splitTopBottom.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this._splitTopBottom)).EndInit();
+            this._splitTopBottom.ResumeLayout(false);
             this._splitPortWifi.Panel1.ResumeLayout(false);
             this._splitPortWifi.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this._splitPortWifi)).EndInit();

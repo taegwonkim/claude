@@ -10,9 +10,12 @@ namespace Stm32WifiConfigTool
     /// STM32L562C WiFi 계측 브릿지 PC 도구의 메인(유일한) 창.
     /// 포트 설정(좌상단) / WiFi 설정(중앙상단) / Measurement 설정 / RTC 설정 / ESP32 상태(우상단) /
     /// 측정값·상태 보기(하단, 전체 폭)를 별도 창을 띄우지 않고 한 창 안에서 동시에 볼 수 있도록
-    /// 도킹 배치한다. 상단 5개 패널은 <see cref="SplitContainer"/> 4개를 중첩해 구성했으므로
-    /// 사용자가 패널 사이 경계선을 마우스로 드래그해 각 패널의 폭을 자유롭게 조절할 수 있다
-    /// (드래그 중 실시간으로 <see cref="AppSettings"/>에 반영되고, 앱 재시작 후에도 유지된다).
+    /// 도킹 배치한다. 위 5개 설정 패널이 모여 있는 상단 영역과 하단 측정값·상태 보기 영역은
+    /// <see cref="SplitContainer"/>(<c>_splitTopBottom</c>, 가로 분할)로 나뉘어 있어 그 경계선을
+    /// 드래그해 위/아래 영역의 높이를 조절할 수 있고, 상단 5개 설정 패널은 다시
+    /// <see cref="SplitContainer"/> 4개(세로 분할)를 중첩해 구성했으므로 그 사이 경계선을 드래그해
+    /// 각 패널의 폭도 자유롭게 조절할 수 있다(드래그 중 실시간으로 <see cref="AppSettings"/>에
+    /// 반영되고, 앱 재시작 후에도 유지된다).
     /// UI 레이아웃은 <c>MainForm.Designer.cs</c>에 있으며 Visual Studio 디자이너로 편집 가능하다.
     /// UART 연결(ConnectionManager)은 이 창이 소유하며, 6개 패널이 모두 공유한다.
     /// 포트/보레이트/타임아웃 등 UI 설정은 시작 시 AppSettingsStore.Load()로 복원하고,
@@ -109,26 +112,39 @@ namespace Stm32WifiConfigTool
             SaveWindowBounds();
         }
 
-        /// <summary>저장된 패널 폭(px)을 각 스플리터에 복원한다. 창이 저장 당시보다 좁아졌거나
-        /// 설정값이 손상된 경우에도 Panel1MinSize/Panel2MinSize 범위 밖 값은 SplitterDistance
-        /// setter가 예외를 던지므로, 유효 범위로 clamp한 뒤 적용한다.</summary>
+        /// <summary>저장된 패널 폭(px)/상단 영역 높이(px)를 각 스플리터에 복원한다. 창이 저장
+        /// 당시보다 좁아졌거나(또는 짧아졌거나) 설정값이 손상된 경우에도 Panel1MinSize/
+        /// Panel2MinSize 범위 밖 값은 SplitterDistance setter가 예외를 던지므로, 유효 범위로
+        /// clamp한 뒤 적용한다.</summary>
         private void ApplySavedSplitterDistances()
         {
+            SetSplitterDistanceClamped(_splitTopBottom, _settings.TopAreaHeight);
             SetSplitterDistanceClamped(_splitPortWifi, _settings.PortPanelWidth);
             SetSplitterDistanceClamped(_splitWifiMeas, _settings.WifiPanelWidth);
             SetSplitterDistanceClamped(_splitMeasStatus, _settings.MeasConfigPanelWidth);
             SetSplitterDistanceClamped(_splitRtcStatus, _settings.RtcPanelWidth);
         }
 
+        /// <summary>SplitterDistance의 유효 범위는 분할 방향을 따라 계산해야 한다 - 좌우로 나누는
+        /// (기본값, Vertical) 스플리터는 컨테이너의 Width를, 위아래로 나누는(Horizontal) 스플리터는
+        /// Height를 기준으로 Panel1MinSize/Panel2MinSize/SplitterWidth를 뺀 나머지가 유효
+        /// 범위다.</summary>
         private static void SetSplitterDistanceClamped(SplitContainer split, int distance)
         {
             int min = split.Panel1MinSize;
-            int max = split.Width - split.Panel2MinSize - split.SplitterWidth;
+            int available = split.Orientation == Orientation.Horizontal ? split.Height : split.Width;
+            int max = available - split.Panel2MinSize - split.SplitterWidth;
             if (max < min)
             {
-                return; /* 창이 너무 좁아 아직 유효 범위를 계산할 수 없음 - 디자이너 기본값 유지 */
+                return; /* 창이 너무 좁거나 짧아 아직 유효 범위를 계산할 수 없음 - 디자이너 기본값 유지 */
             }
             split.SplitterDistance = Math.Max(min, Math.Min(max, distance));
+        }
+
+        private void SplitTopBottom_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            _settings.TopAreaHeight = _splitTopBottom.SplitterDistance;
+            SaveSettingsSafe();
         }
 
         private void SplitPortWifi_SplitterMoved(object sender, SplitterEventArgs e)

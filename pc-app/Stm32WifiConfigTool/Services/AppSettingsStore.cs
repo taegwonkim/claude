@@ -56,6 +56,7 @@ namespace Stm32WifiConfigTool.Services
                 settings.MeasurementColDcIpWidth = GetInt(map, "MeasurementColDcIpWidth", settings.MeasurementColDcIpWidth);
                 settings.MeasurementColMacWidth = GetInt(map, "MeasurementColMacWidth", settings.MeasurementColMacWidth);
                 settings.MeasurementColSamplesWidth = GetInt(map, "MeasurementColSamplesWidth", settings.MeasurementColSamplesWidth);
+                settings.TopAreaHeight = GetInt(map, "TopAreaHeight", settings.TopAreaHeight);
                 settings.PortPanelWidth = GetInt(map, "PortPanelWidth", settings.PortPanelWidth);
                 settings.WifiPanelWidth = GetInt(map, "WifiPanelWidth", settings.WifiPanelWidth);
                 settings.MeasConfigPanelWidth = GetInt(map, "MeasConfigPanelWidth", settings.MeasConfigPanelWidth);
@@ -112,6 +113,7 @@ namespace Stm32WifiConfigTool.Services
                 "MeasurementColDcIpWidth=" + settings.MeasurementColDcIpWidth,
                 "MeasurementColMacWidth=" + settings.MeasurementColMacWidth,
                 "MeasurementColSamplesWidth=" + settings.MeasurementColSamplesWidth,
+                "TopAreaHeight=" + settings.TopAreaHeight,
                 "PortPanelWidth=" + settings.PortPanelWidth,
                 "WifiPanelWidth=" + settings.WifiPanelWidth,
                 "MeasConfigPanelWidth=" + settings.MeasConfigPanelWidth,
