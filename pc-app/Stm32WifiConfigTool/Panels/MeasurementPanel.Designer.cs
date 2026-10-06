@@ -158,8 +158,8 @@ namespace Stm32WifiConfigTool.Panels
             this._macAddressGroup.TabIndex = 3;
             //
             // _macAddressCaptionLabel (MCU가 "<STX>MAC_<mac address><CR><LF>" 형식으로 보내면
-            // MAC_ 뒤의 값만 옆의 _macAddressValueLabel에 별도 표시한다. 수신 프레임 원본은
-            // 평소대로 우측 "그 외 수신값" 로그에도 그대로 남는다.
+            // MAC_ 뒤의 값만 옆의 _macAddressValueLabel에 표시하고, 우측 "그 외 수신값" 로그에는
+            // 남기지 않는다(중복 표시 방지 - MeasurementPanel.cs의 HandleLineOnUiThread 참고).
             // AutoSize=false로 꺼서 Text/Font에 맞춰 크기가 자동으로 다시 계산되지 않으므로,
             // 위 _macAddressGroup 안에서 Location/Size를 자유롭게 조절할 수 있다.)
             //

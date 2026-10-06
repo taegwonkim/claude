@@ -16,9 +16,9 @@ namespace Stm32WifiConfigTool.Panels
     /// "현재 ESP32 상태"에 이미 크게 표시되므로 여기서는 별도 칸을 두지 않는다. 측정값이 아닌
     /// 프레임은 STX 유무에 관계없이 전부 표시된다(<see cref="Stm32Protocol.DisplayText"/> 참고).
     /// 그 중 "MAC_&lt;mac address&gt;" 형식("&lt;STX&gt;MAC_mac address&lt;CR&gt;&lt;LF&gt;"로 옴,
-    /// <see cref="Stm32Protocol.TryParseMacAddress"/> 참고)인 경우에는 원본 프레임을 위 로그에
-    /// 그대로 남기는 것과 별도로, "MAC_" 뒤의 값만 상단 "자동 스크롤" 체크박스 옆의
-    /// MAC Address 표시 영역에도 갱신한다. 이 캡션 라벨(<c>_macAddressCaptionLabel</c>)과
+    /// <see cref="Stm32Protocol.TryParseMacAddress"/> 참고)인 경우는 예외로, 우측 로그에는 전혀
+    /// 표시하지 않고 "MAC_" 뒤의 값만 상단 "자동 스크롤" 체크박스 옆의 MAC Address 표시 영역에
+    /// 갱신한다(같은 값이 두 곳에 중복 표시되지 않도록). 이 캡션 라벨(<c>_macAddressCaptionLabel</c>)과
     /// 값 표시 텍스트박스(<c>_macAddressValueLabel</c>, 한 줄짜리 single-line TextBox)는
     /// <c>_macAddressGroup</c>이라는 "자유 배치" 컨테이너(Panel) 안에 들어 있어서, 둘 다
     /// Visual Studio 디자이너에서 폭/높이/위치를 완전히 자유롭게 조절할 수 있다 -
@@ -314,15 +314,18 @@ namespace Stm32WifiConfigTool.Panels
             }
             else
             {
-                /* 측정값이 아닌 나머지 전부(STATUS/EVENT/RESET_COUNT/커맨드 응답 및 STX 없이 오는
-                 * 값 포함)는 우측 일반 로그에 원본 그대로 표시한다. */
-                _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload + Environment.NewLine);
-
-                /* "MAC_<mac address>" 형식이면 그 값만 별도로 MAC Address 표시 영역에도 갱신한다
-                 * (위 원본 로그 표시는 그대로 유지한 채 추가로 표시하는 것). */
+                /* "MAC_<mac address>" 형식이면 그 값만 MAC Address 표시 영역에 반영하고, 우측
+                 * "그 외 수신값" 로그에는 남기지 않는다(같은 값이 두 곳에 중복 표시되는 것을
+                 * 막기 위함 - Stm32Protocol.TryParseMacAddress 참고). 그 외의(측정값도 아니고
+                 * MAC_도 아닌) 모든 프레임(STATUS/EVENT/RESET_COUNT/커맨드 응답 및 STX 없이
+                 * 오는 값 포함)만 로그에 원본 그대로 표시한다. */
                 if (Stm32Protocol.TryParseMacAddress(payload, out string macAddress))
                 {
                     _macAddressValueLabel.Text = macAddress;
+                }
+                else
+                {
+                    _eventLogBox.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + "  " + payload + Environment.NewLine);
                 }
             }
         }

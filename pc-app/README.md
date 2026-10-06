@@ -266,7 +266,9 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
      유지됩니다(`RawLine` 열은 항상 남는 폭을 채우는 열이라 폭을 따로 저장하지 않고, 열 순서
      자체도 재시작 후 다시 기본 순서로 돌아갑니다 - 저장되지 않습니다).
    - **우측 — 그 외 모든 값**: 좌측 측정값 그리드에 표시되지 않는 나머지를 한 로그에 원본
-     그대로 모아 보여줍니다(높이 전체를 채움) — STX 유무나 태그 형식에 관계없이 전부 표시되며
+     그대로 모아 보여줍니다(높이 전체를 채움, 단 `MAC_<mac address>` 형식은 예외로 아래 "MAC
+     Address" 표시 영역에만 남고 여기에는 표시되지 않습니다) — STX 유무나 태그 형식에 관계없이
+     전부 표시되며
      (`Stm32Protocol.DisplayText`가 STX를 있으면 떼고 없으면 그대로 두며, 빈 줄만 무시합니다 —
      실측 결과 MCU가 모든 프레임에 STX를 붙이지는 않았습니다), `STATUS,<번호>`/`STATUS:<번호>`,
      `EVENT,WIFI_DISCONNECTED` / `EVENT,WIFI_CONNECTED` / `EVENT,TCP_CONNECTED` / `EVENT,TCP_CLOSED`
@@ -278,8 +280,8 @@ STATUS/EVENT/RESET_COUNT/커맨드 응답 등 측정값이 아닌 모든 프레�
    - "자동 스크롤": 새 측정값이 들어올 때마다 그리드를 자동으로 맨 아래로 스크롤합니다.
    - "MAC Address": "자동 스크롤" 체크박스 옆에 있는 별도 표시 영역입니다. MCU가
      `<STX>MAC_<mac address><CR><LF>` 형식(`Stm32Protocol.TryParseMacAddress` 참고)으로 보내면,
-     그 원본 프레임은 평소대로 위 "그 외 모든 값" 로그에 그대로 남기면서, `MAC_` 뒤의 값만
-     추가로 이 영역에 별도 표시합니다. 캡션 라벨(`_macAddressCaptionLabel`)과 값 표시용
+     `MAC_` 뒤의 값만 이 영역에 표시하고 우측 "그 외 모든 값" 로그에는 남기지 않습니다(같은
+     값이 두 곳에 중복 표시되지 않도록 하기 위함). 캡션 라벨(`_macAddressCaptionLabel`)과 값 표시용
      한 줄(single-line) 텍스트박스(`_macAddressValueLabel`)는 `_macAddressGroup`이라는 별도의
      "자유 배치" 컨테이너(`Panel`) 안에 들어 있어서, 둘 다 Visual Studio 디자이너에서 글꼴
      크기·폭·높이·위치를 완전히 자유롭게 바꿀 수 있습니다(자세한 이유는 아래 "왜 어떤 컨트롤은
