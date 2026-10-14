@@ -5,6 +5,9 @@
 >
 > **FPGA**: Cyclone IV UART 바이트 간 지연(송신)/간격 필요(수신) 원인과 해결 RTL
 > → [`FPGA_UART_Cyclone4/`](FPGA_UART_Cyclone4/README.md)
+>
+> **STM32L562 ↔ FPGA UART 링크** (DMA 순환 수신 + IDLE, 명령 큐)
+> → [`STM32L562_FPGA_Link/`](STM32L562_FPGA_Link/README.md)
 
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
 스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
