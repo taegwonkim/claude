@@ -176,8 +176,10 @@ iverilog -g2005 -o sim.out -DERR_PPM=30000 sim/tb_uart.v rtl/*.v && vvp sim.out
 
 ## 6. 실제 프로젝트(SGDT_DC_6CH, Nios II) 코드 분석과 수정
 
-원본: [`nios_orig/`](nios_orig/) (main.c, main.h, nios_io.c, nios_io.h, top.v)
-수정본: [`nios_fix/`](nios_fix/) (main.c, main.h, nios_io.c, nios_io.h, fifo_uart_regs.h)
+대상 FPGA : **EP4CE10E22C8N** (Cyclone IV E, 10,320 LE, M9K 46개, PLL 2개, EQFP144)
+
+원본: [`nios_orig/`](nios_orig/) (main.c/h, nios_io.c/h, pc_cmd.c/h, adc_ltc2292.c/h, top.v)
+수정본: [`nios_fix/`](nios_fix/) (위 C/H 파일 + fifo_uart_regs.h)
 
 `top.v` 는 UART 핀(`UART1_RX/TX`, `UART2_RX/TX`)을 Platform Designer 의 `altera_avalon_uart`
 에 그대로 연결하고 있으므로, UART 동작은 **Nios II 소프트웨어 + altera_avalon_uart 코어**가 결정합니다.
@@ -238,7 +240,7 @@ iverilog -g2005 -o sim.out -DERR_PPM=30000 sim/tb_uart.v rtl/*.v && vvp sim.out
 
 | 항목 | altera_avalon_uart | FIFO UART |
 |------|-------------------|-----------|
-| RX 버퍼 | 1 바이트 | 256 바이트 (ISR 이 256문자 시간까지 늦어도 손실 없음) |
+| RX 버퍼 | 1 바이트 | 257 바이트 (ISR 이 256문자 시간까지 늦어도 손실 없음) |
 | TX 버퍼 | 1 바이트 + 시프트 | 256 바이트 (CPU 가 한 번에 쓰고 다른 일 가능, 바이트 간 간격 0) |
 | RX 판정 | 비트 중앙 1회 샘플 | 16x 오버샘플 + 3샘플 다수결, STOP 중앙 복귀 |
 | 에러 | ROE/FE/PE (ISR 이 직접 확인) | RX_OVF / RX_FERR sticky 비트 |
@@ -249,3 +251,39 @@ iverilog -g2005 -o sim.out -DERR_PPM=30000 sim/tb_uart.v rtl/*.v && vvp sim.out
 
 > 실제 보드/Quartus 에서의 컴파일·동작은 아직 확인하지 않았습니다. `fifo_uart_hw.tcl` 로드나
 > 타이밍에서 문제가 생기면 메시지를 알려주세요.
+
+
+### 6-5. pc_cmd.c / adc_ltc2292.c 분석 (추가)
+
+| # | 위치 | 문제 | 수정 |
+|---|------|------|------|
+| A1 ★ | `ADC_Data_to_MCU_All()` | `uart1_string_write(txbuf, 100)` — **문자열 길이와 상관없이 항상 100바이트 전송**. 문자열(보통 40~70자) 뒤에 `0x00` 이 30~60개 붙어서 MCU 로 나감. 반대로 카운트 값이 커지면 문자열이 최대 105자까지 되어 **끝의 `\r\n` 이 잘림** → MCU 가 패킷 끝을 못 찾고 다음 패킷과 합쳐짐 | `snprintf` 반환값(실제 길이)으로 전송 |
+| A2 | `ADC_Data_to_MCU_All()` | `fAdcAvrgSum / AdcAvrgCnt` 에서 카운트가 0 이면 `nan`/`inf` 출력 | 0 이면 0 출력 |
+| A3 | `ADC_Data_Read_from_Dpram()`, `ADC_Data_Average()` | DPRAM 을 일반 포인터로 읽음. Nios II/f(데이터 캐시)면 **캐시된 옛 값**을 읽고, 최적화 시 읽기가 생략될 수 있음 | `IORD_32DIRECT()` (캐시 우회) |
+| P1 | `Mcu_Command_Check()` | `UART1_RxBuf[i+1]` 를 i=99 까지 읽어 `RxBuf[100]`(범위 밖) 접근. `McuCmdBuf` 를 지우지 않아 이전의 긴 명령 잔여 데이터가 남음 | 범위 검사 + `memset` |
+| P2 | `Mcu_Command_Proc()` | 파라미터 탐색이 `'\0'` 뒤까지(`n + McuCmdSize + 1`) 읽고, `McuParaPoint[20]` 범위 검사 없음 → 잔여 데이터의 ',' 로 배열 넘침 가능 | 문자열 끝까지만, 20개 제한 |
+| P3 | `Mcu_Command_Check()` | 받은 명령마다 RS485(uart2)로 디버그 에코 → **송신 끝날 때까지 메인루프 정지** | `MCU_CMD_DEBUG_ECHO` 로 on/off (기본 1 = 원본 동작, 양산 시 0 권장) |
+| P4 | `ADC_Data_Read_Command()` | `(long unsigned int)AdcPeakVal` → 배열 **주소**를 출력 | `AdcPeakVal[0]`, `AdcPeakCnt[0]` |
+
+`Mcu_Command_Check()` 가 `UART1_RxOK_Flag` 를 직접 0 으로 지우는 구조임을 확인했습니다.
+6-3 의 `Uart_Rx_Poll()`(패킷 1개 완성 시 리턴, 다음 호출에서 다음 패킷)과 그대로 맞물립니다.
+(PC 에서 `"\x02SW_REFV,1234\r\n\x02SW_ALL,5000,100,2\r\n\x02START\r\n"` 을 **간격 없이 한 번에** 넣고
+3개 명령이 순서대로 정상 처리되는 것을 단위 테스트로 확인)
+
+**코드는 바꾸지 않았지만 MCU 측과 확인이 필요한 프로토콜 사항**
+
+- `SR_OFFSV`, `SR_RDTIME` 응답은 끝이 `ETX(0x03)`, 나머지 응답은 `\r\n` — MCU 파서가 `\n` 을 기다리면 이 두 응답은 끝을 못 찾음
+- `SW_ALL` 은 `ReadInterval = 값 × 1000`, `SW_RDTIME` 은 `ReadInterval = 값` (단위 불일치)
+- `SW_ALL` 의 응답은 uart1(MCU)이 아니라 **uart2(디버그)** 로 나감 — MCU 가 응답을 기다린다면 타임아웃
+- `"%.0f"` 출력은 BSP 에서 **Small C library 를 끄고** 빌드해야 동작 (켜져 있으면 float 이 빈 문자열)
+
+### 6-6. EP4CE10 리소스 관련
+
+- `rtl/uart_fifo.v` 는 **동기 읽기 구조로 M9K 블록 RAM 에 합성**되도록 작성 (비동기 읽기로 쓰면
+  256바이트 FIFO 하나가 LE 2,000개 이상 — EP4CE10 의 20% 이상)
+- FIFO UART 1개 = M9K 2개(RX/TX 각 256×8) + 로직 수백 LE 수준으로 예상.
+  2개(uart1, uart2) 교체 시 M9K 4개. 기존 DPRAM 6개와 Nios 메모리 사용량을 고려해
+  Quartus Fitter 리포트의 *Total memory bits / M9K blocks* 여유를 확인하세요.
+  M9K 가 부족하면 Platform Designer 에서 `FIFO_AW` 를 6(64바이트)으로 줄여도 충분합니다.
+- top.v 는 이미 PLL 2개(altpll_0, altpll_1)를 모두 사용 중 — FIFO UART 는 PLL 을 쓰지 않으므로 영향 없음.
+- (아직 Quartus 합성으로 실제 사용량을 확인하지는 않았습니다)
