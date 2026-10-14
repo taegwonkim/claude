@@ -15,6 +15,7 @@ module uart_fifo #(
     output wire [WIDTH-1:0] dout,
     input  wire             rd_en,
     output wire             empty,
+    output wire [AW:0]      count,       // 저장된 데이터 수
     output reg              overflow     // full 상태에서 쓰기 시도 (sticky)
 );
     reg [WIDTH-1:0] mem [0:(1<<AW)-1];
@@ -23,6 +24,7 @@ module uart_fifo #(
     assign empty = (wptr == rptr);
     assign full  = (wptr[AW] != rptr[AW]) && (wptr[AW-1:0] == rptr[AW-1:0]);
     assign dout  = mem[rptr[AW-1:0]];
+    assign count = wptr - rptr;
 
     always @(posedge clk) begin
         if (rst) begin

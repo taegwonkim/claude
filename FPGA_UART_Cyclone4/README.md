@@ -171,3 +171,81 @@ iverilog -g2005 -o sim.out -DERR_PPM=30000 sim/tb_uart.v rtl/*.v && vvp sim.out
 | 〃 오차 ±30000 ppm (±3%) | PASS |
 | 〃 오차 ±45000 ppm (±4.5%) | PASS |
 | (비교) RX 를 "STOP 끝까지 대기" 로 바꾼 버전, 0 ppm | **FAIL** (8번째 바이트부터 깨짐) |
+
+---
+
+## 6. 실제 프로젝트(SGDT_DC_6CH, Nios II) 코드 분석과 수정
+
+원본: [`nios_orig/`](nios_orig/) (main.c, main.h, nios_io.c, nios_io.h, top.v)
+수정본: [`nios_fix/`](nios_fix/) (main.c, main.h, nios_io.c, nios_io.h, fifo_uart_regs.h)
+
+`top.v` 는 UART 핀(`UART1_RX/TX`, `UART2_RX/TX`)을 Platform Designer 의 `altera_avalon_uart`
+에 그대로 연결하고 있으므로, UART 동작은 **Nios II 소프트웨어 + altera_avalon_uart 코어**가 결정합니다.
+
+### 6-1. 송신 지연 원인
+
+| # | 위치 | 내용 |
+|---|------|------|
+| S1 ★ | `nios_io.c` `uart1_string_write()` | 호출할 때마다 `MCU_RX` Low → **20 ms 대기** → 송신 → **3 ms 대기**. 메시지 사이에 최소 23 ms 공백. `ADC_Data_to_MCU_All()` 이 채널별로 여러 번 호출하면 그만큼 곱해짐 (6채널이면 약 140 ms) |
+| S2 | `uart1/2_string_write()` 폴링 루프 | `altera_avalon_uart` 의 TX 버퍼는 **TXDATA 1바이트 + 시프트 레지스터** 뿐. 송신 루프 도중 `timer_1ms_isr`/UART ISR 이 끼어들어 1문자 시간 이상 걸리면 그 시간만큼 바이트 사이에 공백 (보레이트가 높거나 Nios II/e 일수록 잘 보임) |
+| S3 ★ | `uart2_string_write()` (RS485) | 마지막 바이트를 TXDATA 에 쓰고 **TRDY 만 보고** `for(i<3){}`(최적화되면 0클럭) 후 바로 `UART2_DE` Low. TRDY 는 "홀딩 레지스터가 비었다"는 의미라 **마지막 1~2바이트가 아직 송신 중**에 드라이버가 꺼짐 → 상대는 끝 바이트가 깨짐/누락. 그래서 "지연을 넣어야 된다"는 증상으로 보임 |
+
+### 6-2. 수신 시 간격이 필요한 원인
+
+| # | 위치 | 내용 |
+|---|------|------|
+| R1 ★ | `altera_avalon_uart` 코어 | **RX 버퍼가 1바이트(FIFO 없음)**. ISR 이 1문자 시간(115200bps = 86.8 µs) 안에 RXDATA 를 읽지 못하면 다음 바이트가 덮어씀(ROE). HAL 인터럽트 진입 오버헤드 + timer ISR 과 겹치면 발생. 원본 ISR 은 STATUS 의 ROE 를 보지 않아 **조용히 사라짐** |
+| R2 ★ | `uart1_rxd_isr()` ↔ `Mcu_Command_Proc()` | 패킷 버퍼(`UART1_RxBuf`) 하나를 ISR 과 메인루프가 공유. 메인이 패킷을 처리하는 중에 다음 패킷의 STX 가 들어오면 ISR 이 `RxCnt=0`, `RxOK_Flag=0` 으로 만들고 버퍼를 덮어씀 → MCU 가 연속으로 보내면 깨지고, 간격을 주면 정상 |
+| R3 | `main.h` / `main.c` | `volatile` 선언이 주석 처리되어 있음. `TickCnt`, `WaitCnt` 는 main.c 에서 일반 변수로 정의, nios_io.c 에서는 `extern volatile` 로 선언(불일치). 최적화(-O1 이상)에서 ISR 이 바꾼 값을 못 볼 수 있음 |
+| R4 | `uart1_rxd_isr()` | `UART1_RxCnt > RXBUFSIZE` 검사가 쓰기 **후**, 그리고 `>` 라서 `RxBuf[100]`, `RxBuf[101]`… 계속 씀 → '\n' 없는 쓰레기가 들어오면 인접 전역변수 오염 |
+| R5 | `uart2` RS485 | 트랜시버 /RE 가 항상 Low 면 송신 중 자기 에코가 UART2 RX 로 들어와 STX 로 오인 |
+
+### 6-3. 수정 1 — 소프트웨어만 수정 (`nios_fix/`, 하드웨어 변경 없음)
+
+| 파일 | 수정 내용 |
+|------|-----------|
+| `nios_io.c` | UART ISR 을 이곳으로 이동. **ISR 은 RXDATA 를 읽어 512바이트 링버퍼에 넣기만** 함 (최소 실행시간 → R1 완화). STATUS 의 ROE/FE/PE/BRK 확인 후 클리어, 횟수를 `Uart1_Ring.hw_error` 에 기록 |
+| `nios_io.c` | `Uart_Rx_Poll()` 추가: 메인루프에서 링버퍼를 읽어 패킷 조립. 원본과 같은 프로토콜/플래그(`UART1_RxOK_Flag`, `UART1_RxBuf` …)를 쓰므로 **pc_cmd.c 수정 불필요**. 패킷 1개 완성 시 리턴하고 나머지는 링버퍼에 남김 → 처리 중 덮어쓰기 없음 (R2), 버퍼 경계 검사 (R4) |
+| `nios_io.c` | `uart1/2_string_write()`: 마지막 바이트 후 **TMT(송신 완료)** 까지 기다린 뒤 DE/MCU_RX 해제 (S3). 빈 for 루프 제거. 20 ms/3 ms 대기는 `nios_io.h` 의 `UART1_PRE_DELAY_MS`, `UART1_POST_DELAY_MS` 로 분리 (S1) |
+| `nios_io.c` | RS485 송신 중 UART2 수신 바이트 버림 (`UART2_DISCARD_ECHO`, R5) |
+| `main.c` | ISR 제거 → `Uart_Init()` 호출, 메인루프 맨 앞에 `Uart_Rx_Poll()` 추가. `TickCnt`, `WaitCnt` 를 `volatile` 로 정의. ISR 시그니처를 `void isr(void *context)` 로 정리 |
+| `main.h` | `extern volatile unsigned long TickCnt, WaitCnt;` (R3) |
+
+적용 방법: `nios_fix/` 의 5개 파일을 Eclipse 프로젝트에 덮어쓰고 빌드.
+
+> **반드시 확인/조정할 것**
+> - `UART1_PRE_DELAY_MS`(20)/`UART1_POST_DELAY_MS`(3) 는 MCU 측 핸드셰이크 요구사항에 맞춰 줄이세요.
+>   메시지 간 지연의 대부분이 이 값입니다. 또 `ADC_Data_to_MCU_All()` 에서 채널마다
+>   `uart1_string_write()` 를 부르고 있다면, **한 버퍼에 모아 한 번만 호출**하면 23 ms × N 이 23 ms 로 줄어듭니다.
+> - 디버깅 시 `Uart1_Ring.hw_error` 가 증가하면 R1(하드웨어 overrun)이 여전히 발생 중인 것 →
+>   아래 수정 2 (FIFO UART) 적용.
+
+### 6-4. 수정 2 — 하드웨어: altera_avalon_uart → FIFO UART 교체 (근본 해결)
+
+`altera_avalon_uart` 는 RX 1바이트 버퍼라 ISR 지연이 1문자 시간을 넘으면 데이터 손실을
+피할 수 없습니다. `rtl/fifo_uart_avalon.v` 는 위 1~3절의 수신기/송신기에 **RX/TX 256바이트 FIFO** 를
+붙인 Avalon-MM 컴포넌트입니다.
+
+1. `rtl/fifo_uart_avalon.v`, `uart_rx.v`, `uart_tx.v`, `uart_fifo.v`, `fifo_uart_hw.tcl` 을
+   Quartus 프로젝트 폴더(또는 `ip/fifo_uart/`)에 복사
+2. Platform Designer 에서 `uart1` 의 Base 주소와 IRQ 번호를 메모 후 삭제 →
+   IP Catalog *Interface Protocols > Serial > FIFO UART (8N1)* 추가, **이름을 `uart1`** 로,
+   BAUD 설정, clock/reset/`s1`(Nios data_master)/`irq` 연결, Base·IRQ 를 원래 값으로
+3. `external_connection` 을 Export 하고 이름을 `uart1_external_connection` 으로 →
+   포트 이름이 기존과 같아 **top.v 수정 불필요** (`uart1_external_connection_rxd/txd`)
+4. `uart2` 도 같은 방법으로 교체 (선택)
+5. Generate HDL → Quartus 컴파일 → BSP Generate → `nios_io.h` 에서 `#define USE_FIFO_UART 1`
+
+| 항목 | altera_avalon_uart | FIFO UART |
+|------|-------------------|-----------|
+| RX 버퍼 | 1 바이트 | 256 바이트 (ISR 이 256문자 시간까지 늦어도 손실 없음) |
+| TX 버퍼 | 1 바이트 + 시프트 | 256 바이트 (CPU 가 한 번에 쓰고 다른 일 가능, 바이트 간 간격 0) |
+| RX 판정 | 비트 중앙 1회 샘플 | 16x 오버샘플 + 3샘플 다수결, STOP 중앙 복귀 |
+| 에러 | ROE/FE/PE (ISR 이 직접 확인) | RX_OVF / RX_FERR sticky 비트 |
+
+시뮬레이션 (`sim/tb_fifo_uart_avalon.v`, 921600bps 루프백): CPU 가 64바이트를 한 번에 TX FIFO 에 쓰고,
+**전송이 모두 끝난 뒤에야** RX 를 읽어도 64바이트 전부 정상 수신, overrun 0 — **PASS**.
+(altera_avalon_uart 였다면 마지막 1바이트만 남고 63바이트 손실)
+
+> 실제 보드/Quartus 에서의 컴파일·동작은 아직 확인하지 않았습니다. `fifo_uart_hw.tcl` 로드나
+> 타이밍에서 문제가 생기면 메시지를 알려주세요.
