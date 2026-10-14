@@ -2,6 +2,9 @@
 
 > **다른 프로젝트**: ESP32-C3(ESP-AT) Wi-Fi AP / TCP 서버 접속 + 자동 재접속 (STM32L562CET6, 폴링 방식)
 > → [`STM32L562_ESP32C3_WiFi/`](STM32L562_ESP32C3_WiFi/README.md)
+>
+> **FPGA**: Cyclone IV UART 바이트 간 지연(송신)/간격 필요(수신) 원인과 해결 RTL
+> → [`FPGA_UART_Cyclone4/`](FPGA_UART_Cyclone4/README.md)
 
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
 스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
