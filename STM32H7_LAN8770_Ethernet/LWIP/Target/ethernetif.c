@@ -112,6 +112,22 @@ static uint32_t phy_retry_tick;   /* 실패 시 재시도 타이머   */
 static void pbuf_free_custom(struct pbuf *p);
 
 /* ---------------------------------------------------------------------------
+ *  확장 훅 (veh_vlan.c 가 강한 심볼로 대체. 없으면 아래 기본 동작)
+ * ------------------------------------------------------------------------ */
+/* 수신 프레임을 lwIP 로 넘기기 전에 호출. 0 이면 버림 */
+__weak uint8_t ethernetif_rx_hook(struct pbuf *p)
+{
+  LWIP_UNUSED_ARG(p);
+  return 1U;
+}
+
+/* HAL_ETH_Init 직후 호출 (MAC 필터 등 추가 설정) */
+__weak void ethernetif_post_init_hook(ETH_HandleTypeDef *ethHandle)
+{
+  LWIP_UNUSED_ARG(ethHandle);
+}
+
+/* ---------------------------------------------------------------------------
  *  PHY 하드웨어 리셋 (main.h 에 PHY_RST_Pin 이 있을 때만)
  * ------------------------------------------------------------------------ */
 static void phy_hw_reset(void)
@@ -162,11 +178,15 @@ static void low_level_init(struct netif *netif)
   {
     Error_Handler();
   }
+  ethernetif_post_init_hook(&heth);
 
   netif->hwaddr_len = ETH_HWADDR_LEN;
   memcpy(netif->hwaddr, macaddress, ETH_HWADDR_LEN);
   netif->mtu   = ETH_MAX_PAYLOAD;
   netif->flags |= NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP;
+#if LWIP_IGMP
+  netif->flags |= NETIF_FLAG_IGMP;   /* SOME/IP-SD 멀티캐스트 그룹 가입 */
+#endif
 
   LWIP_MEMPOOL_INIT(RX_POOL);
 
@@ -252,7 +272,11 @@ void ethernetif_input(struct netif *netif)
     p = low_level_input(netif);
     if (p != NULL)
     {
-      if (netif->input(p, netif) != ERR_OK)
+      if (!ethernetif_rx_hook(p))
+      {
+        pbuf_free(p);
+      }
+      else if (netif->input(p, netif) != ERR_OK)
       {
         pbuf_free(p);
       }

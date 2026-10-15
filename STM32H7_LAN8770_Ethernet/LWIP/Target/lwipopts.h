@@ -93,7 +93,19 @@
 #define CHECKSUM_CHECK_ICMP6 0
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
-
+/* ---- 차량 이더넷 확장 (Core/Inc/vehicle_net_conf.h 참고) ---- */
+/* VLAN : 항상 컴파일, 실제 태그 사용 여부는 APP_VLAN_ENABLE (veh_vlan.c) */
+#define ETHARP_SUPPORT_VLAN     1
+#define LWIP_HOOK_FILENAME      "lwip_hooks.h"
+#define LWIP_HOOK_VLAN_SET(netif, p, src, dst, eth_type)  veh_vlan_set_hook(netif, p, src, dst, eth_type)
+#define LWIP_HOOK_VLAN_CHECK(netif, eth_hdr, vlan_hdr)    veh_vlan_check_hook(netif, eth_hdr, vlan_hdr)
+/* SOME/IP-SD 멀티캐스트 : IGMP 가입 여부 (0 이면 lwIP 가 모든 멀티캐스트를 받음) */
+#include "vehicle_net_conf.h"
+#define LWIP_IGMP               APP_SOMEIP_IGMP_JOIN
+/* UDP : 에코 + SOME/IP-SD + SOME/IP 추가 포트 4 + DoIP 2 */
+#define MEMP_NUM_UDP_PCB        10
+/* DoIP TCP 연결 */
+#define MEMP_NUM_TCP_PCB        4
 /* USER CODE END 1 */
 
 #ifdef __cplusplus

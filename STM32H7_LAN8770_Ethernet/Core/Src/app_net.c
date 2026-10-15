@@ -12,6 +12,8 @@
 #include "app_net.h"
 #include "lan8770_conf.h"
 #include "ethernetif.h"
+#include "veh_vlan.h"
+#include "app_someip.h"
 #include "lwip/netif.h"
 #include "lwip/udp.h"
 #include "lwip/ip_addr.h"
@@ -104,6 +106,9 @@ static void print_status(void)
  * ------------------------------------------------------------------------ */
 void APP_Net_Init(void)
 {
+  veh_vlan_init();
+  APP_SOMEIP_Init();
+
   LOG("\r\n=== STM32H7 + LAN8770 (100BASE-T1) ===\r\n");
 
   if (ethernetif_phy_ready())
@@ -129,6 +134,9 @@ void APP_Net_Init(void)
 void APP_Net_Process(void)
 {
   uint8_t link = netif_is_link_up(&gnetif) ? 1U : 0U;
+
+  veh_netmon_process();
+  APP_SOMEIP_Process();
 
   /* 링크 변화는 즉시 출력 */
   if (link != last_link)

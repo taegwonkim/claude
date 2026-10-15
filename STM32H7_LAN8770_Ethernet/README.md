@@ -112,6 +112,7 @@ STM32H7_LAN8770_Ethernet/
 │   │         lan8770_conf.h ← 사용자 설정      app_net.h
 │   ├── Src/  main.c  stm32h7xx_it.c  stm32h7xx_hal_msp.c  system_stm32h7xx.c
 │   │         syscalls.c  sysmem.c   app_net.c ← UDP 에코 + 상태 로그
+│         veh_vlan.c veh_frame.c  someip.c app_someip.c  veh_log.c ← 차량 이더넷 (6-1)
 │   └── Startup/startup_stm32h743zitx.s
 ├── LWIP/
 │   ├── App/     lwip.c  lwip.h                MX_LWIP_Init / MX_LWIP_Process
@@ -215,6 +216,44 @@ LAN8770_Init(obj, addr, role)
 
 초기화 값은 Microchip 이 LAN87xx 용으로 공개한 값입니다(Linux `drivers/net/phy/microchip_t1.c` 에도 같은 값이 있음).
 **양산 전에는 사용하는 칩 리비전의 데이터시트와 에라타로 확인하세요.**
+
+---
+
+## 6-1. 차량 이더넷 기능 (VLAN / 네트워크 모니터 / SOME/IP)
+
+설정은 모두 `Core/Inc/vehicle_net_conf.h` 에 있습니다. **기본값은 수신 전용**이라 차량 쪽으로 아무것도 보내지 않습니다
+(ARP/ICMP 응답 등 lwIP 기본 동작 제외).
+
+| 모듈 | 파일 | 기능 | 기본값 |
+|------|------|------|--------|
+| 네트워크 모니터 | `veh_vlan.c`, `veh_frame.c` | 받은 프레임의 **VLAN ID / EtherType / 송신자 MAC** 을 집계해 10초마다 출력. ECU 를 모를 때 첫 단계 | ON |
+| VLAN (802.1Q) | `veh_vlan.c`, `LWIP/Target/lwip_hooks.h` | 송신 태그 추가(VID, PCP), 수신 VLAN 필터, 태그 없는 프레임 허용 여부 | OFF |
+| SOME/IP | `someip.c`, `app_someip.c` | UDP 30490(SD) + 추가 포트 수신, 헤더 해석·로그, (서비스, 메서드/이벤트)별 집계 | ON |
+| SOME/IP-SD | `someip.c`, `app_someip.c` | Offer/StopOffer/Find/Subscribe 해석, **발견한 서비스 테이블**(ID, 인스턴스, 버전, endpoint, TTL 만료) | ON |
+| FindService 송신 | `app_someip.c` | 모든 서비스에 FindService 멀티캐스트 (⚠ 송신) | OFF |
+
+### 권장 사용 순서 (ECU 를 모를 때)
+1. 기본값 그대로 연결 → `[MON ]` 로그로 어떤 **VLAN ID** 와 EtherType 이 흐르는지 확인
+2. `APP_VLAN_ENABLE 1`, `APP_VLAN_ID` 를 그 값으로, IP 를 해당 서브넷으로 맞춤
+3. `[SD  ]` 로그의 서비스 테이블로 어떤 서비스가 Offer 되는지 확인 → endpoint 포트를 `APP_SOMEIP_EXTRA_PORTS` 에 넣어 이벤트 수신
+4. Offer 가 안 보이면 SD 멀티캐스트 주소/포트(OEM 별)를 확인. 벤치에서만 `APP_SOMEIP_SEND_FIND 1` 시도
+
+### 로그 예시
+```
+[MON ] frames=1532 tagged=1490 vlan_drop=1490 untag_drop=0
+[MON ]   VID    2  : 1210
+[MON ]   type 0x0800 IPv4       : 1490
+[SD  ] NEW service:
+[SD  ]   0x1001/0x0002 v1.3  UDP 10.0.0.5:30501  from 10.0.0.5  ttl 5s  offers 1  age 0.0s
+[SOME] 10.0.0.5:30501 svc 0x1001 evt 0x8001 len 8 cli 0x0000 ses 0x0012 NOTIFICATION E_OK if1 | 00 3C 01 ..
+```
+(값은 예시입니다.)
+
+### 구현 메모
+- VLAN 은 lwIP 훅(`LWIP_HOOK_VLAN_SET/CHECK`)으로 소프트웨어 태그를 붙이고 뗍니다. 훅 매크로는 `lwipopts.h` USER CODE 1 에 있습니다
+- SOME/IP-SD 멀티캐스트는 `APP_SOMEIP_IGMP_JOIN 0`(기본)일 때 IGMP 리포트를 보내지 않고 MAC 의 PassAllMulticast 로 받습니다
+- 로그는 초당 `APP_LOG_LINES_PER_SEC` 줄로 제한해 트래픽이 많아도 UART 때문에 멈추지 않습니다
+- 파서 단위 시험 : `make -C tests` (PC gcc, ASan/UBSan)
 
 ---
 
