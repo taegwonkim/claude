@@ -75,6 +75,12 @@ static void print_status(void)
   uint8_t sqi = 0;
   uint8_t link = netif_is_link_up(&gnetif) ? 1U : 0U;
 
+#if defined(LED_YELLOW_Pin) && defined(LED_YELLOW_GPIO_Port)
+  /* 노란 LED : PHY 를 MDIO 로 찾지 못함 */
+  HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin,
+                    ethernetif_phy_ready() ? GPIO_PIN_RESET : GPIO_PIN_SET);
+#endif
+
   if (!ethernetif_phy_ready())
   {
     LOG("[PHY] LAN8770 not found on MDIO (check power / MDC / MDIO / REF_CLK)\r\n");

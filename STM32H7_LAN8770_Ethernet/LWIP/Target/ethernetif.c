@@ -3,8 +3,9 @@
   * @file    ethernetif.c
   * @brief   lwIP <-> STM32H7 ETH(RMII) <-> Microchip LAN8770 (100BASE-T1)
   ******************************************************************************
-  * CubeMX 가 만든 LWIP/Target/ethernetif.c 를 이 파일로 교체합니다.
-  * (CubeMX 의 LAN8742 전용 코드를 LAN8770 으로 바꾼 버전, NO_SYS = 1 기준)
+  * CubeMX 의 LAN8742 용 ethernetif.c 를 LAN8770 용으로 바꾼 파일입니다 (NO_SYS = 1).
+  * ⚠ CubeMX 에서 코드를 다시 생성하면 이 파일이 LAN8742 버전으로 덮어써집니다.
+  *   재생성 후에는  git checkout -- LWIP/Target/ethernetif.c  로 되돌리세요.
   *
   * - Rx : zero-copy. lwIP 메모리 풀(RX_POOL)의 버퍼를 ETH DMA 에 직접 줍니다.
   * - Tx : HAL_ETH_Transmit() 블로킹 전송 (전송 완료까지 대기)
@@ -67,8 +68,8 @@ ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT];
 #pragma location=0x30000080
 ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT];
 #else /* GCC (STM32CubeIDE) */
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDescripSection")));
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDescripSection")));
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDecripSection")));
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecripSection")));
 #endif
 
 LWIP_MEMPOOL_DECLARE(RX_POOL, ETH_RX_BUFFER_CNT, sizeof(RxBuff_t), "Zero-copy RX PBUF pool");
@@ -315,11 +316,8 @@ u32_t sys_jiffies(void)
    RMII_CRS_DV  ----> PA7        RMII_TX_EN ----> PG11
    RMII_RXD0    ----> PC4        RMII_MDC   ----> PC1
    RMII_RXD1    ----> PC5
-
-   CubeMX 가 stm32h7xx_hal_msp.c 에 HAL_ETH_MspInit 을 만들었다면 그쪽이
-   우선합니다(여기는 __weak). 핀을 바꿨다면 CubeMX 쪽 또는 아래를 수정하세요.
 */
-__weak void HAL_ETH_MspInit(ETH_HandleTypeDef *ethHandle)
+void HAL_ETH_MspInit(ETH_HandleTypeDef *ethHandle)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
@@ -353,6 +351,23 @@ __weak void HAL_ETH_MspInit(ETH_HandleTypeDef *ethHandle)
 
   GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_13;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+}
+
+void HAL_ETH_MspDeInit(ETH_HandleTypeDef *ethHandle)
+{
+  if (ethHandle->Instance != ETH)
+  {
+    return;
+  }
+
+  __HAL_RCC_ETH1MAC_CLK_DISABLE();
+  __HAL_RCC_ETH1TX_CLK_DISABLE();
+  __HAL_RCC_ETH1RX_CLK_DISABLE();
+
+  HAL_GPIO_DeInit(GPIOA, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_7);
+  HAL_GPIO_DeInit(GPIOB, GPIO_PIN_13);
+  HAL_GPIO_DeInit(GPIOC, GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5);
+  HAL_GPIO_DeInit(GPIOG, GPIO_PIN_11 | GPIO_PIN_13);
 }
 
 /*******************************************************************************
