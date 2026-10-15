@@ -3,6 +3,7 @@
 #include <string.h>
 #include "veh_frame.h"
 #include "someip.h"
+#include "veh_ecu.h"
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -65,10 +66,89 @@ static void test_someip(void)
   }
 }
 
+static void test_ipv4(void)
+{
+  /* IPv4 + UDP 10.0.0.5:30501 -> 10.0.0.9:30502 */
+  uint8_t ip[28] = { 0x45,0,0,28, 0,0,0x40,0, 64,17,0,0, 10,0,0,5, 10,0,0,9,
+                     0x77,0x25, 0x77,0x26, 0,8,0,0 };
+  veh_ipv4_info_t ii;
+
+  CHECK(veh_ipv4_parse(ip, sizeof(ip), &ii) == 0 && ii.src == 0x0A000005 && ii.dst == 0x0A000009);
+  CHECK(ii.proto == 17 && ii.has_ports && ii.sport == 30501 && ii.dport == 30502 && ii.total_len == 28);
+  ip[6] = 0x00; ip[7] = 0x10;                     /* 두 번째 조각 : 포트 없음 */
+  CHECK(veh_ipv4_parse(ip, sizeof(ip), &ii) == 0 && !ii.has_ports);
+  ip[0] = 0x65; CHECK(veh_ipv4_parse(ip, sizeof(ip), &ii) == -1);   /* IPv6 아님 */
+  CHECK(veh_ipv4_parse(ip, 10, &ii) == -1);
+}
+
+static void test_ecu(void)
+{
+  veh_frame_info_t fi;
+  veh_ipv4_info_t  ii;
+  const veh_ecu_t *e;
+  uint8_t pl[4] = { 1, 2, 3, 4 };
+  uint32_t t, i;
+
+  veh_ecu_reset();
+  memset(&fi, 0, sizeof(fi));
+  memset(&ii, 0, sizeof(ii));
+  fi.src[0] = 0x02; fi.src[5] = 0x01; fi.vid = 2; fi.ethertype = 0x0800;
+  ii.src = 0x0A000005; ii.proto = 17; ii.has_ports = 1; ii.sport = 30501; ii.dport = 30501; ii.total_len = 100;
+
+  /* 10 ms 주기 이벤트 100 개 (±200 us 흔들림) */
+  for (i = 0, t = 1000000U; i < 100U; i++)
+  {
+    uint32_t jit = (i % 3U == 0U) ? 200U : ((i % 3U == 1U) ? 0U : (uint32_t)-200);
+    t += 10000U + jit;
+    veh_ecu_on_frame(&fi, &ii, t);
+    veh_ecu_on_someip(ii.src, 0x1001, 0x8001, SOMEIP_MT_NOTIFICATION, pl, sizeof(pl), t);
+  }
+  veh_ecu_on_offer(ii.src, 0x1001, 0x0002, 1, t);
+  veh_ecu_on_offer(ii.src, 0x1001, 0x0002, 1, t);   /* 중복은 1 개로 */
+
+  CHECK(veh_ecu_count() == 1);
+  e = veh_ecu_find(0x0A000005);
+  CHECK(e != NULL && e->packets == 100 && e->bytes == 10000 && e->vid == 2 && !e->mac_changed);
+  CHECK(e->num_offers == 1 && e->offers[0].instance_id == 2);
+  CHECK(e->flows[0].iv.count == 100 && e->flows[1].iv.count == 0);
+  CHECK(e->events[0].iv.count == 100 && e->events[0].last_len == 4 && e->events[0].last_payload[3] == 4);
+  CHECK(e->events[0].iv.avg_us > 9700 && e->events[0].iv.avg_us < 10300);
+  CHECK(e->events[0].iv.min_us == 9800 && e->events[0].iv.max_us == 10200);
+
+  /* 같은 IP 가 다른 MAC 으로 (게이트웨이 경유) */
+  fi.src[5] = 0x99;
+  veh_ecu_on_frame(&fi, &ii, t + 10000U);
+  CHECK(veh_ecu_find(0x0A000005)->mac_changed == 1);
+
+  /* 다른 IP, 흐름 테이블 넘침 */
+  ii.src = 0x0A000006;
+  for (i = 0; i < APP_ECU_MAX_FLOWS + 3U; i++)
+  {
+    ii.dport = (uint16_t)(40000U + i);
+    veh_ecu_on_frame(&fi, &ii, t + i);
+  }
+  e = veh_ecu_find(0x0A000006);
+  CHECK(veh_ecu_count() == 2 && e != NULL && e->flow_overflow == 3);
+
+  /* ECU 테이블 넘침 */
+  for (i = 0; i < APP_ECU_MAX + 2U; i++)
+  {
+    ii.src = 0xC0A80000U + i;
+    veh_ecu_on_frame(&fi, &ii, t);
+  }
+  CHECK(veh_ecu_count() == APP_ECU_MAX && veh_ecu_dropped() == 4);
+
+  /* 출력 함수가 죽지 않는지 */
+  CHECK(veh_ecu_print_next(t + 20000U, 5000000U) == 1);
+  veh_ecu_print_summary(t + 20000U, 5000000U);
+}
+
 int main(void)
 {
   test_frame();
   test_someip();
+  test_ipv4();
+  test_ecu();
   printf(fails ? "%d FAILED\n" : "all tests passed\n", fails);
   return fails != 0;
 }

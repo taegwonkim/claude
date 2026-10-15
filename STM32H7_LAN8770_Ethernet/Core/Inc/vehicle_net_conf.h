@@ -59,6 +59,22 @@
 #define APP_SOMEIP_CLIENT_ID        0x0000U
 
 /* ===========================================================================
+ *  4. ECU 테이블 (송신자 IP 별로 MAC / VLAN / 흐름 / SOME/IP 이벤트 / 주기 집계)
+ * ======================================================================== */
+#define APP_ECU_TABLE_ENABLE        1U
+#define APP_ECU_MAX                 16U     /* 기록할 ECU(송신 IP) 수            */
+#define APP_ECU_MAX_FLOWS           8U      /* ECU 당 (프로토콜, 포트) 흐름 수    */
+#define APP_ECU_MAX_EVENTS          16U     /* ECU 당 SOME/IP (서비스, 이벤트) 수 */
+#define APP_ECU_MAX_OFFERS          8U      /* ECU 당 SD Offer 서비스 수          */
+#define APP_ECU_PAYLOAD_BYTES       8U      /* 이벤트별로 저장할 마지막 payload   */
+/* 1 초에 ECU 하나씩 돌아가며 출력 (UART 가 막히지 않도록) */
+#define APP_ECU_PRINT_INTERVAL_MS   1000U
+/* 전체 ECU 한 줄 요약 주기 */
+#define APP_ECU_SUMMARY_PERIOD_MS   30000U
+/* 이 시간 동안 아무것도 안 보낸 ECU 는 출력에서 (idle) 표시 */
+#define APP_ECU_IDLE_MS             5000U
+
+/* ===========================================================================
  *  로그
  * ======================================================================== */
 /* 초당 출력할 수 있는 로그 줄 수 (UART 115200 이 막히지 않도록) */

@@ -15,6 +15,7 @@
 #include "vehicle_net_conf.h"
 #include "lwip_hooks.h"
 #include "ethernetif.h"
+#include "veh_ecu.h"
 #include "lwip/pbuf.h"
 #include "lwip/prot/ethernet.h"
 #include <string.h>
@@ -145,6 +146,19 @@ uint8_t ethernetif_rx_hook(struct pbuf *p)
   kv_add(vlans, APP_NETMON_MAX_VLANS, fi.vid, &vlan_overflow);
   kv_add(etypes, APP_NETMON_MAX_ETHERTYPES, fi.ethertype, &etype_overflow);
   mac_add(fi.src, fi.vid);
+#endif
+
+#if APP_ECU_TABLE_ENABLE
+  if ((fi.ethertype == VEH_ETHTYPE_IPV4) && (p->len > fi.header_len))
+  {
+    veh_ipv4_info_t ip;
+
+    if (veh_ipv4_parse((const uint8_t *)p->payload + fi.header_len,
+                       (uint32_t)p->len - fi.header_len, &ip) == 0)
+    {
+      veh_ecu_on_frame(&fi, &ip, veh_time_us());
+    }
+  }
 #endif
 
 #if APP_VLAN_ENABLE && !APP_VLAN_ACCEPT_UNTAGGED

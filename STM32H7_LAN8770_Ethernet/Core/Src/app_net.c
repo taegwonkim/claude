@@ -14,6 +14,9 @@
 #include "ethernetif.h"
 #include "veh_vlan.h"
 #include "app_someip.h"
+#include "veh_ecu.h"
+#include "veh_log.h"
+#include "vehicle_net_conf.h"
 #include "lwip/netif.h"
 #include "lwip/udp.h"
 #include "lwip/ip_addr.h"
@@ -106,6 +109,7 @@ static void print_status(void)
  * ------------------------------------------------------------------------ */
 void APP_Net_Init(void)
 {
+  veh_time_init();
   veh_vlan_init();
   APP_SOMEIP_Init();
 
@@ -135,8 +139,29 @@ void APP_Net_Process(void)
 {
   uint8_t link = netif_is_link_up(&gnetif) ? 1U : 0U;
 
+  uint32_t now_us = veh_time_us();   /* DWT 누적을 위해 매 루프 호출 */
+
   veh_netmon_process();
   APP_SOMEIP_Process();
+
+#if APP_ECU_TABLE_ENABLE
+  {
+    static uint32_t ecu_tick, sum_tick;
+
+    if ((HAL_GetTick() - ecu_tick) >= APP_ECU_PRINT_INTERVAL_MS)
+    {
+      ecu_tick = HAL_GetTick();
+      (void)veh_ecu_print_next(now_us, APP_ECU_IDLE_MS * 1000U);
+    }
+    if ((HAL_GetTick() - sum_tick) >= APP_ECU_SUMMARY_PERIOD_MS)
+    {
+      sum_tick = HAL_GetTick();
+      veh_ecu_print_summary(now_us, APP_ECU_IDLE_MS * 1000U);
+    }
+  }
+#else
+  (void)now_us;
+#endif
 
   /* 링크 변화는 즉시 출력 */
   if (link != last_link)

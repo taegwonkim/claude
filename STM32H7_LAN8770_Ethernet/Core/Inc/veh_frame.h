@@ -34,6 +34,22 @@ typedef struct
   uint16_t header_len;   /* 14 (태그 없음) / 18 (태그 1개)           */
 } veh_frame_info_t;
 
+typedef struct
+{
+  uint32_t src;          /* 네트워크 바이트 순서가 아닌 값 (a.b.c.d → 0xaabbccdd) */
+  uint32_t dst;
+  uint8_t  proto;        /* 6 TCP, 17 UDP, 1 ICMP ...                   */
+  uint8_t  has_ports;    /* UDP/TCP 이고 첫 조각일 때 1                 */
+  uint16_t sport;
+  uint16_t dport;
+  uint16_t total_len;    /* IPv4 total length                          */
+} veh_ipv4_info_t;
+
+#define VEH_IPPROTO_ICMP      1U
+#define VEH_IPPROTO_IGMP      2U
+#define VEH_IPPROTO_TCP       6U
+#define VEH_IPPROTO_UDP       17U
+
 /* 0 = 성공, -1 = 너무 짧음 */
 int veh_frame_parse(const uint8_t *frame, uint32_t len, veh_frame_info_t *out);
 
@@ -41,5 +57,10 @@ int veh_frame_parse(const uint8_t *frame, uint32_t len, veh_frame_info_t *out);
 uint16_t veh_vlan_tci(uint8_t pcp, uint16_t vid);
 
 const char *veh_ethertype_name(uint16_t ethertype);
+
+/* IPv4 헤더(+UDP/TCP 포트) 해석. l3 = 이더넷 헤더 뒤. 0 = 성공, -1 = IPv4 아님/짧음 */
+int veh_ipv4_parse(const uint8_t *l3, uint32_t len, veh_ipv4_info_t *out);
+
+const char *veh_ipproto_name(uint8_t proto);
 
 #endif /* VEH_FRAME_H */

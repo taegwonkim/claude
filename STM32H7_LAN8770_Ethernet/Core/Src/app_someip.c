@@ -15,6 +15,7 @@
 #include "app_someip.h"
 #include "someip.h"
 #include "veh_log.h"
+#include "veh_ecu.h"
 #include "vehicle_net_conf.h"
 #include "lwip/udp.h"
 #include "lwip/ip_addr.h"
@@ -213,6 +214,14 @@ static void handle_sd(const someip_msg_t *m, const ip_addr_t *from, u16_t port)
     {
       svc_entry_t *s = svc_find(e.service_id, e.instance_id);
 
+#if APP_ECU_TABLE_ENABLE
+      if (e.ttl != 0U)
+      {
+        veh_ecu_on_offer(lwip_ntohl(ip4_addr_get_u32(ip_2_ip4(from))), e.service_id,
+                         e.instance_id, e.major_version, veh_time_us());
+      }
+#endif
+
       if (e.ttl == 0U)
       {
         if (s != NULL)
@@ -352,6 +361,10 @@ static void someip_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
       break;
     }
     cnt.rx_messages++;
+#if APP_ECU_TABLE_ENABLE
+    veh_ecu_on_someip(lwip_ntohl(ip4_addr_get_u32(ip_2_ip4(addr))), m.service_id, m.method_id,
+                      m.message_type, m.payload, m.payload_len, veh_time_us());
+#endif
 
     if (someip_is_sd(&m))
     {

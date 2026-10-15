@@ -112,7 +112,7 @@ STM32H7_LAN8770_Ethernet/
 │   │         lan8770_conf.h ← 사용자 설정      app_net.h
 │   ├── Src/  main.c  stm32h7xx_it.c  stm32h7xx_hal_msp.c  system_stm32h7xx.c
 │   │         syscalls.c  sysmem.c   app_net.c ← UDP 에코 + 상태 로그
-│         veh_vlan.c veh_frame.c  someip.c app_someip.c  veh_log.c ← 차량 이더넷 (6-1)
+│         veh_vlan.c veh_frame.c  someip.c app_someip.c  veh_ecu.c veh_log.c ← 차량 이더넷 (6-1)
 │   └── Startup/startup_stm32h743zitx.s
 ├── LWIP/
 │   ├── App/     lwip.c  lwip.h                MX_LWIP_Init / MX_LWIP_Process
@@ -219,7 +219,7 @@ LAN8770_Init(obj, addr, role)
 
 ---
 
-## 6-1. 차량 이더넷 기능 (VLAN / 네트워크 모니터 / SOME/IP)
+## 6-1. 차량 이더넷 기능 (VLAN / 네트워크 모니터 / SOME/IP / ECU 테이블)
 
 설정은 모두 `Core/Inc/vehicle_net_conf.h` 에 있습니다. **기본값은 수신 전용**이라 차량 쪽으로 아무것도 보내지 않습니다
 (ARP/ICMP 응답 등 lwIP 기본 동작 제외).
@@ -231,6 +231,7 @@ LAN8770_Init(obj, addr, role)
 | SOME/IP | `someip.c`, `app_someip.c` | UDP 30490(SD) + 추가 포트 수신, 헤더 해석·로그, (서비스, 메서드/이벤트)별 집계 | ON |
 | SOME/IP-SD | `someip.c`, `app_someip.c` | Offer/StopOffer/Find/Subscribe 해석, **발견한 서비스 테이블**(ID, 인스턴스, 버전, endpoint, TTL 만료) | ON |
 | FindService 송신 | `app_someip.c` | 모든 서비스에 FindService 멀티캐스트 (⚠ 송신) | OFF |
+| **ECU 테이블** | `veh_ecu.c` | 송신자 **IP 별로** MAC / VLAN / 흐름(프로토콜·포트) / SOME/IP 이벤트 / **송신 주기** / 마지막 payload / Offer 서비스를 묶어 표시 | ON |
 
 ### 권장 사용 순서 (ECU 를 모를 때)
 1. 기본값 그대로 연결 → `[MON ]` 로그로 어떤 **VLAN ID** 와 EtherType 이 흐르는지 확인
@@ -248,6 +249,31 @@ LAN8770_Init(obj, addr, role)
 [SOME] 10.0.0.5:30501 svc 0x1001 evt 0x8001 len 8 cli 0x0000 ses 0x0012 NOTIFICATION E_OK if1 | 00 3C 01 ..
 ```
 (값은 예시입니다.)
+
+### ECU 별 데이터 구분 (ECU 테이블)
+
+수신되는 모든 IPv4 프레임과 SOME/IP 메시지를 **송신자 IP** 기준으로 묶습니다.
+lwIP 가 열지 않은 포트로 가는 트래픽도 프레임 단계에서 집계하므로 빠지지 않습니다.
+
+```
+[ECU ] NEW 10.0.0.5  mac 02:1A:2B:3C:4D:01  VID 2
+[ECU ] 10.0.0.5  mac 02:1A:2B:3C:4D:01  VID 2  pkts 5321  bytes 532100  last 0.0s ago
+[ECU ]    offers 0x1001/0x0002 v1
+[ECU ]    flow UDP  30501->30501 count 5321  period 10.0ms (9.8ms..10.2ms)
+[ECU ]    evt 0x1001/0x8001 NOTIFICATION count 5321  period 10.0ms (9.8ms..10.2ms)  len 8 | 00 3C 01 ..
+[ECU ] 3 ECU(s)
+[ECU ]   10.0.0.5  02:1A:2B:3C:4D:01  VID 2  pkts 5321  flows 1  events 1  offers 1
+```
+(값은 예시입니다. 위 형식은 PC 단위 시험에서 실제로 출력된 것입니다.)
+
+- 자세한 내용은 **1초에 ECU 하나씩** 돌아가며 출력하고, 30초마다 전체 한 줄 요약을 출력합니다 (UART 부하 제한)
+- 주기는 DWT 사이클 카운터로 µs 단위로 재며, 평균(지수 이동 평균)과 최소·최대를 보여줍니다
+- `mac ..(changed)` : 같은 IP 가 다른 MAC 으로 보임 → 게이트웨이를 거쳐 라우팅된 트래픽일 가능성
+- `(idle)` : `APP_ECU_IDLE_MS` 동안 아무것도 보내지 않은 ECU
+- 크기 설정 : `APP_ECU_MAX`(16), `APP_ECU_MAX_FLOWS`(8), `APP_ECU_MAX_EVENTS`(16), `APP_ECU_PAYLOAD_BYTES`(8)
+
+**payload 의미 찾기** : 이벤트의 마지막 payload 를 보면서 (벤치에서) 스위치 조작, 핸들, 문 열기 등을 하면
+어느 바이트가 변하는지 확인할 수 있습니다. 정확한 신호 정의는 OEM 통신 매트릭스(ARXML/FIBEX)가 필요합니다.
 
 ### 구현 메모
 - VLAN 은 lwIP 훅(`LWIP_HOOK_VLAN_SET/CHECK`)으로 소프트웨어 태그를 붙이고 뗍니다. 훅 매크로는 `lwipopts.h` USER CODE 1 에 있습니다
