@@ -102,6 +102,17 @@ static void print_status(void)
   {
     LOG("[NET] link DOWN  (%s) - partner must be the opposite role\r\n", role_str());
   }
+
+  {
+    const ethernetif_stats_t *es = ethernetif_stats();
+
+    LOG("[ETH ] rx %lu tx %lu | lost: no-desc %lu fifo-ovf %lu fifo-miss %lu pool-empty %lu | crc %lu align %lu tx-err %lu%s\r\n",
+        (unsigned long)es->rx_frames, (unsigned long)es->tx_frames,
+        (unsigned long)es->rx_dma_missed, (unsigned long)es->rx_fifo_overflow,
+        (unsigned long)es->rx_fifo_missed, (unsigned long)es->rx_pool_empty,
+        (unsigned long)es->rx_crc_errors, (unsigned long)es->rx_align_errors,
+        (unsigned long)es->tx_errors, es->counter_overflow ? " (hw counter overflowed)" : "");
+  }
 }
 
 /* ---------------------------------------------------------------------------

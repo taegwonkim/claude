@@ -69,6 +69,8 @@ IP 주소는 `LWIP/App/lwip.c` 의 `MX_LWIP_Init()` (기본 **192.168.10.10/24**
 | RMII TXD0 / TXD1 | **PG13 / PB13** | |
 | PHY nRESET | **PG0** (`PHY_RST`) | 부팅 시 10 ms Low 펄스 후 High |
 | UART 로그 | PD8 (TX) / PD9 (RX) | ST-LINK 가상 COM 으로 연결됨 (배선 불필요) |
+| **PC 링크 FDCAN1** | **PD0 (RX) / PD1 (TX)** | CAN FD 트랜시버 경유 → PC CAN FD 어댑터 (6-3절) |
+| HSE 클럭 | PH0 | ST-LINK MCO 8 MHz (보드 기본). CAN 정확도를 위해 HSI 대신 사용 |
 | LED | PB0 초록 / PE1 노랑 / PB14 빨강 | 보드 LD1 / LD2 / LD3 |
 | GND / 전원 | | GND 는 여러 가닥. EVB 전원 레일은 EVB 사용자 가이드로 확인 |
 
@@ -113,6 +115,7 @@ STM32H7_LAN8770_Ethernet/
 │   ├── Src/  main.c  stm32h7xx_it.c  stm32h7xx_hal_msp.c  system_stm32h7xx.c
 │   │         syscalls.c  sysmem.c   app_net.c ← UDP 에코 + 상태 로그
 │         veh_vlan.c veh_frame.c  someip.c app_someip.c  veh_ecu.c veh_log.c ← 차량 이더넷 (6-1)
+│         app_fdcan.c vcan_proto.c  pc_link_conf.h ← PC 링크 CAN FD (6-3)
 │   └── Startup/startup_stm32h743zitx.s
 ├── LWIP/
 │   ├── App/     lwip.c  lwip.h                MX_LWIP_Init / MX_LWIP_Process
@@ -123,7 +126,8 @@ STM32H7_LAN8770_Ethernet/
 │   ├── STM32H7xx_HAL_Driver/   (ST HAL v1.11.5, BSD-3-Clause)
 │   └── CMSIS/                  (Arm/ST, Apache-2.0)
 ├── Middlewares/Third_Party/LwIP/  (lwIP 2.1.2 ST 포팅, BSD-3-Clause)
-└── tools/udp_echo_test.py         PC 쪽 UDP 에코 테스트
+├── tools/udp_echo_test.py         PC 쪽 UDP 에코 테스트
+└── tools/vnet_can_monitor.py      PC 쪽 CAN FD 링크 모니터 (python-can)
 ```
 
 ### 실행 흐름
@@ -131,7 +135,7 @@ STM32H7_LAN8770_Ethernet/
 ```
 main()
  ├─ MPU_Config()          0x30000000: 32KB non-cacheable + 256B device
- ├─ I/D-Cache Enable, HAL_Init(), SystemClock_Config()   HSI → 400 MHz
+ ├─ I/D-Cache Enable, HAL_Init(), SystemClock_Config()   HSE 8 MHz → 400 MHz (FDCAN 80 MHz)
  ├─ D2 SRAM 클럭 Enable
  ├─ MX_GPIO_Init()        LED, PHY_RST(High)
  ├─ MX_USART3_UART_Init() 115200
@@ -152,19 +156,22 @@ MPU 로 캐시를 끕니다.
 
 | 주소 | 내용 | 크기 |
 |------|------|------|
-| 0x3000_0000 | Rx DMA 디스크립터 (`.RxDecripSection`) | 4 × 24 B |
-| 0x3000_0080 | Tx DMA 디스크립터 (`.TxDecripSection`) | 4 × 24 B |
-| 0x3000_0100 | Rx 버퍼 풀 (`.Rx_PoolSection`) | 8 × 1568 B ≈ 12.3 KB |
-| 0x3000_4000 | lwIP heap (`LWIP_RAM_HEAP_POINTER`) | 14 KB |
+| 0x3000_0000 | Rx DMA 디스크립터 (`.RxDecripSection`) | **16** × 24 B (0x200 예약) |
+| 0x3000_0200 | Tx DMA 디스크립터 (`.TxDecripSection`) | **8** × 24 B (0x200 예약) |
+| 0x3000_0400 | Rx 버퍼 풀 (`.Rx_PoolSection`) | **32** × 1568 B ≈ 49 KB |
+| 0x3001_0000 | lwIP heap (`LWIP_RAM_HEAP_POINTER`) | **32 KB** |
 
 | MPU | 영역 | 속성 |
 |-----|------|------|
 | Region 0 | 4 GB 배경 | No access (CubeMX 기본) |
-| Region 1 | 0x3000_0000, 32 KB | Normal, **Non-cacheable** |
-| Region 2 | 0x3000_0000, 256 B | **Device** (디스크립터) |
+| Region 1 | 0x3000_0000, **128 KB** | Normal, **Non-cacheable** |
+| Region 2 | 0x3000_0000, **1 KB** | **Device** (디스크립터) |
 
 링커 스크립트에는 Rx 풀이 heap 을 침범하면 링크 에러를 내는 `ASSERT` 가 있습니다.
-빌드 결과는 `RAM_D2: 12803 B` 이고 풀은 `0x30003203` 에서 끝납니다.
+빌드 결과는 `RAM_D2: 51203 B` 이고 풀은 `0x3000C803` 에서 끝납니다.
+디스크립터 수는 `stm32h7xx_hal_conf.h` 의 `ETH_RX_DESC_CNT 16` / `ETH_TX_DESC_CNT 8`,
+버퍼 수는 `ethernetif.c` 의 `ETH_RX_BUFFER_CNT` (기본 2 × 디스크립터 수) 입니다. 범위를 벗어나면 컴파일 에러가 납니다.
+(D2 SRAM 이 288 KB 인 H743/H753/H750 기준. 32 KB 인 H723/H733 에는 맞지 않습니다.)
 
 ---
 
@@ -283,6 +290,105 @@ lwIP 가 열지 않은 포트로 가는 트래픽도 프레임 단계에서 집�
 
 ---
 
+## 6-2. 수신 손실 집계
+
+MCU 가 트래픽을 놓치는지 확인할 수 있도록 하드웨어 카운터와 소프트웨어 카운터를 함께 집계합니다
+(`ethernetif_stats()`, 100 ms 마다 하드웨어 카운터를 읽어 누적).
+
+| 카운터 | 출처 | 의미 |
+|--------|------|------|
+| `rx_dma_missed` (no-desc) | `ETH->DMACMFCR` | 빈 Rx 디스크립터가 없어 DMA 가 버린 프레임 → **CPU/lwIP 처리가 못 따라감** |
+| `rx_fifo_overflow` | `ETH->MTLRQMPOCR` | MAC Rx FIFO 넘침 → 버스(AXI) 혼잡 |
+| `rx_fifo_missed` | `ETH->MTLRQMPOCR` | Rx FIFO 에서 버린 프레임 |
+| `rx_pool_empty` | 소프트웨어 | lwIP 가 Rx 버퍼를 돌려주지 않아 풀이 빈 횟수 |
+| `rx_crc_errors`, `rx_align_errors` | MMC 카운터 | 배선 / 노이즈 / RMII 타이밍 문제 |
+| `tx_errors` | 소프트웨어 | 송신 실패 |
+| `counter_overflow` | 하드웨어 | 11 bit 카운터가 100 ms 안에 넘침 → 값은 최소치 |
+
+UART 상태 로그 (2초마다):
+```
+[ETH ] rx 51234 tx 120 | lost: no-desc 0 fifo-ovf 0 fifo-miss 0 pool-empty 0 | crc 0 align 0 tx-err 0
+```
+`no-desc` 가 늘면 `ETH_RX_DESC_CNT` / `ETH_RX_BUFFER_CNT` 를 더 늘리거나 로그 출력을 줄이세요.
+`crc` 가 늘면 RMII 배선(길이, GND)을 먼저 의심하세요. 같은 값이 PC 링크의 `ETH_STATS` 프레임으로도 나갑니다.
+
+## 6-3. PC 링크 : FDCAN (CAN FD)
+
+### FDCAN 으로 PC 와 통신하는 것이 적절한가?
+
+**상태 / 통계 / ECU 테이블 같은 요약 데이터와 명령에는 적절합니다. 원본 패킷을 PC 로 넘기는 용도로는 부적절합니다.**
+
+| 항목 | CAN FD (500k / 2M) | UART 115200 | USB CDC (FS) |
+|------|--------------------|-------------|--------------|
+| 실효 처리량 | 약 100 ~ 150 KB/s (이론 계산, 64 B 프레임 연속) | 약 11 KB/s | 약 0.5 ~ 1 MB/s |
+| 100 Mbit/s 원본 미러링 | 불가 | 불가 | 불가 (부분만 가능) |
+| 차량 환경 내성 (노이즈, 케이블 길이) | **좋음** (차동, 수십 m) | 나쁨 | 보통 (5 m) |
+| 분석 도구 | CANoe, PCAN-View, SavvyCAN, python-can | 터미널 | 터미널 |
+| 필요한 것 | 트랜시버 + PC CAN FD 어댑터 + 종단 | 없음 (ST-LINK VCP) | USB 케이블 |
+
+- 1 초마다 STATUS(32 B) + ETH_STATS(48 B), 10 초마다 ECU 덤프(ECU 16 개 × 레코드 수십 개) 정도면 버스 사용률은 수 % 수준입니다
+- **차량의 CAN 버스에 연결하지 마세요.** 장치 ↔ PC 전용 버스로 쓰는 것을 전제로 합니다 (ID 0x700 대가 차량 ID 와 겹칠 수 있음)
+- 원본 패킷 저장이 필요해지면 USB(또는 SD 카드 pcap)를 추가하는 것이 맞습니다
+
+### 하드웨어
+```
+ NUCLEO-H743ZI2               CAN FD 트랜시버               PC
+ PD1 FDCAN1_TX ───────► TXD   (TCAN1042V / MCP2562FD /     CAN FD 어댑터
+ PD0 FDCAN1_RX ◄─────── RXD    TJA1051T/3, VIO=3.3V)  CANH ═══ CANH   (PCAN-USB FD,
+ 3.3V ─── VIO, 5V ─── VCC                             CANL ═══ CANL    Kvaser, Vector,
+ GND ──── GND                         120 Ω ┘              └ 120 Ω    candleLight FD ...)
+```
+- 2 Mbit/s 데이터 구간을 지원하는 **CAN FD 트랜시버**가 필요합니다 (NUCLEO 보드에는 없음)
+- 버스 양 끝에 120 Ω 종단 (어댑터에 스위치가 있는 경우가 많음)
+- 시스템 클럭을 **HSE 8 MHz (ST-LINK MCO)** 로 바꿨습니다. HSI 는 CAN FD 에 필요한 클럭 정확도를 보장하지 못합니다
+
+### 비트 타이밍 (FDCAN 커널 클럭 80 MHz)
+| 구간 | 비트레이트 | Prescaler | Seg1 | Seg2 | SJW | Sample point |
+|------|-----------|-----------|------|------|-----|--------------|
+| Nominal | 500 kbit/s | 1 | 127 | 32 | 32 | 80 % |
+| Data (BRS) | 2 Mbit/s | 1 | 31 | 8 | 8 | 80 % |
+
+송신 지연 보상(TDC) 켜짐 (오프셋 = DataPrescaler × DataSeg1 = 31). PC 어댑터도 같은 비트레이트와 sample point 80 % 로 설정하세요.
+
+### 프로토콜 (`Core/Inc/vcan_proto.h`, little endian, 11 bit ID)
+| ID | 방향 | 길이 | 내용 | 주기 |
+|----|------|------|------|------|
+| 0x700 | 장치→PC | 32 | STATUS : 링크, 역할, SQI, IP, uptime, ECU/서비스 수, rx/tx/손실 | 1 s |
+| 0x701 | 장치→PC | 48 | ETH_STATS : 6-2 절의 카운터 + 모니터/VLAN 카운터 | 1 s |
+| 0x710 | 장치→PC | 48 | ECU : IP, MAC, VLAN, 패킷, 바이트, 마지막 수신, Offer 4 개 | 덤프 |
+| 0x711 | 장치→PC | 48 | EVENT : ECU IP, 서비스/이벤트, 개수, 주기(평균/최소/최대 µs), payload 8 B | 덤프 |
+| 0x712 | 장치→PC | 24 | FLOW : ECU IP, 프로토콜, 포트, 개수, 주기 | 덤프 |
+| 0x713 | 장치→PC | 32 | SERVICE : SOME/IP-SD 서비스, endpoint, TTL | 덤프 |
+| 0x714 | 장치→PC | 8 | DUMP_END : 레코드 수, 장치에서 버린 프레임 수 | 덤프 끝 |
+| 0x740 | PC→장치 | 8 | COMMAND : 0x01 PING, 0x02 DUMP, 0x03 RESET_STATS, 0x04 SET_STATUS_MS(u16), 0x05 SET_DUMP_MS(u32) | - |
+| 0x741 | 장치→PC | 16 | RESPONSE : 명령, 결과(0 OK / 1 모르는 명령 / 2 인자 오류), 버전, uptime, 값 | 명령마다 |
+
+- 덤프는 10 초마다(`APP_PCLINK_DUMP_MS`) 또는 DUMP 명령으로 시작하고, Tx FIFO 여유를 보며 메인 루프 한 번에 4 프레임씩 나눠 보냅니다
+- Bus-Off 가 나면 100 ms 안에 자동으로 다시 시작합니다. PC 어댑터가 없으면 Tx FIFO 가 차서 `tx_dropped` 만 늘고 나머지 동작에는 영향이 없습니다
+- 설정 : `Core/Inc/pc_link_conf.h` (ID 시작값, 주기, 덤프 속도)
+
+### PC 도구 (`tools/vnet_can_monitor.py`, python-can)
+```bash
+pip install python-can
+# Linux SocketCAN
+sudo ip link set can0 type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on
+sudo ip link set can0 up
+python tools/vnet_can_monitor.py -i socketcan -c can0 --ping --dump
+# Windows PEAK
+python tools/vnet_can_monitor.py -i pcan -c PCAN_USBBUS1 --dump --quiet-status
+```
+출력 예 (C 인코더가 만든 시험 벡터를 이 도구로 해석한 실제 결과):
+```
+[STATUS] link UP  MASTER  SQI 6/7  IP 192.168.10.10  up 123.5s  ECU 3  SVC 2  rx 1000 tx 20 lost 7  someip 500
+[ECU 1/1] 10.0.0.5  02:1A:00:00:00:01  VID 2  pkts 5  bytes 300  last 0.0s  flows 1 events 1  offers 0x1001/0x0002
+    flow  UDP  30501->30502 count 5  period 10.0ms  max 10.0ms
+    evt   0x1001/0x8001 NOTIFICATION count 5  period 10.0ms (10.0ms..10.0ms)  len 10 | DE AD BE EF 05 06 07 08
+[SVC   ] 0x1234/0x0001 v2.7  UDP 10.0.0.5:30501  from 10.0.0.5  ttl inf  offers 42
+[RESP  ] PING -> OK  (proto v1, fw 1.0, uptime 5.0s, value 77)
+```
+
+---
+
 ## 7. STM32CubeMX 로 설정을 바꿀 때
 
 `.ioc` 를 열면 핀, 클럭, MPU, ETH, LWIP, USART3 설정을 GUI 로 볼 수 있고 바꿀 수도 있습니다.
@@ -296,6 +402,9 @@ lwIP 가 열지 않은 포트로 가는 트래픽도 프레임 단계에서 집�
 - CubeMX 가 `Drivers/BSP/Components/lan8742` 를 다시 만들 수 있지만 참조하는 곳이 없으므로 무해합니다
 - 생성 후에도 `.cproject` 의 include 경로에 `../Drivers/BSP/Components/lan8770` 이 있는지 확인하세요
 - 링커 스크립트를 CubeMX 가 새로 만들었다면 `.lwip_sec` 블록을 다시 넣어야 합니다 (git diff 로 확인)
+- ETH 의 **Tx/Rx Descriptor Length 를 8 / 16** 으로 맞춰 두세요. 다시 생성하면 `stm32h7xx_hal_conf.h` 의 값이 GUI 값으로 바뀝니다
+- `.ioc` 의 FDCAN1 파라미터 키와 `RCC.FDCANCLockSelection` 은 참고할 ST 예제가 없어 HAL 필드 이름 규칙으로 작성했습니다.
+  CubeMX 로 열었을 때 FDCAN1 비트 타이밍(위 표)과 FDCAN 클럭(PLL1Q 80 MHz)이 맞는지 꼭 확인하세요
 
 > `.ioc` 는 ST 가 공개한 NUCLEO-H743ZI2 Ethernet 예제(STM32CubeMX 6.14.1)를 바탕으로
 > FreeRTOS 를 빼고 이 프로젝트에 맞게 고친 것입니다. CubeMX 버전에 따라 열 때 마이그레이션을 물어볼 수 있습니다.

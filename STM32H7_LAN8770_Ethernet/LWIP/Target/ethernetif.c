@@ -12,10 +12,12 @@
   * - 링크 : 100BASE-T1 은 오토네고가 없으므로 링크 Up 이면 MAC 을 100M/Full 로 고정
   *
   * 메모리 배치 (D2 SRAM, 링커 스크립트의 .lwip_sec 와 MPU 설정이 필요)
-  *   0x30000000  Rx DMA 디스크립터
-  *   0x30000080  Tx DMA 디스크립터
-  *   0x30000100  Rx 버퍼 풀 (ETH_RX_BUFFER_CNT x 약 1.5KB)
-  *   0x30004000  lwIP heap (LWIP_RAM_HEAP_POINTER, Tx 버퍼)
+  *   0x30000000  Rx DMA 디스크립터 (ETH_RX_DESC_CNT 16 x 24 B, 0x200 예약)
+  *   0x30000200  Tx DMA 디스크립터 (ETH_TX_DESC_CNT  8 x 24 B, 0x200 예약)
+  *   0x30000400  Rx 버퍼 풀 (ETH_RX_BUFFER_CNT 32 x 1568 B ≈ 49 KB)
+  *   0x30010000  lwIP heap (LWIP_RAM_HEAP_POINTER, MEM_SIZE 32 KB, Tx 버퍼)
+  *
+  * 수신 손실 집계 : ethernetif_stats() (하드웨어 카운터 + 소프트웨어 카운터)
   ******************************************************************************
   */
 
@@ -44,7 +46,17 @@
 #define ETH_RX_BUFFER_SIZE          (1536U)  /* 32 의 배수, 최대 프레임 수용 */
 #endif
 #ifndef ETH_RX_BUFFER_CNT
-#define ETH_RX_BUFFER_CNT           (8U)     /* ETH_RX_DESC_CNT ~ 2*ETH_RX_DESC_CNT */
+#define ETH_RX_BUFFER_CNT           (2U * ETH_RX_DESC_CNT)  /* 32 : 디스크립터 수 ~ 2배 */
+#endif
+
+#if (ETH_RX_BUFFER_CNT < ETH_RX_DESC_CNT) || (ETH_RX_BUFFER_CNT > (2U * ETH_RX_DESC_CNT))
+#error "ETH_RX_BUFFER_CNT must be between ETH_RX_DESC_CNT and 2 * ETH_RX_DESC_CNT"
+#endif
+#if (ETH_RX_DESC_CNT * 24U) > 0x200U
+#error "Rx descriptors exceed 0x200 bytes reserved at 0x30000000 (see linker .lwip_sec)"
+#endif
+#if (ETH_TX_DESC_CNT * 24U) > 0x200U
+#error "Tx descriptors exceed 0x200 bytes reserved at 0x30000200 (see linker .lwip_sec)"
 #endif
 
 /* ---------------------------------------------------------------------------
@@ -65,7 +77,7 @@ typedef struct
 #if defined ( __ICCARM__ )
 #pragma location=0x30000000
 ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT];
-#pragma location=0x30000080
+#pragma location=0x30000200
 ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT];
 #else /* GCC (STM32CubeIDE) */
 ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDecripSection")));
@@ -75,7 +87,7 @@ ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecr
 LWIP_MEMPOOL_DECLARE(RX_POOL, ETH_RX_BUFFER_CNT, sizeof(RxBuff_t), "Zero-copy RX PBUF pool");
 
 #if defined ( __ICCARM__ )
-#pragma location = 0x30000100
+#pragma location = 0x30000400
 extern u8_t memp_memory_RX_POOL_base[];
 #elif defined ( __ARMCC_VERSION )
 __attribute__((section(".Rx_PoolSection"))) u8_t memp_memory_RX_POOL_base[];
@@ -107,6 +119,10 @@ static lan8770_IOCtx_t LAN8770_IOCtx =
 };
 
 static uint8_t  phy_ready;        /* LAN8770_Init 성공 여부  */
+
+/* 송수신 / 손실 통계 */
+static ethernetif_stats_t eth_stats;
+static uint32_t mmc_crc_prev, mmc_align_prev;
 static uint32_t phy_retry_tick;   /* 실패 시 재시도 타이머   */
 
 static void pbuf_free_custom(struct pbuf *p);
@@ -225,6 +241,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
   {
     if (i >= ETH_TX_DESC_CNT)
     {
+      eth_stats.tx_errors++;      /* pbuf 조각이 Tx 디스크립터보다 많음 */
       return ERR_IF;
     }
     Txbuffer[i].buffer = q->payload;
@@ -244,8 +261,10 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
    * heap 을 cacheable 영역에 둔다면 여기서 SCB_CleanDCache_by_Addr() 필요 */
   if (HAL_ETH_Transmit(&heth, &TxConfig, ETH_DMA_TRANSMIT_TIMEOUT) != HAL_OK)
   {
+    eth_stats.tx_errors++;
     return ERR_IF;
   }
+  eth_stats.tx_frames++;
   return ERR_OK;
 }
 
@@ -272,6 +291,7 @@ void ethernetif_input(struct netif *netif)
     p = low_level_input(netif);
     if (p != NULL)
     {
+      eth_stats.rx_frames++;
       if (!ethernetif_rx_hook(p))
       {
         pbuf_free(p);
@@ -427,10 +447,65 @@ static int32_t ETH_PHY_IO_GetTick(void)
 /*******************************************************************************
                        링크 상태 관리 (약 100ms 주기로 호출됨)
 *******************************************************************************/
+/*******************************************************************************
+                       송수신 / 손실 통계
+*******************************************************************************/
+/* 하드웨어 카운터를 읽어 누적 (약 100 ms 마다 ethernet_link_check_state 에서 호출)
+ *  - DMACMFCR   : 빈 Rx 디스크립터가 없어 DMA 가 버린 프레임 (읽으면 0, 11 bit)
+ *  - MTLRQMPOCR : Rx FIFO overflow / missed (읽으면 0, 11 bit)
+ *  - MMC        : CRC / alignment 오류 (free-running 32 bit → 차이로 계산) */
+void ethernetif_poll_hw_counters(void)
+{
+  uint32_t v, crc, align;
+
+  v = ETH->DMACMFCR;
+  eth_stats.rx_dma_missed += (v & ETH_DMACMFCR_MFC);
+  if ((v & ETH_DMACMFCR_MFCO) != 0U)
+  {
+    eth_stats.counter_overflow = 1U;
+  }
+
+  v = ETH->MTLRQMPOCR;
+  eth_stats.rx_fifo_overflow += (v & ETH_MTLRQMPOCR_OVFPKTCNT) >> ETH_MTLRQMPOCR_OVFPKTCNT_Pos;
+  eth_stats.rx_fifo_missed   += (v & ETH_MTLRQMPOCR_MISPKTCNT) >> ETH_MTLRQMPOCR_MISPKTCNT_Pos;
+  if ((v & (ETH_MTLRQMPOCR_OVFCNTOVF | ETH_MTLRQMPOCR_MISCNTOVF)) != 0U)
+  {
+    eth_stats.counter_overflow = 1U;
+  }
+
+  crc   = ETH->MMCRCRCEPR;
+  align = ETH->MMCRAEPR;
+  eth_stats.rx_crc_errors   += crc - mmc_crc_prev;
+  eth_stats.rx_align_errors += align - mmc_align_prev;
+  mmc_crc_prev   = crc;
+  mmc_align_prev = align;
+}
+
+const ethernetif_stats_t *ethernetif_stats(void)
+{
+  return &eth_stats;
+}
+
+uint32_t ethernetif_stats_rx_lost(void)
+{
+  return eth_stats.rx_dma_missed + eth_stats.rx_fifo_overflow + eth_stats.rx_fifo_missed;
+}
+
+void ethernetif_stats_reset(void)
+{
+  (void)ETH->DMACMFCR;              /* 읽어서 하드웨어 카운터 비우기 */
+  (void)ETH->MTLRQMPOCR;
+  mmc_crc_prev   = ETH->MMCRCRCEPR;
+  mmc_align_prev = ETH->MMCRAEPR;
+  memset(&eth_stats, 0, sizeof(eth_stats));
+}
+
 void ethernet_link_check_state(struct netif *netif)
 {
   ETH_MACConfigTypeDef MACConf = {0};
   int32_t PHYLinkState;
+
+  ethernetif_poll_hw_counters();
 
   /* PHY 초기화가 아직 안 됐으면 주기적으로 재시도 */
   if (!phy_ready)
@@ -481,6 +556,10 @@ void HAL_ETH_RxAllocateCallback(uint8_t **buff)
   }
   else
   {
+    if (RxAllocStatus == RX_ALLOC_OK)
+    {
+      eth_stats.rx_pool_empty++;  /* lwIP 가 Rx 버퍼를 아직 돌려주지 않아 풀이 비었음 */
+    }
     RxAllocStatus = RX_ALLOC_ERROR;
     *buff = NULL;
   }

@@ -538,6 +538,35 @@ void APP_SOMEIP_PrintTable(void)
   }
 }
 
+int APP_SOMEIP_GetService(uint32_t index, app_someip_service_t *out)
+{
+  uint32_t i, k = 0U;
+
+  for (i = 0; i < APP_SOMEIP_MAX_SERVICES; i++)
+  {
+    if (!svcs[i].used)
+    {
+      continue;
+    }
+    if (k++ == index)
+    {
+      out->service_id  = svcs[i].service_id;
+      out->instance_id = svcs[i].instance_id;
+      out->major       = svcs[i].major;
+      out->minor       = svcs[i].minor;
+      out->ttl         = svcs[i].ttl;
+      out->has_ep      = svcs[i].has_ep;
+      memcpy(out->ep_ip, svcs[i].ep_ip, 4);
+      out->ep_proto    = svcs[i].ep_proto;
+      out->ep_port     = svcs[i].ep_port;
+      out->from_ip     = lwip_ntohl(ip4_addr_get_u32(&svcs[i].from));
+      out->offers      = svcs[i].offers;
+      return 0;
+    }
+  }
+  return -1;
+}
+
 uint32_t APP_SOMEIP_ServiceCount(void)
 {
   uint32_t i, n = 0U;
@@ -560,6 +589,7 @@ static app_someip_counters_t cnt;
 void APP_SOMEIP_Init(void) {}
 void APP_SOMEIP_Process(void) {}
 void APP_SOMEIP_PrintTable(void) {}
+int  APP_SOMEIP_GetService(uint32_t index, app_someip_service_t *out) { (void)index; (void)out; return -1; }
 uint32_t APP_SOMEIP_ServiceCount(void) { return 0U; }
 const app_someip_counters_t *APP_SOMEIP_Counters(void) { return &cnt; }
 

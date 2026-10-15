@@ -163,24 +163,25 @@ SECTIONS
   } >RAM_D1
   
   /* LAN8770 project: ETH DMA descriptors and Rx buffer pool in D2 SRAM.
-   * 0x30000000 Rx desc, 0x30000080 Tx desc, 0x30000100 Rx pool,
-   * 0x30004000 lwIP heap (LWIP_RAM_HEAP_POINTER, not placed by the linker).
-   * MPU makes 0x30000000-0x30007FFF non-cacheable (see MPU_Config in main.c). */
+   * 0x30000000 Rx desc (16 x 24 B), 0x30000200 Tx desc (8 x 24 B),
+   * 0x30000400 Rx pool (32 x 1568 B),
+   * 0x30010000 lwIP heap (LWIP_RAM_HEAP_POINTER, 32 KB, not placed by the linker).
+   * MPU: 0x30000000-0x3001FFFF non-cacheable, 0x30000000-0x300003FF device. */
   .lwip_sec (NOLOAD) :
   {
     . = ABSOLUTE(0x30000000);
     *(.RxDecripSection)
 
-    . = ABSOLUTE(0x30000080);
+    . = ABSOLUTE(0x30000200);
     *(.TxDecripSection)
 
-    . = ABSOLUTE(0x30000100);
+    . = ABSOLUTE(0x30000400);
     *(.Rx_PoolSection)
   } >RAM_D2
 
   /* Fail the link if the Rx pool runs into the lwIP heap */
-  ASSERT(ADDR(.lwip_sec) + SIZEOF(.lwip_sec) <= 0x30004000,
-         "ETH Rx pool overlaps LWIP_RAM_HEAP_POINTER (0x30004000)")
+  ASSERT(ADDR(.lwip_sec) + SIZEOF(.lwip_sec) <= 0x30010000,
+         "ETH Rx pool overlaps LWIP_RAM_HEAP_POINTER (0x30010000)")
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
