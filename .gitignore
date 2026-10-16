@@ -1,14 +1,6 @@
-# Build output
+build/
 Debug/
 Release/
-*.o
-*.d
-*.elf
-*.bin
-*.hex
-*.map
-*.list
-
-# CubeIDE
-.metadata/
 .settings/
+*.launch
+__pycache__/

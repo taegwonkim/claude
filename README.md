@@ -1,738 +1,443 @@
-# STM32L562RET6 — RTC WakeUp Timer 주기적 Software Reset + RS485 / USB CDC 보고
+# STM32H7_LAN8770_Ethernet — STM32H743 + Microchip LAN8770 (EV48S68A) 100BASE-T1
 
-> **다른 프로젝트**: ESP32-C3(ESP-AT) Wi-Fi AP / TCP 서버 접속 + 자동 재접속 (STM32L562CET6, 폴링 방식)
-> → [`STM32L562_ESP32C3_WiFi/`](STM32L562_ESP32C3_WiFi/README.md)
->
-> **FPGA**: Cyclone IV UART 바이트 간 지연(송신)/간격 필요(수신) 원인과 해결 RTL
-> → [`FPGA_UART_Cyclone4/`](FPGA_UART_Cyclone4/README.md)
->
-> **STM32L562 ↔ FPGA UART 링크** (DMA 순환 수신 + IDLE, 명령 큐)
-> → [`STM32L562_FPGA_Link/`](STM32L562_FPGA_Link/README.md)
->
-> **STM32H7 + LAN8770 (EV48S68A)** 100BASE-T1 차량용 이더넷 시험 장비
-> → [`lan8770/`](lan8770/README.md)
+**바로 열어서 빌드할 수 있는 독립 STM32CubeIDE 프로젝트**입니다.
+HAL, CMSIS, lwIP 소스가 모두 들어 있어서 CubeMX 코드 생성 없이 **Import → Build → Debug** 하면 됩니다.
 
-STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
-스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
-USB CDC(가상 COM 포트) 양쪽으로 PC 에 전송**합니다.
+- 보드 : **NUCLEO-H743ZI2** (STM32H743ZIT6). 다른 STM32H743 보드도 핀만 맞추면 그대로 사용 가능
+- PHY : **Microchip EVB-LAN8770-RMII (EV48S68A)**, 100BASE-T1 (오토네고 없음, 100 Mbps Full Duplex 고정)
+- 스택 : lwIP 2.1.2 (STM32CubeMX 방식, **NO_SYS = 1 베어메탈**)
+- 동작
+  - **ping 응답**, **UDP 에코 서버 (포트 7)**
+  - USART3(ST-LINK 가상 COM, 115200)로 PHY 주소, MASTER/SLAVE, 링크, **SQI(신호 품질)**, IP 를 2초마다 출력
+  - LED : 초록 = 링크 Up, 노랑 = PHY 를 못 찾음, 빨강 = `Error_Handler`
+  - PHY 를 못 찾으면 멈추지 않고 1초마다 다시 초기화
 
-- 대상 : **STM32L562RET6 (LQFP64, Flash 512KB)**, TrustZone Disabled
-- 리셋 주기 : **분 단위 / 시간 단위** 중 선택 (기본 **5분**)
-- 보고 채널 (**같은 내용이 동시에 나갑니다**)
-  - **USART3 RS485** — PB10 TX / PB11 RX / PB14 DE, 115200-8-N-1
-  - **USB CDC** — PA11 D−/ PA12 D+, 가상 COM 포트 (보레이트 무관)
-  - `USE_RS485` / `USE_USB_CDC` 로 각각 켜고 끕니다. 명령 수신도 양쪽에서 받습니다
-- RTC 클럭 : 내부 **LSI(~32 kHz)** 기본, 크리스탈이 있으면 LSE 로 전환 가능
-- **VBAT 가 MCU 전원과 함께 on/off 되는 보드**를 전제로 설계 ([1-3절](#1-3-백업-전원vbat-이-vdd-와-함께-꺼진다-이-프로젝트의-전제))
-- 저전력 모드에 진입하지 않고 **계속 동작**하다가 시간이 되면 리셋
+```
+ NUCLEO-H743ZI2                EVB-LAN8770-RMII (EV48S68A)          상대편 T1 장비
+┌────────────────┐   RMII    ┌──────────────────────┐ 100BASE-T1 ┌────────────────┐
+│ STM32H743 ETH  │═══════════│ LAN8770              │────────────│ T1 미디어 컨버터 │── PC
+│ USART3 → VCP ──┼─ USB(PC)  │ (MASTER or SLAVE)    │  UTP 1pair │ 또는 LAN8770 EVB │
+└────────────────┘ MDIO/MDC  └──────────────────────┘            └────────────────┘
+```
 
 ---
 
-## 1. 동작 원리
+## 1. 빠른 시작
 
-| 항목 | 내용 |
-|------|------|
-| 타이머 | RTC Wakeup Timer (WUT) |
-| RTC 클럭 | 내부 **LSI ~32 kHz** (`AsynchPrediv=127`, `SynchPrediv=249`) |
-| 카운트 클럭 | `ck_spre` = 1 Hz |
-| 인터럽트 | `RTC_IRQn` → `HAL_RTCEx_WakeUpTimerEventCallback()` |
-| 리셋 방법 | `HAL_NVIC_SystemReset()` (Cortex-M33 `AIRCR.SYSRESETREQ`) |
-| 보고 | `USART3` RS485 Driver Enable 모드 + `USB_OTG_FS` CDC |
+### 1-1. STM32CubeIDE 로 열기
+1. 저장소를 받은 뒤 `STM32H7_LAN8770_Ethernet/` 폴더를 사용합니다 (CubeIDE 프로젝트 이름은 `STM32H7_LAN8770_Ethernet`)
+2. STM32CubeIDE → **File → Import → General → Existing Projects into Workspace**
+3. **Select root directory** 에 이 폴더 지정 → 프로젝트 `STM32H7_LAN8770_Ethernet` 체크 → Finish
+   (작업 공간으로 복사하지 않고 이 폴더를 직접 사용해도 됩니다)
+4. **Project → Build Project** (Debug 구성)
+5. 보드를 USB 로 연결 → **Run → Debug As → STM32 C/C++ Application**
+6. 터미널(115200-8-N-1)로 ST-LINK 가상 COM 포트를 엽니다
 
-```
-전원 ON
-  └─ COLD BOOT  : 백업 레지스터에 매직값 없음
-                  → 카운터 0 으로 시작, Flash 의 "전원 인가 횟수" +1
-                  → RS485 / USB CDC 로 배너 전송 → WakeUp Timer 장전
-       │
-       │  MCU 는 계속 풀스피드로 동작 (저전력 모드 미사용)
-       │  LED 500ms 토글 + 30초마다 [ALIVE] 로그
-       ▼
-  시간 만료 → RTC_IRQHandler → 콜백에서 플래그만 set
-       │
-       ▼
-  main 루프
-       ├─ 백업 레지스터에 "내가 거는 리셋" 표식 기록
-       ├─ Flash 의 "총 리셋 횟수" +1 기록
-       ├─ 두 채널로 "*** SOFTWARE RESET ... ***" 전송
-       ├─ RS485 송신 완료(TC) 대기 + USB 마지막 패킷 전송 후 정상 분리
-       │                              ← 없으면 메시지 꼬리가 잘린다
-       └─ HAL_NVIC_SystemReset()
-       │
-       ▼
-  WARM BOOT : 매직값 있음 + 표식 있음 → 횟수 +1 → 배너 전송 → 다시 장전 ... 반복
+### 1-2. 명령줄 빌드 (선택)
+```bash
+make -j8          # build/STM32H7_LAN8770_Ethernet.elf / .hex / .bin
+make flash        # STM32_Programmer_CLI 로 SWD 다운로드
 ```
 
-인터럽트 콜백에서는 **플래그만 세우고** `main()` 루프에서 리셋합니다.
-ISR 안에서 바로 리셋하면 로그가 중간에서 끊깁니다.
+### 1-3. 처음 바꿔야 할 설정 — `Core/Inc/lan8770_conf.h`
 
-애플리케이션은 `comm.c` 의 `COMM_Printf()` 하나만 호출하고, 그 안에서
-RS485 와 USB CDC 양쪽으로 같은 바이트열을 내보냅니다. 채널을 늘리거나 빼도
-`app_reset.c` 는 건드릴 필요가 없습니다.
+| 매크로 | 기본값 | 설명 |
+|--------|-------|------|
+| `APP_PHY_ROLE` | `LAN8770_ROLE_MASTER` | **상대편과 반대로**. `LAN8770_ROLE_KEEP` 은 EVB strap 설정 유지 |
+| `APP_PHY_ADDR` | `LAN8770_ADDR_AUTO` | MDIO 주소 0~31 자동 탐색. 알면 숫자로 고정 |
+| `APP_MAC_ADDR0~5` | 02:80:E1:87:70:01 | 로컬 관리 MAC |
+| `APP_UDP_ECHO_PORT` | 7 | UDP 에코 포트 |
+| `APP_STATUS_PERIOD_MS` | 2000 | 상태 로그 주기 |
+| `APP_USE_UART_LOG` | 1 | USART3 printf 사용 |
 
-### 1-0. 18.2시간을 넘는 주기는 소프트웨어로 나눠 장전합니다
-
-WUT 카운터는 16비트라서 `ck_spre`(1 Hz) 기준 **한 번에 최대 65535초 ≈ 18.2시간**
-입니다. 이 프로젝트는 주기가 그보다 길면 **여러 조각으로 나눠 이어서 장전**합니다.
-
-```c
-/* app_reset.c */
-static void AppReset_ArmChunk(void)
-{
-  uint32_t chunk = (s_remain_sec > WUT_MAX_CHUNK_SEC) ? WUT_MAX_CHUNK_SEC : s_remain_sec;
-  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, chunk - 1U, RTC_WAKEUPCLOCK_CK_SPRE_16BITS, 0U);
-  s_remain_sec -= chunk;
-}
-```
-
-24시간 = 65535 + 20865 (2조각), 48시간 = 65535 + 65535 + 41730 (3조각).
-마지막 조각이 끝났을 때만 리셋합니다.
-
-> 하드웨어에는 `CK_SPRE_17BITS` 모드(카운터에 2¹⁶을 더해 최대 약 36.4시간)도
-> 있지만, 이 프로젝트는 **한 가지 모드(16BITS)만 쓰는 대신 범위 제한을 없애는**
-> 쪽을 택했습니다. 재장전에 드는 시간은 18.2시간당 수 ms 수준이라 LSI 오차
-> (±5%)에 비하면 무시할 수 있습니다.
-
----
-
-## 1-1. 저전력 모드에 진입하지 않습니다
-
-"Wakeup Timer" 라는 이름은 저전력 모드에서 MCU 를 **깨울 수 있다**는 뜻이지
-저전력 모드에 **들어가야 한다**는 뜻이 아닙니다. WUT 는 RTC 안에서 독립적으로
-도는 주기 타이머일 뿐이고, MCU 가 풀스피드로 돌든 STOP 모드에 있든 상관없이
-카운트해서 인터럽트를 겁니다.
-
-이 프로젝트에는 저전력 진입 코드가 **하나도 없습니다.**
-
-| 사용하지 않는 API | 상태 |
-|---|---|
-| `HAL_PWR_EnterSLEEPMode()` | ❌ 없음 |
-| `HAL_PWR_EnterSTOPMode()` / `HAL_PWREx_EnterSTOP0/1/2Mode()` | ❌ 없음 |
-| `HAL_PWR_EnterSTANDBYMode()` / `HAL_PWREx_EnterSHUTDOWNMode()` | ❌ 없음 |
-| `__WFI()` / `__WFE()` | ❌ 없음 |
-
-`main()` 의 `while(1)` 은 `AppReset_Task()` 를 폴링하는 **완전 활성 상태의
-busy loop** 입니다. 애플리케이션 코드는 `/* USER CODE BEGIN 3 */` 에 넣으면 됩니다.
-
-> 반대로 저전력이 필요해지면 이 루프 안에 `HAL_PWREx_EnterSTOP2Mode()` 한 줄만
-> 넣으면 됩니다. RTC 는 STOP 모드에서도 계속 돌기 때문에 나머지는 그대로입니다.
-> (단, STOP 에서는 RS485 수신 명령이 동작하지 않습니다)
-
----
-
-## 1-2. 내부 LSI 를 쓸 때의 정확도
-
-LSI 는 온칩 RC 발진기라 **외부 부품이 필요 없고 기동이 빠르며 실패하지
-않는다**는 장점이 있지만, **주파수 오차가 ±5% 수준**(데이터시트 기준, 온도·전압
-조건에 따라 변동)입니다. 이 오차는 그대로 리셋 주기의 오차가 됩니다.
-
-| 설정 주기 | LSI ±5% 기준 실제 리셋 시점 |
-|---|---|
-| 1분 | 57초 ~ 63초 |
-| **5분** (기본) | **4분 45초 ~ 5분 15초** |
-| 30분 | 28.5분 ~ 31.5분 |
-| 1시간 | 57분 ~ 63분 |
-| 24시간 | 22.8시간 ~ 25.2시간 (±1.2시간) |
-
-"대략 N분/N시간마다 리프레시" 용도라면 문제없지만, **정확도가 중요하면
-32.768 kHz 외부 크리스탈(LSE)** 이 필요합니다. 크리스탈이 실제로 달려 있다면
-`main.h` 한 줄로 전환됩니다.
-
-```c
-#define RTC_CLOCK_LSE   1U    /* 크리스탈이 실제로 있을 때만 1 로! */
-```
-
-> **크리스탈이 없는데 `1` 로 두면 부팅이 멈춥니다.** `HAL_RCC_OscConfig()` 가
-> LSE 기동 타임아웃 후 `Error_Handler()` 로 빠지고, 상태 LED 가 빠르게
-> 깜빡입니다. 그럴 땐 `0` 으로 되돌리세요.
->
-> 실측 보정도 가능합니다. 로그의 `RTC time` 이 설정 주기보다 일정 비율로
-> 빠르거나 느리면 `RESET_PERIOD_VALUE` 를 그만큼 보정하면 됩니다.
-
----
-
-## 1-3. 백업 전원(VBAT)이 VDD 와 함께 꺼진다 — 이 프로젝트의 전제
-
-**VBAT 에 별도 배터리/슈퍼캡이 없고 VBAT 가 MCU 전원(VDD)에 연결되어 있습니다.**
-즉 백업 도메인(RTC, TAMP 백업 레지스터)은 MCU 전원이 살아있는 동안에만 유지됩니다.
-
-| 이벤트 | RTC 달력 | 백업 레지스터 | WUT 설정 | 내부 Flash |
-|---|---|---|---|---|
-| **소프트웨어 리셋** (`HAL_NVIC_SystemReset()`) | ✅ 유지 | ✅ 유지 | ✅ 유지 | ✅ 유지 |
-| **NRST 핀 리셋 / 디버거 리셋** | ✅ 유지 | ✅ 유지 | ✅ 유지 | ✅ 유지 |
-| **전원 off → on** | ❌ 초기화 | ❌ 초기화 | ❌ 초기화 | ✅ 유지 |
-
-**소프트웨어 리셋으로는 백업 도메인이 지워지지 않고, 이건 VBAT 배선과
-무관합니다.** 리셋 직후에도 RTC 는 멈추지 않고 계속 돌기 때문에 주기 리셋
-동작 자체는 배터리 유무와 상관없이 그대로입니다.
-
-문제가 되는 건 **"리셋 횟수"** 입니다. 전원을 내리면 백업 레지스터가 0 이 되므로
-백업 레지스터만으로는 전원 사이클을 넘어선 횟수를 셀 수 없습니다.
-그래서 횟수를 두 군데에 나눠서 관리합니다.
-
-| 저장 위치 | 내용 | 소프트 리셋 | 전원 OFF→ON |
-|---|---|---|---|
-| TAMP 백업 레지스터 | 전원 인가 후 리셋/부팅 횟수, 누적 동작 시간, 실행 중 바뀐 주기 | **유지** | **소실** |
-| 내부 Flash 마지막 페이지 | 총 리셋 횟수, 전원 인가 횟수 | 유지 | **유지** |
-
-### ① 콜드 부트 판별 — 백업 레지스터 매직값
-
-```c
-if (BKP_Read(BKP_REG_MAGIC) != BKP_MAGIC_VALUE)  /* COLD : 전원을 새로 넣었다 */
-```
-
-`RCC->CSR` 의 리셋 플래그만으로는 구분이 애매합니다. NRST 핀 리셋과 전원
-인가(BOR)가 둘 다 `PINRSTF` 를 세우는 경우가 있는데, 전자는 백업 도메인이
-살아있고 후자는 지워집니다. 매직값 방식은 이 차이를 정확히 잡아냅니다.
-
-### ② "내가 건 리셋" 표식 — 디버거 리셋과 구분
-
-`SFTRSTF` 플래그만 보면 디버거가 건 리셋이나 다른 코드가 부른
-`NVIC_SystemReset()` 까지 카운트에 섞입니다. 그래서 리셋 **직전에**
-`BKP_REG_PENDING` 에 표식(`0x52535421`)을 남기고, 부팅 시 표식이 있을 때만
-RTC 리셋으로 셉니다.
-
-### ③ 전원을 넘어가는 누적 횟수는 내부 Flash 에
-
-`flash_counter.c` 가 내부 Flash **마지막 페이지**(STM32L562RET6 = `0x0807F800`,
-256KB 품목인 RC 라면 `0x0803F800`)에 16바이트 레코드를 덧붙여 기록합니다.
-
-- 레코드 = `[64bit 데이터][데이터의 보수]` — 쓰다 만 레코드를 걸러냅니다.
-- 페이지가 꽉 차면(128개) 지우고 처음부터 다시 씁니다.
-  → **128번 저장마다 erase 1번.** Flash 지우기 수명 10,000회 기준
-  1,280,000번 저장 가능. 5분 주기(하루 288회)면 약 12년입니다.
-- 저장 주소는 `FLASHSIZE_BASE` 의 **실제 칩 용량에서 런타임 계산**하므로
-  512KB(RE) / 256KB(RC) 품목 모두 코드 수정 없이 동작합니다.
-  듀얼뱅크(출하 기본, 2KB 페이지)와 싱글뱅크(4KB 페이지)도 `FLASH_OPTR.DBANK`
-  를 보고 자동으로 맞춥니다. 512KB 듀얼뱅크에서는 뱅크2의 127번 페이지입니다.
-
-> **주의** — 마지막 페이지를 데이터로 쓰므로 프로그램이 그 영역까지 커지면
-> 안 됩니다. 이 예제는 수십 KB라 여유가 많지만, 코드가 커질 것 같으면
-> 링커 스크립트(`STM32L562RETX_FLASH.ld`)의 `FLASH` `LENGTH` 를
-> `512K` → `510K` 로 줄여 두세요.
->
-> Flash 저장이 필요 없으면 `USE_FLASH_COUNTER` 를 `0` 으로 두세요.
-> 그러면 "전원 인가 후 횟수"만 보고합니다.
-
-### ④ RTC 달력 재초기화
-
-`MX_RTC_Init()` 에서 `ICSR.INITS` 비트(달력이 한 번이라도 설정됐는지)를 보고,
-설정된 적 있으면 달력을 다시 쓰지 않습니다. 소프트 리셋 후에는 RTC 가 계속
-돌고 있으므로 건드리지 않고, 전원을 껐다 켜면 `INITS = 0` 이라 자동으로
-`2000-01-01 00:00:00` 으로 다시 초기화됩니다.
-
-오히려 이게 주기 검증에 편합니다 — 부팅할 때마다 찍히는 `RTC time` 이
-설정 주기만큼 늘어나면 정상입니다.
-
----
-
-## 1-4. 살아있음(heartbeat) 로그
-
-계속 동작 중인지 확인하기 쉽도록 **30초마다 uptime 과 리셋까지 남은 시간**을
-RS485 로 출력합니다.
-
-```c
-#define USE_HEARTBEAT_LOG     1U    /* 0 이면 출력 안 함 */
-#define HEARTBEAT_PERIOD_SEC  30U   /* 출력 주기 [초] */
-```
-
-```
-[ALIVE] up 00:00:30 | next reset in 00:04:30 | resets 0 (total 41)
-[ALIVE] up 00:01:00 | next reset in 00:04:00 | resets 0 (total 41)
-```
-
-LED 하트비트(500 ms 토글)와 함께, MCU 가 잠들지 않고 도는지 육안/로그 양쪽으로
-확인할 수 있습니다.
+IP 주소는 `LWIP/App/lwip.c` 의 `MX_LWIP_Init()` (기본 **192.168.10.10/24**, GW 192.168.10.1) 또는 CubeMX 의 LWIP 설정에서 바꿉니다.
 
 ---
 
 ## 2. 하드웨어 연결
 
-### 2-1. 핀 배치 (STM32L562RET6, LQFP64)
+### 2-1. 핀 배치 (NUCLEO-H743ZI2)
 
-| 핀 | 기능 | 비고 |
-|---|---|---|
-| **PB10** | USART3_TX (AF7) | 트랜시버 **DI** |
-| **PB11** | USART3_RX (AF7) | 트랜시버 **RO** |
-| **PB14** | USART3_DE (AF7) | 트랜시버 **DE** (+ `/RE`) |
-| **PA11** | USB_OTG_FS_DM | USB D− (`USE_USB_CDC 1` 일 때) |
-| **PA12** | USB_OTG_FS_DP | USB D+ (`USE_USB_CDC 1` 일 때) |
-| PA5 | 상태 LED (GPIO_Output) | 500ms 토글. 안 쓰면 `USE_STATUS_LED 0` |
-| PA13/PA14 | SWDIO / SWCLK | 디버거 |
+| 신호 | STM32 핀 | 비고 |
+|------|---------|------|
+| RMII REF_CLK | **PA1** | 50 MHz **입력** (STM32 는 만들지 않음) |
+| RMII MDIO | **PA2** | 1.5 kΩ 풀업 필요 (EVB 에 있는지 확인) |
+| RMII CRS_DV | **PA7** | |
+| RMII MDC | **PC1** | ≤ 2.5 MHz, HAL 이 자동 분주 |
+| RMII RXD0 / RXD1 | **PC4 / PC5** | |
+| RMII TX_EN | **PG11** | |
+| RMII TXD0 / TXD1 | **PG13 / PB13** | |
+| PHY nRESET | **PG0** (`PHY_RST`) | 부팅 시 10 ms Low 펄스 후 High |
+| UART 로그 | PD8 (TX) / PD9 (RX) | ST-LINK 가상 COM 으로 연결됨 (배선 불필요) |
+| **PC 링크 FDCAN1** | **PD0 (RX) / PD1 (TX)** | CAN FD 트랜시버 경유 → PC CAN FD 어댑터 (6-3절) |
+| HSE 클럭 | PH0 | ST-LINK MCO 8 MHz (보드 기본). CAN 정확도를 위해 HSI 대신 사용 |
+| LED | PB0 초록 / PE1 노랑 / PB14 빨강 | 보드 LD1 / LD2 / LD3 |
+| GND / 전원 | | GND 는 여러 가닥. EVB 전원 레일은 EVB 사용자 가이드로 확인 |
 
-> PB14 가 이미 다른 용도로 쓰이고 있으면 `main.h` 의 `RS485_DE_PIN` /
-> `RS485_DE_GPIO_PORT` 를 원하는 핀으로 바꾸고 `RS485_USE_HW_DE` 를 `0` 으로
-> 두세요. 그러면 그 핀을 **일반 GPIO 로 소프트웨어 토글**합니다.
-> (USART3_DE 대체 핀은 PB1 / PD2 / PD12 이지만 LQFP64 에서는 PB1 만 나옵니다.
-> CubeMX 핀아웃 화면에서 핀을 클릭하면 그 핀이 지원하는 신호가 뜹니다.)
+> EVB 의 RMII 커넥터는 Microchip SAMA5D3 EDS 호스트 규격입니다.
+> **커넥터 핀 번호는 EVB 회로도에서 반드시 확인**하세요.
 
-### 2-2. RS485 트랜시버 배선 (MAX3485 / SP3485 / SN65HVD3082 등)
+### 2-2. ⚠ 온보드 PHY 분리 (NUCLEO-H743ZI2)
 
-```
-  STM32L562                     트랜시버                RS485 선로
-  PB10 (TX) ───────────────────► DI
-  PB11 (RX) ◄─────────────────── RO
-  PB14 (DE) ───────────┬───────► DE
-                       └───────► /RE      ← 묶기를 권장 (아래 설명)
-                                  A  ──────────► A  (+)
-                                  B  ──────────► B  (−)
-                                  GND ────────── GND
-```
+보드에 있는 **LAN8742 PHY 가 위 RMII 핀에 이미 연결**되어 있습니다.
+특히 PA1/PA7/PC4/PC5 는 대체 핀이 없습니다. **UM2407(보드 매뉴얼)의 Ethernet 절을 보고 해당 솔더 브리지를 제거**해
+온보드 PHY 를 분리하세요. 분리하지 않으면 두 PHY 가 RXD/CRS_DV 를 동시에 구동합니다.
+(드라이버는 PHY ID 로 LAN8770 만 골라내므로 MDIO 공유는 괜찮습니다.)
 
-- **`/RE` 를 `DE` 와 묶는 것을 권장**합니다. 송신 중에는 수신이 꺼지므로
-  자기 송신이 되돌아오는 에코가 없습니다.
-- `/RE` 를 GND 에 고정해 항상 수신 상태로 두어도 동작합니다. 이 경우 자기
-  송신이 그대로 되돌아오는데, `RS485_Write()` 가 송신 직후 수신 버퍼를 비워
-  에코를 명령으로 오인하지 않도록 처리합니다.
-- 선로 **양 끝단**에 120Ω 종단 저항. 필요하면 A/B 에 바이어스 저항
-  (560Ω~1kΩ 풀업/풀다운)을 달아 유휴 상태를 확정하세요. 바이어스가 없으면
-  아무도 송신하지 않을 때 선로가 플로팅이라 수신 에러가 자주 납니다.
-  (`HAL_UART_ErrorCallback()` 에서 수신을 재무장하므로 멈추지는 않습니다)
-- PC 쪽은 USB-RS485 컨버터를 쓰고 터미널을 **115200-8-N-1** 로 엽니다.
+### 2-3. REF_CLK 50 MHz
 
-### 2-3. DE 타이밍
+| 방식 | 설명 |
+|------|------|
+| **A. PHY 가 출력** | LAN8770 이 25 MHz 크리스탈로 50 MHz 를 만들어 출력 (strap 설정) → PA1 에 연결. EVB 기본값을 회로도로 확인 |
+| B. 외부 50 MHz 오실레이터 | PHY REF_CLK 입력과 PA1 에 함께 연결 |
+| C. STM32 MCO1(PA8) | 50 MHz 를 만들어 PHY 와 PA1 에 함께 연결 (지터 주의) |
 
-`RS485_USE_HW_DE = 1` 이면 USART3 하드웨어가 첫 바이트 전에 DE 를 올리고
-마지막 바이트 뒤에 내려줍니다. 앞뒤 여유 시간은 샘플 단위로 지정합니다.
+REF_CLK 가 없으면 `HAL_ETH_Init()` 이 실패해 **빨간 LED** 가 켜지고 멈춥니다.
 
-```c
-#define RS485_DE_ASSERT_TIME    8U   /* 8/16 = 0.5 비트시간 */
-#define RS485_DE_DEASSERT_TIME  8U
-```
-
-`0` 이면 소프트웨어 토글 모드이고, `HAL_UART_Transmit()` 후 `TC` 플래그를
-기다린 뒤 DE 를 내립니다.
-
-### 2-4. USB CDC — 배선과 "주기 리셋"과의 궁합
-
-#### 배선
-
-```
-  STM32L562                         USB 커넥터 (Type-C / micro-B)
-  PA11 ─────────────────────────────► D−
-  PA12 ─────────────────────────────► D+
-  GND  ─────────────────────────────► GND
-  (VBUS 는 감지용으로만 쓰거나 미연결)
-```
-
-- **32 MHz 크리스탈이 필요 없습니다.** 내부 **HSI48 + CRS** 를 씁니다.
-  CRS 가 호스트의 SOF(1 ms)를 기준으로 HSI48 을 계속 보정해 USB 규격
-  (±0.25%)을 만족시킵니다. 설정은 `MX_USB_Clock_Init()` 에 있습니다.
-- **`HAL_PWREx_EnableVddUSB()` 가 필수**입니다. 이걸 빠뜨리면 USB 트랜시버가
-  아예 동작하지 않아 PC 가 장치를 인식조차 못 합니다. L4/L5 에서 "USB 가
-  무반응"인 경우 대부분 이것입니다.
-- D+/D− 는 90Ω 차동 임피던스로 짧고 나란히 배선하세요.
-
-#### USB 를 켜면 시스템 클럭이 48 MHz 로 올라갑니다
-
-USB FS 는 인터럽트를 제때 처리해야 열거(enumeration)가 되는데 MSI 4 MHz 로는
-빠듯합니다. `USE_USB_CDC = 1` 이면 `main.c` 가 자동으로 MSI 를 48 MHz
-(`RCC_MSIRANGE_11`)로 올립니다. USART3 는 그대로 HSI16 을 쓰므로 보레이트는
-영향받지 않습니다.
-
-#### ⚠ 리셋마다 COM 포트가 끊깁니다
-
-이게 USB CDC 의 본질적인 제약입니다. 소프트웨어 리셋이 걸리면 USB 장치가
-사라졌다가 다시 나타나므로, **PC 의 COM 포트도 매번 사라졌다 다시 생깁니다.**
-PuTTY / TeraTerm 같은 터미널은 그 시점에 포트를 닫아버립니다.
-
-코드에서 할 수 있는 만큼은 해 두었습니다.
-
-| 문제 | 대응 |
-|---|---|
-| 리셋 직후 배너가 열거 전에 나가서 사라짐 | `COMM_Init()` 이 `USBD_STATE_CONFIGURED` 가 될 때까지 대기 (`USB_CDC_READY_TIMEOUT_MS`, 기본 2초) |
-| 열거 직후 호스트가 아직 포트를 못 염 | 추가 대기 `USB_CDC_READY_EXTRA_MS` (기본 300 ms) |
-| 리셋 시 호스트가 장치 제거를 늦게 인식 | 리셋 직전 `USBD_Stop()` 으로 정상 분리 |
-| 케이블 미연결 시 송신에서 멈춤 | 열거 안 됐으면 즉시 버림, 호스트가 안 읽어가면 `USB_CDC_TX_TIMEOUT_MS` 후 포기 |
-
-그래도 **터미널 쪽이 포트를 다시 열어줘야** 합니다. 끊김 없는 로그가 필요하면
-**RS485 를 기준 채널로 쓰고 USB 는 현장 점검용으로 쓰는 것**을 권합니다.
-
-자동 재접속이 필요하면 PC 에서 이 정도 스크립트면 충분합니다.
-
-```python
-# pip install pyserial
-import serial, serial.tools.list_ports, time
-
-VID_PID = (0x0483, 0x5740)          # ST 기본 CDC VID/PID
-
-def find_port():
-    for p in serial.tools.list_ports.comports():
-        if (p.vid, p.pid) == VID_PID:
-            return p.device
-    return None
-
-while True:
-    port = find_port()
-    if port is None:
-        time.sleep(0.2); continue
-    try:
-        with serial.Serial(port, 115200, timeout=0.2) as ser:
-            print(f"--- connected: {port} ---", flush=True)
-            while True:
-                data = ser.read(256)
-                if data:
-                    print(data.decode("utf-8", "replace"), end="", flush=True)
-    except serial.SerialException:
-        print("--- disconnected, waiting ---", flush=True)
-        time.sleep(0.3)
-```
-
-> `USB_CDC_READY_TIMEOUT_MS` 는 **케이블을 안 꽂았을 때 매 부팅마다 그만큼
-> 기다린다**는 뜻이기도 합니다. USB 를 가끔만 쓴다면 값을 줄이거나
-> `USE_USB_CDC` 를 `0` 으로 두세요.
+### 2-4. 배선 품질과 상대편
+- 50 MHz 신호입니다. 점퍼선은 **10 cm 이하**, 가능하면 어댑터 PCB 를 권장합니다
+- 100BASE-T1 은 일반 PC 랜카드에 바로 연결되지 않습니다 → **100BASE-T1 ↔ 100BASE-TX 미디어 컨버터** 또는 다른 T1 장비가 필요합니다
+- 링크 양 끝 중 **하나는 MASTER, 하나는 SLAVE**
 
 ---
 
-## 3. 파일 구성
+## 3. 프로젝트 구성
 
 ```
-.
-├── STM32L562_RTC_WakeUp_Reset.ioc   # CubeMX 설정 파일 (시작점)
+STM32H7_LAN8770_Ethernet/    (CubeIDE 프로젝트 이름 : STM32H7_LAN8770_Ethernet)
+├── .project / .cproject                  STM32CubeIDE 프로젝트 (Debug / Release)
+├── STM32H7_LAN8770_Ethernet.ioc          STM32CubeMX 설정 (핀, 클럭, MPU, ETH, LWIP, USART3)
+├── STM32H743ZITX_FLASH.ld                링커 스크립트 (.lwip_sec + 겹침 검사 ASSERT)
+├── Makefile                              명령줄 빌드 (CubeIDE 와 같은 소스/옵션)
 ├── Core/
-│   ├── Inc/
-│   │   ├── main.h                   # ★ 모든 사용자 설정이 여기 있음
-│   │   ├── app_reset.h
-│   │   ├── comm.h                   # 보고 채널 분배
-│   │   ├── rs485.h
-│   │   ├── usb_cdc.h
-│   │   ├── flash_counter.h
-│   │   └── stm32l5xx_it.h
-│   └── Src/
-│       ├── main.c                   # 클럭/주변장치 초기화, main 루프
-│       ├── app_reset.c              # 콜드·웜 판별, 카운터, WUT 장전, 리셋, 배너
-│       ├── comm.c                   # COMM_Printf() → RS485 + USB CDC 동시 출력
-│       ├── rs485.c                  # USART3 RS485(DE) 송수신
-│       ├── usb_cdc.c                # USB CDC 송수신 래퍼 + OTG_FS_IRQHandler
-│       ├── flash_counter.c          # Flash 기반 비휘발성 카운터
-│       ├── stm32l5xx_hal_msp.c      # RTC/USART3 클럭·GPIO·NVIC
-│       └── stm32l5xx_it.c           # RTC_IRQHandler, USART3_IRQHandler
-└── README.md
+│   ├── Inc/  main.h  stm32h7xx_hal_conf.h  stm32h7xx_it.h
+│   │         lan8770_conf.h ← 사용자 설정      app_net.h
+│   ├── Src/  main.c  stm32h7xx_it.c  stm32h7xx_hal_msp.c  system_stm32h7xx.c
+│   │         syscalls.c  sysmem.c   app_net.c ← UDP 에코 + 상태 로그
+│         veh_vlan.c veh_frame.c  someip.c app_someip.c  veh_ecu.c veh_log.c ← 차량 이더넷 (6-1)
+│         app_fdcan.c vcan_proto.c  pc_link_conf.h ← PC 링크 CAN FD (6-3)
+│   └── Startup/startup_stm32h743zitx.s
+├── LWIP/
+│   ├── App/     lwip.c  lwip.h                MX_LWIP_Init / MX_LWIP_Process
+│   └── Target/  ethernetif.c  ethernetif.h    ← LAN8770 용 (RMII, 100M FD, zero-copy Rx)
+│                lwipopts.h                    NO_SYS, heap 0x30004000
+├── Drivers/
+│   ├── BSP/Components/lan8770/  lan8770.c  lan8770.h   ← PHY 드라이버
+│   ├── STM32H7xx_HAL_Driver/   (ST HAL v1.11.5, BSD-3-Clause)
+│   └── CMSIS/                  (Arm/ST, Apache-2.0)
+├── Middlewares/Third_Party/LwIP/  (lwIP 2.1.2 ST 포팅, BSD-3-Clause)
+├── tools/udp_echo_test.py         PC 쪽 UDP 에코 테스트
+└── tools/vnet_can_monitor.py      PC 쪽 CAN FD 링크 모니터 (python-can)
 ```
 
-> HAL 드라이버(`Drivers/`), 링커 스크립트, `startup_stm32l562xx.s`, `syscalls.c`,
-> 그리고 **USB 미들웨어(`USB_DEVICE/`, `Middlewares/ST/STM32_USB_Device_Library/`)**
-> 는 용량이 커서 포함하지 않았습니다. 4장대로 CubeMX/CubeIDE 에서 프로젝트를 만든 뒤
-> 위 소스를 덮어쓰고 추가하면 바로 빌드됩니다.
-
-### 채널 구조
+### 실행 흐름
 
 ```
-  app_reset.c  ──► COMM_Printf() ─┬─► rs485.c   ──► USART3 (DE = PB14)
-                                  └─► usb_cdc.c ──► CDC_Transmit_FS()
-                                                    └─ ST USB Device Library
+main()
+ ├─ MPU_Config()          0x30000000: 32KB non-cacheable + 256B device
+ ├─ I/D-Cache Enable, HAL_Init(), SystemClock_Config()   HSE 8 MHz → 400 MHz (FDCAN 80 MHz)
+ ├─ D2 SRAM 클럭 Enable
+ ├─ MX_GPIO_Init()        LED, PHY_RST(High)
+ ├─ MX_USART3_UART_Init() 115200
+ ├─ MX_LWIP_Init()        lwip_init → netif_add → ethernetif_init
+ │                         └─ PHY 리셋 → HAL_ETH_Init(RMII) → LAN8770_Init
+ ├─ APP_Net_Init()        UDP 에코 bind, 배너 출력
+ └─ while(1)
+      ├─ MX_LWIP_Process()   수신 → lwIP, 타이머, 100 ms 마다 링크 확인
+      └─ APP_Net_Process()   LED, 2초마다 상태 로그
 ```
 
 ---
 
-## 4. STM32CubeMX / CubeIDE 설정 순서
+## 4. 메모리 배치 (STM32H7 의 핵심 주의점)
 
-### 4-1. 프로젝트 생성
+ETH DMA 는 **DTCM(0x2000_0000)에 접근할 수 없습니다.** 그래서 디스크립터와 버퍼를 D2 SRAM 에 두고
+MPU 로 캐시를 끕니다.
 
-1. CubeMX → **File ▸ New Project** → MCU 선택기에서 `STM32L562RET6` 검색 →
-   LQFP64 패키지 선택.
-   - 256KB 품목(`STM32L562RCT6`)으로 바꿔도 그대로 동작합니다. 핀 배치와
-     주변장치가 같고 Flash 용량만 다른데, Flash 저장 주소를 칩에서 읽어
-     런타임에 계산하기 때문입니다.
-2. **TrustZone 활성화 여부를 묻는 창에서 반드시 `Without TrustZone`
-   (TZEN Disabled) 을 선택**합니다. 켜면 Secure/Non-secure 두 프로젝트가
-   생성되고 RTC 인터럽트도 `RTC_S_IRQn` 으로 바뀝니다.
+| 주소 | 내용 | 크기 |
+|------|------|------|
+| 0x3000_0000 | Rx DMA 디스크립터 (`.RxDecripSection`) | **16** × 24 B (0x200 예약) |
+| 0x3000_0200 | Tx DMA 디스크립터 (`.TxDecripSection`) | **8** × 24 B (0x200 예약) |
+| 0x3000_0400 | Rx 버퍼 풀 (`.Rx_PoolSection`) | **32** × 1568 B ≈ 49 KB |
+| 0x3001_0000 | lwIP heap (`LWIP_RAM_HEAP_POINTER`) | **32 KB** |
 
-### 4-2. System Core
+| MPU | 영역 | 속성 |
+|-----|------|------|
+| Region 0 | 4 GB 배경 | No access (CubeMX 기본) |
+| Region 1 | 0x3000_0000, **128 KB** | Normal, **Non-cacheable** |
+| Region 2 | 0x3000_0000, **1 KB** | **Device** (디스크립터) |
 
-| 항목 | 설정 |
-|---|---|
-| **SYS** | Debug = `Serial Wire` |
-| **RCC** | High Speed Clock (HSE) = `Disable` |
-| | Low Speed Clock (LSE) = `Disable` (크리스탈이 있으면 `Crystal/Ceramic Resonator`) |
-| **ICACHE** | Activated 체크 (1-way) |
+링커 스크립트에는 Rx 풀이 heap 을 침범하면 링크 에러를 내는 `ASSERT` 가 있습니다.
+빌드 결과는 `RAM_D2: 51203 B` 이고 풀은 `0x3000C803` 에서 끝납니다.
+디스크립터 수는 `stm32h7xx_hal_conf.h` 의 `ETH_RX_DESC_CNT 16` / `ETH_TX_DESC_CNT 8`,
+버퍼 수는 `ethernetif.c` 의 `ETH_RX_BUFFER_CNT` (기본 2 × 디스크립터 수) 입니다. 범위를 벗어나면 컴파일 에러가 납니다.
+(D2 SRAM 이 288 KB 인 H743/H753/H750 기준. 32 KB 인 H723/H733 에는 맞지 않습니다.)
 
-### 4-3. RTC (Timers → RTC)
+---
 
-- **Activate Clock Source** 체크
-- **Activate Calendar** 체크
-- **WakeUp** → `Internal WakeUp` 체크
-- Parameter Settings
-  - Asynchronous Predivider value : `127`
-  - Synchronous Predivider value : `249` (LSI) / `255` (LSE)
-  - Wake Up Clock : `RTC_WAKEUPCLOCK_CK_SPRE_16BITS`
-  - Wake Up Counter : `299` (아무 값이어도 됩니다. 실제 값은 코드에서 넣습니다)
-- **NVIC Settings** → `RTC global interrupt` 체크, Preemption Priority `5`
+## 5. 테스트
 
-### 4-4. USART3 (RS485)
+### UART 로그 예시
+```
+=== STM32H7 + LAN8770 (100BASE-T1) ===
+[PHY] LAN8770 found: addr=4 rev=1 role=MASTER
+[APP] UDP echo server on port 7
+[NET] link DOWN  (MASTER) - partner must be the opposite role
+[NET] link UP  100BASE-T1 MASTER  SQI=7/7  IP=192.168.10.10  udp_rx=0
+```
+(주소, 리비전, SQI 값은 예시입니다.)
 
-- Mode : `Asynchronous`
-- **Hardware Flow Control (RS485)** : `Driver Enable`
-  → PB14 가 `USART3_DE` 로 잡힙니다.
-  - CubeMX 버전에 따라 이 항목이 안 보일 수 있습니다. **없어도 됩니다.**
-    `rs485.c` 가 `HAL_RS485Ex_Init()` 를 직접 호출하고,
-    `stm32l5xx_hal_msp.c` 가 PB14 를 AF7 로 직접 설정합니다.
-    다만 CubeMX 로 재생성할 때 핀이 겹치지 않도록 PB14 는 비워 두세요.
-- Parameter Settings : 115200 / 8bit / None / 1stop
-- **NVIC Settings** → `USART3 global interrupt` 체크, Preemption Priority `6`
-  (PC 명령 수신용. `USE_COMM_CMD 0` 이면 불필요)
-- 핀아웃에서 **PB10 = USART3_TX, PB11 = USART3_RX** 확인
+### PC 에서
+PC 를 같은 서브넷(예: 192.168.10.2/24)으로 설정하고 미디어 컨버터에 연결합니다.
+```bash
+ping 192.168.10.10
+python tools/udp_echo_test.py 192.168.10.10 -n 1000 -s 1024
+```
 
-### 4-5. USB (USB_OTG_FS + USB_DEVICE CDC)
+### 확인 순서
+1. **MDIO** : `LAN8770 found` 로그 (노란 LED 꺼짐)
+2. **링크** : 역할을 상대와 반대로 → `link UP` + 초록 LED
+3. **SQI** : 5 이상이면 양호
+4. **데이터** : ping → UDP 에코
 
-`USE_USB_CDC = 0` 으로 쓸 거면 이 절은 건너뛰어도 됩니다.
+---
 
-1. **Connectivity ▸ USB_OTG_FS**
-   - Mode : **`Device_Only`**
-   - 핀아웃에서 **PA11 = USB_OTG_FS_DM, PA12 = USB_OTG_FS_DP** 확인
-   - **NVIC Settings** → `USB OTG FS global interrupt` 체크, Preemption Priority `4`
-     (RTC `5` / USART3 `6` 보다 높게 — USB 는 응답이 늦으면 열거에 실패합니다)
-2. **Middleware and Software Packs ▸ USB_DEVICE**
-   - Class For FS IP : **`Communication Device Class (Virtual Port Com)`**
-   - Parameter Settings 의 제품명/VID/PID 는 기본값 그대로 두면 됩니다
-     (ST 기본 VID `0x0483` / PID `0x5740`)
-3. **RCC** → `HSI48` 을 활성화할 수 있으면 켜 둡니다.
-   (CubeMX 에서 안 보여도 됩니다 — `MX_USB_Clock_Init()` 이 코드에서 켭니다)
+## 6. LAN8770 드라이버 요약 (`Drivers/BSP/Components/lan8770`)
 
-### 4-6. GPIO
+```
+LAN8770_Init(obj, addr, role)
+  PHY ID 확인 (Reg2=0x0007, Reg3=0xC15x, 주소 자동 탐색)
+  → 소프트 리셋 → HW init 시작
+  → MASTER/SLAVE 설정 (Reg9 bit11) → SLAVE 면 Equalizer freeze
+  → DSP/AFE 초기화 테이블 → PCS 리셋 → HW init 완료 대기
+```
 
-- **PA5** 클릭 → `GPIO_Output` → User Label `STATUS_LED`
+| API | 설명 |
+|-----|------|
+| `LAN8770_GetLinkState` | T1 Mode Status(0x11) bit0 → `LINK_DOWN` / `100MBITS_FULLDUPLEX` |
+| `LAN8770_SetRole / GetRole` | MASTER/SLAVE 변경(재초기화 포함) / 읽기 |
+| `LAN8770_GetSQI` | 신호 품질 0~7 |
+| `LAN8770_EnableLinkIT / ClearIT` | nINT 핀용 링크 인터럽트 |
+| `LAN8770_Read/WriteExtReg` | MISC/PCS/AFE/DSP 뱅크 확장 레지스터 |
+| `LAN8770_Enable/DisableLoopbackMode` | 루프백 |
 
-### 4-7. Clock Configuration
+초기화 값은 Microchip 이 LAN87xx 용으로 공개한 값입니다(Linux `drivers/net/phy/microchip_t1.c` 에도 같은 값이 있음).
+**양산 전에는 사용하는 칩 리비전의 데이터시트와 에라타로 확인하세요.**
 
-| 항목 | 값 | 이유 |
-|---|---|---|
-| System Clock Mux | **MSI** — USB 사용 시 **48 MHz**, 미사용 시 4 MHz | USB FS 인터럽트를 제때 처리하려면 4 MHz 로는 빠듯 |
-| **USART3 Clock Mux** | **HSI16** | 시스템 클럭과 분리해 보레이트 정확도 확보 |
-| **USB Clock Mux** | **HSI48** | CRS 로 SOF 동기 → 크리스탈 불필요 |
-| RTC Clock Mux | **LSI** (또는 LSE) | |
+---
 
-> USART3 를 HSI16 으로 쓰는 이유: 16 MHz ÷ 115200 = 138.9 → 오차 **−0.08%**.
-> MSI 를 그대로 쓰면 −0.79% 라 장거리 RS485 에서 마진이 줄어듭니다.
->
-> 클럭/Flash wait state 는 `main.c` 의 `SystemClock_Config()` 가 `USE_USB_CDC`
-> 값에 따라 알아서 고릅니다. CubeMX 화면과 숫자가 달라도 코드가 기준입니다.
+## 6-1. 차량 이더넷 기능 (VLAN / 네트워크 모니터 / SOME/IP / ECU 테이블)
 
-### 4-8. 코드 생성 & 소스 반영
+설정은 모두 `Core/Inc/vehicle_net_conf.h` 에 있습니다. **기본값은 수신 전용**이라 차량 쪽으로 아무것도 보내지 않습니다
+(ARP/ICMP 응답 등 lwIP 기본 동작 제외).
 
-- Project Manager → Toolchain `STM32CubeIDE` → **GENERATE CODE**
-- 생성된 프로젝트에 이 저장소의 `Core/Inc/*.h`, `Core/Src/*.c` 를 덮어쓰기/추가
-- **USB 를 쓰면 생성된 `USB_DEVICE/App/usbd_cdc_if.c` 에 두 군데를 추가**합니다.
-  (CubeMX 로 재생성해도 USER CODE 구간이라 보존됩니다)
+| 모듈 | 파일 | 기능 | 기본값 |
+|------|------|------|--------|
+| 네트워크 모니터 | `veh_vlan.c`, `veh_frame.c` | 받은 프레임의 **VLAN ID / EtherType / 송신자 MAC** 을 집계해 10초마다 출력. ECU 를 모를 때 첫 단계 | ON |
+| VLAN (802.1Q) | `veh_vlan.c`, `LWIP/Target/lwip_hooks.h` | 송신 태그 추가(VID, PCP), 수신 VLAN 필터, 태그 없는 프레임 허용 여부 | OFF |
+| SOME/IP | `someip.c`, `app_someip.c` | UDP 30490(SD) + 추가 포트 수신, 헤더 해석·로그, (서비스, 메서드/이벤트)별 집계 | ON |
+| SOME/IP-SD | `someip.c`, `app_someip.c` | Offer/StopOffer/Find/Subscribe 해석, **발견한 서비스 테이블**(ID, 인스턴스, 버전, endpoint, TTL 만료) | ON |
+| FindService 송신 | `app_someip.c` | 모든 서비스에 FindService 멀티캐스트 (⚠ 송신) | OFF |
+| **ECU 테이블** | `veh_ecu.c` | 송신자 **IP 별로** MAC / VLAN / 흐름(프로토콜·포트) / SOME/IP 이벤트 / **송신 주기** / 마지막 payload / Offer 서비스를 묶어 표시 | ON |
 
-  ```c
-  /* USER CODE BEGIN INCLUDE */
-  #include "usb_cdc.h"
-  /* USER CODE END INCLUDE */
+### 권장 사용 순서 (ECU 를 모를 때)
+1. 기본값 그대로 연결 → `[MON ]` 로그로 어떤 **VLAN ID** 와 EtherType 이 흐르는지 확인
+2. `APP_VLAN_ENABLE 1`, `APP_VLAN_ID` 를 그 값으로, IP 를 해당 서브넷으로 맞춤
+3. `[SD  ]` 로그의 서비스 테이블로 어떤 서비스가 Offer 되는지 확인 → endpoint 포트를 `APP_SOMEIP_EXTRA_PORTS` 에 넣어 이벤트 수신
+4. Offer 가 안 보이면 SD 멀티캐스트 주소/포트(OEM 별)를 확인. 벤치에서만 `APP_SOMEIP_SEND_FIND 1` 시도
+
+### 로그 예시
+```
+[MON ] frames=1532 tagged=1490 vlan_drop=1490 untag_drop=0
+[MON ]   VID    2  : 1210
+[MON ]   type 0x0800 IPv4       : 1490
+[SD  ] NEW service:
+[SD  ]   0x1001/0x0002 v1.3  UDP 10.0.0.5:30501  from 10.0.0.5  ttl 5s  offers 1  age 0.0s
+[SOME] 10.0.0.5:30501 svc 0x1001 evt 0x8001 len 8 cli 0x0000 ses 0x0012 NOTIFICATION E_OK if1 | 00 3C 01 ..
+```
+(값은 예시입니다.)
+
+### ECU 별 데이터 구분 (ECU 테이블)
+
+수신되는 모든 IPv4 프레임과 SOME/IP 메시지를 **송신자 IP** 기준으로 묶습니다.
+lwIP 가 열지 않은 포트로 가는 트래픽도 프레임 단계에서 집계하므로 빠지지 않습니다.
+
+```
+[ECU ] NEW 10.0.0.5  mac 02:1A:2B:3C:4D:01  VID 2
+[ECU ] 10.0.0.5  mac 02:1A:2B:3C:4D:01  VID 2  pkts 5321  bytes 532100  last 0.0s ago
+[ECU ]    offers 0x1001/0x0002 v1
+[ECU ]    flow UDP  30501->30501 count 5321  period 10.0ms (9.8ms..10.2ms)
+[ECU ]    evt 0x1001/0x8001 NOTIFICATION count 5321  period 10.0ms (9.8ms..10.2ms)  len 8 | 00 3C 01 ..
+[ECU ] 3 ECU(s)
+[ECU ]   10.0.0.5  02:1A:2B:3C:4D:01  VID 2  pkts 5321  flows 1  events 1  offers 1
+```
+(값은 예시입니다. 위 형식은 PC 단위 시험에서 실제로 출력된 것입니다.)
+
+- 자세한 내용은 **1초에 ECU 하나씩** 돌아가며 출력하고, 30초마다 전체 한 줄 요약을 출력합니다 (UART 부하 제한)
+- 주기는 DWT 사이클 카운터로 µs 단위로 재며, 평균(지수 이동 평균)과 최소·최대를 보여줍니다
+- `mac ..(changed)` : 같은 IP 가 다른 MAC 으로 보임 → 게이트웨이를 거쳐 라우팅된 트래픽일 가능성
+- `(idle)` : `APP_ECU_IDLE_MS` 동안 아무것도 보내지 않은 ECU
+- 크기 설정 : `APP_ECU_MAX`(16), `APP_ECU_MAX_FLOWS`(8), `APP_ECU_MAX_EVENTS`(16), `APP_ECU_PAYLOAD_BYTES`(8)
+
+**payload 의미 찾기** : 이벤트의 마지막 payload 를 보면서 (벤치에서) 스위치 조작, 핸들, 문 열기 등을 하면
+어느 바이트가 변하는지 확인할 수 있습니다. 정확한 신호 정의는 OEM 통신 매트릭스(ARXML/FIBEX)가 필요합니다.
+
+### 구현 메모
+- VLAN 은 lwIP 훅(`LWIP_HOOK_VLAN_SET/CHECK`)으로 소프트웨어 태그를 붙이고 뗍니다. 훅 매크로는 `lwipopts.h` USER CODE 1 에 있습니다
+- SOME/IP-SD 멀티캐스트는 `APP_SOMEIP_IGMP_JOIN 0`(기본)일 때 IGMP 리포트를 보내지 않고 MAC 의 PassAllMulticast 로 받습니다
+- 로그는 초당 `APP_LOG_LINES_PER_SEC` 줄로 제한해 트래픽이 많아도 UART 때문에 멈추지 않습니다
+- 파서 단위 시험 : `make -C tests` (PC gcc, ASan/UBSan)
+
+---
+
+## 6-2. 수신 손실 집계
+
+MCU 가 트래픽을 놓치는지 확인할 수 있도록 하드웨어 카운터와 소프트웨어 카운터를 함께 집계합니다
+(`ethernetif_stats()`, 100 ms 마다 하드웨어 카운터를 읽어 누적).
+
+| 카운터 | 출처 | 의미 |
+|--------|------|------|
+| `rx_dma_missed` (no-desc) | `ETH->DMACMFCR` | 빈 Rx 디스크립터가 없어 DMA 가 버린 프레임 → **CPU/lwIP 처리가 못 따라감** |
+| `rx_fifo_overflow` | `ETH->MTLRQMPOCR` | MAC Rx FIFO 넘침 → 버스(AXI) 혼잡 |
+| `rx_fifo_missed` | `ETH->MTLRQMPOCR` | Rx FIFO 에서 버린 프레임 |
+| `rx_pool_empty` | 소프트웨어 | lwIP 가 Rx 버퍼를 돌려주지 않아 풀이 빈 횟수 |
+| `rx_crc_errors`, `rx_align_errors` | MMC 카운터 | 배선 / 노이즈 / RMII 타이밍 문제 |
+| `tx_errors` | 소프트웨어 | 송신 실패 |
+| `counter_overflow` | 하드웨어 | 11 bit 카운터가 100 ms 안에 넘침 → 값은 최소치 |
+
+UART 상태 로그 (2초마다):
+```
+[ETH ] rx 51234 tx 120 | lost: no-desc 0 fifo-ovf 0 fifo-miss 0 pool-empty 0 | crc 0 align 0 tx-err 0
+```
+`no-desc` 가 늘면 `ETH_RX_DESC_CNT` / `ETH_RX_BUFFER_CNT` 를 더 늘리거나 로그 출력을 줄이세요.
+`crc` 가 늘면 RMII 배선(길이, GND)을 먼저 의심하세요. 같은 값이 PC 링크의 `ETH_STATS` 프레임으로도 나갑니다.
+
+## 6-3. PC 링크 : FDCAN (CAN FD)
+
+### FDCAN 으로 PC 와 통신하는 것이 적절한가?
+
+**상태 / 통계 / ECU 테이블 같은 요약 데이터와 명령에는 적절합니다. 원본 패킷을 PC 로 넘기는 용도로는 부적절합니다.**
+
+| 항목 | CAN FD (500k / 2M) | UART 115200 | USB CDC (FS) |
+|------|--------------------|-------------|--------------|
+| 실효 처리량 | 약 100 ~ 150 KB/s (이론 계산, 64 B 프레임 연속) | 약 11 KB/s | 약 0.5 ~ 1 MB/s |
+| 100 Mbit/s 원본 미러링 | 불가 | 불가 | 불가 (부분만 가능) |
+| 차량 환경 내성 (노이즈, 케이블 길이) | **좋음** (차동, 수십 m) | 나쁨 | 보통 (5 m) |
+| 분석 도구 | CANoe, PCAN-View, SavvyCAN, python-can | 터미널 | 터미널 |
+| 필요한 것 | 트랜시버 + PC CAN FD 어댑터 + 종단 | 없음 (ST-LINK VCP) | USB 케이블 |
+
+- 1 초마다 STATUS(32 B) + ETH_STATS(48 B), 10 초마다 ECU 덤프(ECU 16 개 × 레코드 수십 개) 정도면 버스 사용률은 수 % 수준입니다
+- **차량의 CAN 버스에 연결하지 마세요.** 장치 ↔ PC 전용 버스로 쓰는 것을 전제로 합니다 (ID 0x700 대가 차량 ID 와 겹칠 수 있음)
+- 원본 패킷 저장이 필요해지면 USB(또는 SD 카드 pcap)를 추가하는 것이 맞습니다
+
+### 하드웨어
+```
+ NUCLEO-H743ZI2               CAN FD 트랜시버               PC
+ PD1 FDCAN1_TX ───────► TXD   (TCAN1042V / MCP2562FD /     CAN FD 어댑터
+ PD0 FDCAN1_RX ◄─────── RXD    TJA1051T/3, VIO=3.3V)  CANH ═══ CANH   (PCAN-USB FD,
+ 3.3V ─── VIO, 5V ─── VCC                             CANL ═══ CANL    Kvaser, Vector,
+ GND ──── GND                         120 Ω ┘              └ 120 Ω    candleLight FD ...)
+```
+- 2 Mbit/s 데이터 구간을 지원하는 **CAN FD 트랜시버**가 필요합니다 (NUCLEO 보드에는 없음)
+- 버스 양 끝에 120 Ω 종단 (어댑터에 스위치가 있는 경우가 많음)
+- 시스템 클럭을 **HSE 8 MHz (ST-LINK MCO)** 로 바꿨습니다. HSI 는 CAN FD 에 필요한 클럭 정확도를 보장하지 못합니다
+
+### 비트 타이밍 (FDCAN 커널 클럭 80 MHz)
+| 구간 | 비트레이트 | Prescaler | Seg1 | Seg2 | SJW | Sample point |
+|------|-----------|-----------|------|------|-----|--------------|
+| Nominal | 500 kbit/s | 1 | 127 | 32 | 32 | 80 % |
+| Data (BRS) | 2 Mbit/s | 1 | 31 | 8 | 8 | 80 % |
+
+송신 지연 보상(TDC) 켜짐 (오프셋 = DataPrescaler × DataSeg1 = 31). PC 어댑터도 같은 비트레이트와 sample point 80 % 로 설정하세요.
+
+### 프로토콜 (`Core/Inc/vcan_proto.h`, little endian, 11 bit ID)
+| ID | 방향 | 길이 | 내용 | 주기 |
+|----|------|------|------|------|
+| 0x700 | 장치→PC | 32 | STATUS : 링크, 역할, SQI, IP, uptime, ECU/서비스 수, rx/tx/손실 | 1 s |
+| 0x701 | 장치→PC | 48 | ETH_STATS : 6-2 절의 카운터 + 모니터/VLAN 카운터 | 1 s |
+| 0x710 | 장치→PC | 48 | ECU : IP, MAC, VLAN, 패킷, 바이트, 마지막 수신, Offer 4 개 | 덤프 |
+| 0x711 | 장치→PC | 48 | EVENT : ECU IP, 서비스/이벤트, 개수, 주기(평균/최소/최대 µs), payload 8 B | 덤프 |
+| 0x712 | 장치→PC | 24 | FLOW : ECU IP, 프로토콜, 포트, 개수, 주기 | 덤프 |
+| 0x713 | 장치→PC | 32 | SERVICE : SOME/IP-SD 서비스, endpoint, TTL | 덤프 |
+| 0x714 | 장치→PC | 8 | DUMP_END : 레코드 수, 장치에서 버린 프레임 수 | 덤프 끝 |
+| 0x740 | PC→장치 | 8 | COMMAND : 0x01 PING, 0x02 DUMP, 0x03 RESET_STATS, 0x04 SET_STATUS_MS(u16), 0x05 SET_DUMP_MS(u32) | - |
+| 0x741 | 장치→PC | 16 | RESPONSE : 명령, 결과(0 OK / 1 모르는 명령 / 2 인자 오류), 버전, uptime, 값 | 명령마다 |
+
+- 덤프는 10 초마다(`APP_PCLINK_DUMP_MS`) 또는 DUMP 명령으로 시작하고, Tx FIFO 여유를 보며 메인 루프 한 번에 4 프레임씩 나눠 보냅니다
+- Bus-Off 가 나면 100 ms 안에 자동으로 다시 시작합니다. PC 어댑터가 없으면 Tx FIFO 가 차서 `tx_dropped` 만 늘고 나머지 동작에는 영향이 없습니다
+- 설정 : `Core/Inc/pc_link_conf.h` (ID 시작값, 주기, 덤프 속도)
+
+### PC 도구 (`tools/vnet_can_monitor.py`, python-can)
+```bash
+pip install python-can
+# Linux SocketCAN
+sudo ip link set can0 type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on
+sudo ip link set can0 up
+python tools/vnet_can_monitor.py -i socketcan -c can0 --ping --dump
+# Windows PEAK
+python tools/vnet_can_monitor.py -i pcan -c PCAN_USBBUS1 --dump --quiet-status
+```
+출력 예 (C 인코더가 만든 시험 벡터를 이 도구로 해석한 실제 결과):
+```
+[STATUS] link UP  MASTER  SQI 6/7  IP 192.168.10.10  up 123.5s  ECU 3  SVC 2  rx 1000 tx 20 lost 7  someip 500
+[ECU 1/1] 10.0.0.5  02:1A:00:00:00:01  VID 2  pkts 5  bytes 300  last 0.0s  flows 1 events 1  offers 0x1001/0x0002
+    flow  UDP  30501->30502 count 5  period 10.0ms  max 10.0ms
+    evt   0x1001/0x8001 NOTIFICATION count 5  period 10.0ms (10.0ms..10.0ms)  len 10 | DE AD BE EF 05 06 07 08
+[SVC   ] 0x1234/0x0001 v2.7  UDP 10.0.0.5:30501  from 10.0.0.5  ttl inf  offers 42
+[RESP  ] PING -> OK  (proto v1, fw 1.0, uptime 5.0s, value 77)
+```
+
+---
+
+## 7. STM32CubeMX 로 설정을 바꿀 때
+
+`.ioc` 를 열면 핀, 클럭, MPU, ETH, LWIP, USART3 설정을 GUI 로 볼 수 있고 바꿀 수도 있습니다.
+**코드를 다시 생성할 때는 아래를 지키세요.**
+
+- `USER CODE BEGIN/END` 사이의 코드는 유지됩니다 (`main.c` 의 D2 SRAM 클럭, `APP_Net_*` 호출 등)
+- ⚠ **`LWIP/Target/ethernetif.c` 는 CubeMX 가 LAN8742 버전으로 덮어씁니다.** 생성 후 바로 되돌리세요
+  ```bash
+  git checkout -- LWIP/Target/ethernetif.c
   ```
+- CubeMX 가 `Drivers/BSP/Components/lan8742` 를 다시 만들 수 있지만 참조하는 곳이 없으므로 무해합니다
+- 생성 후에도 `.cproject` 의 include 경로에 `../Drivers/BSP/Components/lan8770` 이 있는지 확인하세요
+- 링커 스크립트를 CubeMX 가 새로 만들었다면 `.lwip_sec` 블록을 다시 넣어야 합니다 (git diff 로 확인)
+- ETH 의 **Tx/Rx Descriptor Length 를 8 / 16** 으로 맞춰 두세요. 다시 생성하면 `stm32h7xx_hal_conf.h` 의 값이 GUI 값으로 바뀝니다
+- `.ioc` 의 FDCAN1 파라미터 키와 `RCC.FDCANCLockSelection` 은 참고할 ST 예제가 없어 HAL 필드 이름 규칙으로 작성했습니다.
+  CubeMX 로 열었을 때 FDCAN1 비트 타이밍(위 표)과 FDCAN 클럭(PLL1Q 80 MHz)이 맞는지 꼭 확인하세요
 
-  ```c
-  static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
-  {
-    /* USER CODE BEGIN 6 */
-    USB_CDC_RxHandler(Buf, *Len);          /* ← 이 한 줄 추가 */
-    USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
-    USBD_CDC_ReceivePacket(&hUsbDeviceFS);
-    return (USBD_OK);
-    /* USER CODE END 6 */
-  }
-  ```
-
-  이 한 줄이 없으면 **USB 로 보낸 명령만** 동작하지 않습니다(출력은 정상).
-
-- 생성된 `Core/Src/stm32l5xx_it.c` 에 `OTG_FS_IRQHandler` 가 들어 있으면
-  **지우세요.** 이 프로젝트는 같은 핸들러를 `usb_cdc.c` 에 두고 있어서 그대로
-  두면 중복 정의로 링크 에러가 납니다. (반대로 CubeMX 가 만든 이름이
-  `OTG_FS_IRQHandler` 가 아니면 `main.h` 의 `USB_CDC_IRQ_HANDLER` 를 그 이름으로
-  고치면 됩니다.)
-
-- 빌드 → 다운로드 → 터미널 열기
-  - RS485 : USB-RS485 컨버터, **115200-8-N-1**
-  - USB CDC : 새로 생긴 COM 포트 (보레이트는 아무 값이나 무관)
+> `.ioc` 는 ST 가 공개한 NUCLEO-H743ZI2 Ethernet 예제(STM32CubeMX 6.14.1)를 바탕으로
+> FreeRTOS 를 빼고 이 프로젝트에 맞게 고친 것입니다. CubeMX 버전에 따라 열 때 마이그레이션을 물어볼 수 있습니다.
 
 ---
 
-## 5. 리셋 주기 변경 — 분 단위 / 시간 단위
+## 8. 문제 해결
 
-`Core/Inc/main.h` 상단 두 줄만 고칩니다.
-
-```c
-#define RESET_PERIOD_UNIT       RESET_UNIT_MINUTE   /* 분 단위 */
-#define RESET_PERIOD_VALUE      5U                  /* 5분마다 리셋 */
-```
-
-```c
-#define RESET_PERIOD_UNIT       RESET_UNIT_HOUR     /* 시간 단위 */
-#define RESET_PERIOD_VALUE      24U                 /* 24시간마다 리셋 */
-```
-
-| 예시 | UNIT | VALUE | 실제 주기 |
-|---|---|---|---|
-| 1분 | `RESET_UNIT_MINUTE` | `1U` | 60 s |
-| 5분 | `RESET_UNIT_MINUTE` | `5U` | 300 s |
-| 30분 | `RESET_UNIT_MINUTE` | `30U` | 1,800 s |
-| 1시간 | `RESET_UNIT_HOUR` | `1U` | 3,600 s |
-| 12시간 | `RESET_UNIT_HOUR` | `12U` | 43,200 s |
-| 24시간 | `RESET_UNIT_HOUR` | `24U` | 86,400 s (2조각) |
-| 48시간 | `RESET_UNIT_HOUR` | `48U` | 172,800 s (3조각) |
-
-`VALUE` 는 1~1000 이며, 벗어나면 `#error` 로 빌드가 막힙니다.
-
-### 실행 중 변경 — RS485 **또는 USB CDC** 로 문자 하나 보내기
-
-| 명령 | 동작 |
-|---|---|
-| `s` 또는 `?` | 현재 상태 배너 다시 출력 |
-| `r` | 즉시 소프트웨어 리셋 |
-| `m` | 단위를 **분**으로 변경 |
-| `h` | 단위를 **시간**으로 변경 |
-| `+` / `-` | 값 1 증가 / 감소 (1~1000) |
-| `t` | **10초 주기 테스트 모드** (동작 확인용) |
-| `c` | 모든 카운터 초기화 (백업 레지스터 + Flash) |
-
-명령은 **두 채널 중 아무 쪽으로 보내도** 됩니다. 응답(배너/로그)은 항상
-양쪽으로 나갑니다.
-
-실행 중 바꾼 값은 백업 레지스터에 저장되어 **소프트 리셋을 넘어 유지**되지만,
-**전원을 껐다 켜면 `main.h` 의 컴파일 타임 기본값으로 돌아갑니다**
-(VBAT 가 같이 꺼지기 때문). 필요 없으면 `USE_COMM_CMD` 를 `0` 으로 두세요.
-
-> USB 로 보낸 명령이 안 먹으면 4-8 의 `USB_CDC_RxHandler()` 한 줄을 빠뜨린
-> 것입니다. 출력은 정상인데 입력만 안 되는 게 이 경우의 증상입니다.
+| 증상 | 원인 / 확인할 것 |
+|------|-----------------|
+| 부팅 직후 빨간 LED | **REF_CLK 50 MHz 가 PA1 에 없음** (`HAL_ETH_Init` 실패) |
+| 노란 LED + `LAN8770 not found` | EVB 전원, MDC/MDIO 배선, MDIO 풀업, PG0 nRESET 배선, GND |
+| 계속 `link DOWN` | 양쪽 역할이 같음, T1 선로(P/N) 배선, 상대가 100BASE-T1 이 아님 (1000BASE-T1/10BASE-T1S 와는 호환 안 됨) |
+| 링크 Up 인데 ping 실패 | PC 서브넷, RMII 데이터선(TXD/RXD 뒤바뀜, 너무 긴 점퍼), 온보드 LAN8742 미분리 |
+| 데이터가 깨지거나 가끔 멈춤 | MPU/링커 설정이 바뀌었는지 (디스크립터가 0x30000000 에 있는지 `.map` 확인) |
+| 링크 에러 `ETH Rx pool overlaps ...` | `ETH_RX_BUFFER_CNT`/버퍼 크기를 늘림 → heap 주소를 옮기거나 개수 축소 |
+| SQI 낮음 (≤3) | 케이블 길이/품질, 커넥터, 공통모드 초크·종단 |
+| CubeMX 재생성 후 LAN8742 로 바뀜 | `git checkout -- LWIP/Target/ethernetif.c` |
 
 ---
 
-## 6. 실행 결과 예시
+## 9. 검증 범위
 
-아래 내용이 **RS485 와 USB CDC 양쪽에 똑같이** 나옵니다.
-전원을 넣고 5분 주기로 한 번 리셋된 상황입니다.
+- `arm-none-eabi-gcc 13.2` 로 이 폴더의 **모든 소스(HAL, lwIP 전체 포함)를 `-Wall` 경고 0개로 빌드·링크**했습니다.
+  CubeIDE 와 같은 조건이 되도록 `.cproject` 의 include 경로와 define 을 그대로 써서 한 번 더 빌드했습니다.
+  (FLASH 66.6 KB, RAM_D1 21.6 KB, RAM_D2 12.8 KB)
+- 디스크립터와 Rx 풀이 0x30000000 / 0x30000080 / 0x30000100 에 놓이는 것을 `.map` 으로 확인했습니다
+- **STM32CubeIDE GUI 에서 직접 Import 해보지는 못했고, 실제 EVB 하드웨어에서도 아직 시험하지 않았습니다.**
+  `.project`/`.cproject`/`.ioc` 는 ST 가 공개한 CubeMX 생성 프로젝트를 바탕으로 만들었습니다.
+- EVB 커넥터 핀맵, strap 설정(REF_CLK 모드, PHY 주소, MASTER/SLAVE), 전원 레일은 EVB 사용자 가이드와 회로도로 확인하세요
 
-```
-========================================================
- STM32L562RET6  RTC WakeUp -> Software Reset (RS485/USB)
-========================================================
- Reset cause  : BOR/POR NRST-PIN (CSR=0x0C000000)
- Boot type    : COLD  (power ON - VBAT/backup domain cleared)
- RTC resets   : 0   (since power ON, backup reg)
- Boot count   : 1   (since power ON, backup reg)
- TOTAL resets : 41   (survives power OFF, flash @0x0807F800)
- Power cycles : 7   (survives power OFF)
- RTC clock    : LSI 32000Hz(+-5%)
- Reset period : 5 min  = 300 s (00:05:00)
- Run time     : 00:00:00  (accumulated since power ON)
- RTC time     : 2000-01-01 00:00:00
- Next reset in: 300 s
---------------------------------------------------------
- CMD: s=status  r=reset now  m=minute  h=hour  +/-=value
-      t=test(10s)  c=clear counters
---------------------------------------------------------
-[ALIVE] up 00:00:30 | next reset in 00:04:30 | resets 0 (total 41)
-[ALIVE] up 00:01:00 | next reset in 00:04:00 | resets 0 (total 41)
-      :
-*** SOFTWARE RESET (RTC wakeup) : RTC reset #1, total #42 ***
+## 라이선스
 
-========================================================
- STM32L562RET6  RTC WakeUp -> Software Reset (RS485/USB)
-========================================================
- Reset cause  : SOFTWARE (CSR=0x10000000)
- Boot type    : WARM  *** RESET BY RTC WAKEUP TIMER ***
- RTC resets   : 1   (since power ON, backup reg)
- Boot count   : 2   (since power ON, backup reg)
- TOTAL resets : 42   (survives power OFF, flash @0x0807F800)
- Power cycles : 7   (survives power OFF)
- RTC clock    : LSI 32000Hz(+-5%)
- Reset period : 5 min  = 300 s (00:05:00)
- Run time     : 00:05:00  (accumulated since power ON)
- RTC time     : 2000-01-01 00:05:00
- Next reset in: 300 s
---------------------------------------------------------
-```
-
-- `RTC resets` : 이번에 전원을 넣은 뒤의 리셋 횟수 (전원을 끄면 0)
-- `TOTAL resets` : 장비 설치 후 누적 리셋 횟수 (전원을 꺼도 유지)
-- `Run time` : 이번에 전원을 넣은 뒤의 누적 동작 시간
-- `RTC time` : 부팅할 때마다 주기만큼 늘어나면 정상 (전원 off 시 초기화)
-
----
-
-## 7. 동작 확인 순서
-
-1. **5분을 기다리지 말고** 터미널에서 `t` 를 보내세요 → 10초 뒤 리셋됩니다.
-   `*** SOFTWARE RESET ***` 과 새 배너가 연달아 뜨면 전체 경로가 정상입니다.
-2. `r` 로 즉시 리셋 → `Boot type : WARM *** RESET BY RTC WAKEUP TIMER ***`
-   와 `RTC resets` 증가 확인.
-3. 보드 전원을 껐다 켜기 → `Boot type : COLD`, `RTC resets : 0` 으로 돌아가지만
-   `TOTAL resets` 는 유지되고 `Power cycles` 가 1 증가하는지 확인.
-   **VBAT 공용 보드에서 의도한 동작이 이것입니다.**
-4. 두 채널의 출력이 같은지 비교. RS485 는 리셋 중에도 연결이 유지되고,
-   USB 는 매 리셋마다 COM 포트가 끊겼다 다시 붙습니다(2-4 참고).
-5. `c` 로 카운터를 모두 0 으로 되돌리고 실사용 주기로 두기.
-
-### 안 될 때
-
-| 증상 | 먼저 볼 것 |
-|---|---|
-| RS485 글자가 깨짐 | 보레이트(115200), 종단 저항 120Ω, GND 공통 |
-| RS485 아무것도 안 나옴 | DE 핀이 송신 중 HIGH 인지 (오실로스코프), A/B 극성 |
-| PC 가 USB 장치를 아예 인식 못 함 | `HAL_PWREx_EnableVddUSB()` 호출 여부, D+/D− 배선, PA11/PA12 를 GPIO 로 잡아두지 않았는지 |
-| USB 장치는 뜨는데 "알 수 없는 장치" | HSI48/CRS 설정, USB 인터럽트 우선순위(RTC 보다 높게) |
-| USB 로 출력은 되는데 명령이 안 먹음 | `usbd_cdc_if.c` 의 `USB_CDC_RxHandler()` 한 줄 (4-8) |
-| 리셋 후 USB 배너가 안 보임 | 터미널이 포트를 다시 열었는지 (2-4 의 스크립트 사용) |
-| 부팅이 매번 2초씩 느림 | USB 케이블 미연결 상태. `USB_CDC_READY_TIMEOUT_MS` 를 줄이거나 `USE_USB_CDC 0` |
-
----
-
-## 8. STM32L5 사용 시 주의사항
-
-1. **RTC 인터럽트 벡터가 통합되어 있습니다.**
-   STM32F4 처럼 `RTC_WKUP_IRQn` 이 따로 없고, L5 는 Alarm/WakeUp/Timestamp 가
-   모두 **`RTC_IRQn`(`RTC_IRQHandler`)** 하나로 들어옵니다.
-   TrustZone Secure 프로젝트에서는 **`RTC_S_IRQn` / `RTC_S_IRQHandler`** 를 쓰세요.
-
-2. **`__HAL_RCC_RTCAPB_CLK_ENABLE()` 필수.**
-   L5 는 RTC/TAMP 레지스터 접근용 APB 클럭이 별도입니다. 없으면 RTC 레지스터를
-   읽어도 0 만 나옵니다. (`HAL_RTC_MspInit()` 에 포함되어 있음)
-
-3. **백업 레지스터는 TAMP 블록에 있습니다.**
-   L5 는 `TAMP_BKPxR` 이지만 HAL API 는 동일하게
-   `HAL_RTCEx_BKUPWrite()` / `HAL_RTCEx_BKUPRead()` 를 씁니다.
-   쓰기 전에 `HAL_PWR_EnableBkUpAccess()` 를 호출해야 합니다.
-
-4. **`HAL_RTC_GetTime()` 뒤에는 반드시 `HAL_RTC_GetDate()` 를 호출하세요.**
-   GetTime 이 shadow register 를 잠그고 GetDate 가 해제합니다.
-   빠뜨리면 다음 읽기부터 시각이 갱신되지 않습니다.
-
-5. **달력 재설정 금지.**
-   소프트 리셋 후 `HAL_RTC_SetTime()` 을 다시 호출하면 시각이 초기화되어
-   경과 시간을 확인할 수 없게 됩니다. `RTC_ICSR.INITS` 비트를 검사해
-   **콜드 부트일 때만** 달력을 설정합니다.
-
-6. **리셋 원인 플래그는 1회성입니다.**
-   `RCC->CSR` 를 읽은 뒤 `__HAL_RCC_CLEAR_RESET_FLAGS()` 로 지워야 다음 리셋
-   원인을 구분할 수 있습니다. `AppReset_CaptureCause()` 를 `HAL_Init()` 직후
-   **한 번만** 호출하세요.
-
-7. **Flash 를 지우거나 쓸 때는 ICACHE 를 끄세요.**
-   L5 는 명령어 캐시(ICACHE)가 있어 Flash 를 고치면 캐시 내용이 낡은 값이
-   됩니다. `flash_counter.c` 가 `HAL_ICACHE_Disable()` / `Invalidate()` /
-   `Enable()` 로 감싸서 처리합니다.
-
-8. **USB 를 쓰려면 `HAL_PWREx_EnableVddUSB()` 가 반드시 필요합니다.**
-   L5 는 USB 전원 도메인(VDDUSB)이 기본적으로 꺼져 있습니다. 이걸 빠뜨리면
-   PC 가 장치를 인식조차 하지 못합니다. `MX_USB_Clock_Init()` 과 CubeMX 가
-   생성하는 `HAL_PCD_MspInit()` 양쪽에 들어 있습니다(중복 호출은 무해).
-
-9. **`CDC_Transmit_FS()` 는 넘긴 버퍼를 복사하지 않습니다.**
-   함수가 리턴한 뒤에도 전송이 끝날 때까지 그 메모리를 건드리면 안 됩니다.
-   `usb_cdc.c` 는 64바이트 버퍼 두 개를 번갈아 써서 이 문제를 피합니다.
-   직접 `CDC_Transmit_FS()` 를 호출하는 코드를 추가한다면 같은 점을 주의하세요.
-
-10. **USB 인터럽트를 RTC 보다 높은 우선순위로 두세요.**
-    USB 는 열거 중 호스트의 요청에 제때 응답하지 못하면 실패합니다.
-    이 프로젝트는 USB `4` / RTC `5` / USART3 `6` 으로 잡았습니다.
-
-11. **IWDG 로는 대체할 수 없습니다.**
-   독립 워치독은 최대 타임아웃이 약 32초라 분 단위 이상의 주기 리셋에는
-   사용할 수 없습니다.
-
-12. 디버거를 붙인 채로 리셋하면 세션이 끊어질 수 있습니다. 장주기 시험은
-    RS485 로그로 보는 편이 낫습니다.
-
-13. Flash 카운터는 리셋 **직전에** 기록합니다. 기록과 리셋 사이(수 ms)에
-    전원이 끊기면 그 1회는 누락될 수 있습니다.
+- `Drivers/STM32H7xx_HAL_Driver` : STMicroelectronics, BSD-3-Clause (`LICENSE.txt`)
+- `Drivers/CMSIS` : Arm / STMicroelectronics, Apache-2.0 (`LICENSE.txt`)
+- `Middlewares/Third_Party/LwIP` : Swedish Institute of Computer Science, BSD-3-Clause (`COPYING`)
