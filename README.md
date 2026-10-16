@@ -11,6 +11,8 @@
 >
 > **STM32H7 + LAN8770 (EV48S68A)** 100BASE-T1 차량용 이더넷 시험 장비
 > → [`STM32H7_LAN8770_Ethernet/`](STM32H7_LAN8770_Ethernet/README.md)
+> → 프로젝트만 ZIP 으로 받기: [STM32H7_LAN8770_Ethernet.zip](https://github.com/taegwonkim/claude/archive/refs/heads/STM32H7_LAN8770_Ethernet.zip)
+>   (또는 GitHub 에서 브랜치 `STM32H7_LAN8770_Ethernet` 선택 → **Code → Download ZIP**)
 
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
 스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
