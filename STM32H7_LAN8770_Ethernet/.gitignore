@@ -1,6 +1,0 @@
-build/
-Debug/
-Release/
-.settings/
-*.launch
-__pycache__/
