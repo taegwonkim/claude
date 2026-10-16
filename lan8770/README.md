@@ -25,7 +25,7 @@ HAL, CMSIS, lwIP 소스가 모두 들어 있어서 CubeMX 코드 생성 없이 *
 ## 1. 빠른 시작
 
 ### 1-1. STM32CubeIDE 로 열기
-1. 저장소를 받은 뒤 `EV48S68A/` 폴더를 사용합니다 (CubeIDE 프로젝트 이름은 `STM32H7_LAN8770_Ethernet`)
+1. 저장소를 받은 뒤 `lan8770/` 폴더를 사용합니다 (CubeIDE 프로젝트 이름은 `STM32H7_LAN8770_Ethernet`)
 2. STM32CubeIDE → **File → Import → General → Existing Projects into Workspace**
 3. **Select root directory** 에 이 폴더 지정 → 프로젝트 `STM32H7_LAN8770_Ethernet` 체크 → Finish
    (작업 공간으로 복사하지 않고 이 폴더를 직접 사용해도 됩니다)
@@ -104,7 +104,7 @@ REF_CLK 가 없으면 `HAL_ETH_Init()` 이 실패해 **빨간 LED** 가 켜지�
 ## 3. 프로젝트 구성
 
 ```
-EV48S68A/   (CubeIDE 프로젝트 이름 : STM32H7_LAN8770_Ethernet)
+lan8770/    (CubeIDE 프로젝트 이름 : STM32H7_LAN8770_Ethernet)
 ├── .project / .cproject                  STM32CubeIDE 프로젝트 (Debug / Release)
 ├── STM32H7_LAN8770_Ethernet.ioc          STM32CubeMX 설정 (핀, 클럭, MPU, ETH, LWIP, USART3)
 ├── STM32H743ZITX_FLASH.ld                링커 스크립트 (.lwip_sec + 겹침 검사 ASSERT)
