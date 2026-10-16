@@ -1,5 +1,8 @@
 # STM32L562RET6 — RTC WakeUp Timer 주기적 Software Reset + RS485 / USB CDC 보고
 
+> **ZIP 다운로드**: STM32H7_LAN8770_Ethernet 을 뺀 나머지 전체 → [STM32L562_Projects.zip](https://github.com/taegwonkim/claude/archive/refs/heads/STM32L562_Projects.zip)
+> (또는 GitHub 에서 브랜치 `STM32L562_Projects` 선택 → **Code → Download ZIP**)
+>
 > **다른 프로젝트**: ESP32-C3(ESP-AT) Wi-Fi AP / TCP 서버 접속 + 자동 재접속 (STM32L562CET6, 폴링 방식)
 > → [`STM32L562_ESP32C3_WiFi/`](STM32L562_ESP32C3_WiFi/README.md)
 >
