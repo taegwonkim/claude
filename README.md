@@ -9,8 +9,8 @@
 > **STM32L562 ↔ FPGA UART 링크** (DMA 순환 수신 + IDLE, 명령 큐)
 > → [`STM32L562_FPGA_Link/`](STM32L562_FPGA_Link/README.md)
 >
-> **STM32H7 + LAN8770 (EV48S68A)** 100BASE-T1 차량용 이더넷 — 독립 CubeIDE 프로젝트 (RMII, lwIP, UDP 에코)
-> → [`STM32H7_LAN8770_Ethernet/`](STM32H7_LAN8770_Ethernet/README.md)
+> **STM32H7 + LAN8770 (EV48S68A)** 100BASE-T1 차량용 이더넷 시험 장비 — 별도 저장소로 이전
+> → [`taegwonkim/claude_eth`](https://github.com/taegwonkim/claude_eth)
 
 STM32CubeMX / STM32CubeIDE 기반. **부팅 시점으로부터 일정 시간이 지나면
 스스로 소프트웨어 리셋**하고, **리셋 사실과 누적 횟수를 USART3(RS485) 와
