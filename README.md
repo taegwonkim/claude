@@ -12,6 +12,9 @@
 > **STM32L562 ↔ FPGA UART 링크** (DMA 순환 수신 + IDLE, 명령 큐)
 > → [`STM32L562_FPGA_Link/`](STM32L562_FPGA_Link/README.md)
 >
+> **STM32H7 + QCA7005** HomePlug Green PHY PLC 제어, ISO 15118-3 SLAC (충전기 / 차량 측)
+> → [`STM32H7_QCA7005_PLC/`](STM32H7_QCA7005_PLC/README.md)
+>
 > **STM32H7 + LAN8770 (EV48S68A)** 100BASE-T1 차량용 이더넷 시험 장비
 > → [`STM32H7_LAN8770_Ethernet/`](STM32H7_LAN8770_Ethernet/README.md)
 > → 프로젝트만 ZIP 으로 받기: [STM32H7_LAN8770_Ethernet.zip](https://github.com/taegwonkim/claude/archive/refs/heads/STM32H7_LAN8770_Ethernet.zip)

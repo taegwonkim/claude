@@ -1,0 +1,7 @@
+build/
+Debug/
+Release/
+.settings/
+*.launch
+__pycache__/
+tests/test_plc
