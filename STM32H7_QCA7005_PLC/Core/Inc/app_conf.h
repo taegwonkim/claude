@@ -19,43 +19,45 @@
 #error "PLC_ROLE must be PLC_ROLE_EVSE or PLC_ROLE_EV"
 #endif
 
-/* ---- QCA7005 on SPI1 ----------------------------------------------------------
- *   PA5  SPI1_SCK   -> QCA7005 SPI_CLK
- *   PA6  SPI1_MISO  <- QCA7005 SPI_MISO
- *   PB5  SPI1_MOSI  -> QCA7005 SPI_MOSI
- *   PD14 GPIO out   -> QCA7005 SPI_CS_L   (software chip select)
- *   PE13 EXTI13     <- QCA7005 INTR       (rising edge, active high)
- *   PE14 GPIO out   -> QCA7005 RESET_L    (low = reset)
- * SPI1 kernel clock = PLL1Q 80 MHz, prescaler 16 -> 5 MHz, mode 3 */
-#define QCA_CS_PORT      GPIOD
-#define QCA_CS_PIN       GPIO_PIN_14
-#define QCA_INT_PORT     GPIOE
-#define QCA_INT_PIN      GPIO_PIN_13
-#define QCA_INT_IRQn     EXTI15_10_IRQn
-#define QCA_RST_PORT     GPIOE
-#define QCA_RST_PIN      GPIO_PIN_14
-#define QCA_SPI_PRESCALER SPI_BAUDRATEPRESCALER_16
-
-/* ---- Control Pilot ------------------------------------------------------------
- *   PE9  TIM1_CH1   -> CP driver (EVSE only): 1 kHz, high = +12 V, low = -12 V
- *   PA3  ADC1_INP15 <- CP divider / level shifter (both roles)
- *   PE11 GPIO out   -> S2 switch (EV only): 1 = 1.3 kOhm in parallel (state C)
+/* ---- pins ---------------------------------------------------------------------
+ * The pins are defined in STM32CubeMX (STM32H7_QCA7005_PLC.ioc) with these
+ * user labels; CubeMX writes <LABEL>_Pin / <LABEL>_GPIO_Port into main.h.
+ * To move a pin, change it in CubeMX and keep the label.
  *
+ *   label       pin   function
+ *   QCA_SCK     PA5   SPI1_SCK   -> QCA7005 SPI_CLK   (mode 3, 5 MHz)
+ *   QCA_MISO    PA6   SPI1_MISO  <- QCA7005 SPI_MISO
+ *   QCA_MOSI    PB5   SPI1_MOSI  -> QCA7005 SPI_MOSI
+ *   QCA_CS      PD14  GPIO out   -> QCA7005 SPI_CS_L  (software chip select)
+ *   QCA_INT     PE13  EXTI13     <- QCA7005 INTR      (rising edge)
+ *   QCA_RST     PE14  GPIO out   -> QCA7005 RESET_L   (low = reset)
+ *   CP_PWM      PE9   TIM1_CH1   -> CP driver (EVSE): 1 kHz, high = +12 V
+ *   CP_ADC      PA3   ADC1_INP15 <- CP divider / level shifter
+ *   CP_S2       PE11  GPIO out   -> S2 switch (EV): 1 = state C
+ *   LED_GREEN   PB0   LD1, LED_YELLOW PE1 LD2, LED_RED PB14 LD3
+ */
+#define QCA_CS_PORT      QCA_CS_GPIO_Port
+#define QCA_CS_PIN       QCA_CS_Pin
+#define QCA_INT_PORT     QCA_INT_GPIO_Port
+#define QCA_INT_PIN      QCA_INT_Pin
+#define QCA_INT_IRQn     QCA_INT_EXTI_IRQn
+#define QCA_RST_PORT     QCA_RST_GPIO_Port
+#define QCA_RST_PIN      QCA_RST_Pin
+#define CP_S2_PORT       CP_S2_GPIO_Port
+#define CP_S2_PIN        CP_S2_Pin
+#define LED_GREEN_PORT   LED_GREEN_GPIO_Port   /* SLAC matched / AVLN up      */
+#define LED_GREEN_PIN    LED_GREEN_Pin
+#define LED_YELLOW_PORT  LED_YELLOW_GPIO_Port  /* modem in sync, SLAC running */
+#define LED_YELLOW_PIN   LED_YELLOW_Pin
+#define LED_RED_PORT     LED_RED_GPIO_Port     /* no modem / SLAC failed      */
+#define LED_RED_PIN      LED_RED_Pin
+
+/* ---- Control Pilot front end -----------------------------------------------------
  * The ADC sees  V_adc = CP_ADC_ZERO_MV + V_cp * CP_ADC_MV_PER_V / 1000
  * e.g. a front end mapping -12 V..+12 V to 0.33 V..2.97 V:
  *   ZERO = 1650 mV, 110 mV per CP volt.  Adjust to your circuit. */
 #define CP_ADC_ZERO_MV   1650
 #define CP_ADC_MV_PER_V  110
-#define CP_S2_PORT       GPIOE
-#define CP_S2_PIN        GPIO_PIN_11
-
-/* ---- LEDs (NUCLEO-H743ZI2) ------------------------------------------------------ */
-#define LED_GREEN_PORT   GPIOB      /* LD1: SLAC matched / AVLN up        */
-#define LED_GREEN_PIN    GPIO_PIN_0
-#define LED_YELLOW_PORT  GPIOE      /* LD2: modem in sync, SLAC running   */
-#define LED_YELLOW_PIN   GPIO_PIN_1
-#define LED_RED_PORT     GPIOB      /* LD3: no modem / SLAC failed        */
-#define LED_RED_PIN      GPIO_PIN_14
 
 /* status line on USART3 (ST-LINK VCP, 115200-8-N-1) every n ms */
 #define APP_STATUS_PERIOD_MS 2000u

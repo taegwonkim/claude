@@ -1,96 +1,182 @@
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    main.c
-  * @brief   STM32H743 (NUCLEO-H743ZI2) + QCA7005 HomePlug Green PHY
-  *
+  * @file           : main.c
+  * @brief          : STM32H743 (NUCLEO-H743ZI2) + QCA7005 HomePlug Green PHY
+  ******************************************************************************
   *  - QCA7005 on SPI1 (mode 3, 5 MHz), INT on PE13, RESET_L on PE14
   *  - ISO 15118-3 SLAC as charger (EVSE) or vehicle (EV), see app_conf.h
   *  - Control Pilot: TIM1_CH1 1 kHz PWM (EVSE), ADC1 PA3 (both), S2 PE11 (EV)
   *  - Log on USART3 (ST-LINK VCP) 115200-8-N-1
   *  - Clock: HSE 8 MHz bypass (ST-LINK MCO) -> SYSCLK 400 MHz, HCLK 200 MHz
+  *
+  * Generated layout of STM32CubeMX (STM32H7_QCA7005_PLC.ioc). Hand written
+  * code lives only between USER CODE BEGIN / END, so the file can be
+  * regenerated. See docs/CubeMX_설정.md.
   ******************************************************************************
   */
-#include <stdio.h>
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include <stdio.h>
 #include "app_plc.h"
+/* USER CODE END Includes */
 
-SPI_HandleTypeDef  hspi1;
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
+RNG_HandleTypeDef hrng;
+
+SPI_HandleTypeDef hspi1;
+
+TIM_HandleTypeDef htim1;
+
 UART_HandleTypeDef huart3;
-RNG_HandleTypeDef  hrng;
-ADC_HandleTypeDef  hadc1;
-TIM_HandleTypeDef  htim1;
 
-static void MPU_Config(void);
+/* USER CODE BEGIN PV */
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void PeriphClock_Config(void);
+void PeriphCommonClock_Config(void);
+static void MPU_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_RNG_Init(void);
 static void MX_ADC1_Init(void);
-#if PLC_ROLE == PLC_ROLE_EVSE
 static void MX_TIM1_Init(void);
-#endif
+static void MX_RNG_Init(void);
+/* USER CODE BEGIN PFP */
 
-int main(void)
-{
-  MPU_Config();
-  SCB_EnableICache();
-  SCB_EnableDCache();      /* SPI runs in polling mode: no DMA buffers to keep coherent */
+/* USER CODE END PFP */
 
-  HAL_Init();
-  SystemClock_Config();
-  PeriphClock_Config();
-
-  /* DWT cycle counter, used for the CP sampling window */
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-  DWT->CYCCNT = 0;
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-
-  MX_GPIO_Init();
-  MX_USART3_UART_Init();
-  MX_SPI1_Init();
-  MX_RNG_Init();
-  MX_ADC1_Init();
-#if PLC_ROLE == PLC_ROLE_EVSE
-  MX_TIM1_Init();
-#endif
-
-  APP_PLC_Init();
-
-  while (1)
-  {
-    APP_PLC_Process();
-  }
-}
-
-/* printf -> USART3 (used by syscalls.c _write) */
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+/* printf -> USART3 (used by _write in syscalls.c) */
 int __io_putchar(int ch)
 {
   uint8_t c = (uint8_t)ch;
   HAL_UART_Transmit(&huart3, &c, 1, 10);
   return ch;
 }
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MPU Configuration--------------------------------------------------------*/
+  MPU_Config();
+
+  /* Enable the CPU Cache */
+
+  /* Enable I-Cache---------------------------------------------------------*/
+  SCB_EnableICache();
+
+  /* Enable D-Cache---------------------------------------------------------*/
+  SCB_EnableDCache();
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+  /* DWT cycle counter: time base of the 2 ms Control Pilot sampling window */
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART3_UART_Init();
+  MX_SPI1_Init();
+  MX_ADC1_Init();
+  MX_TIM1_Init();
+  MX_RNG_Init();
+  /* USER CODE BEGIN 2 */
+  APP_PLC_Init();          /* CP, QCA7005 driver (pulses RESET_L), role EVSE / EV */
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+    APP_PLC_Process();     /* SPI polling, SLAC state machine, CP, LEDs, status log */
+  }
+  /* USER CODE END 3 */
+}
 
 /**
   * @brief System Clock Configuration
-  *        HSE 8 MHz (bypass) -> PLL1 (M4 N400) -> P 400 MHz SYSCLK, Q 80 MHz (SPI123), R 400 MHz
-  *        HCLK 200 MHz, APB1..4 100 MHz (timers 200 MHz). HSI48 on for the RNG.
+  *        HSE 8 MHz bypass -> PLL1 (M4 N400): P 400 MHz SYSCLK, Q 80 MHz (SPI1), R 400 MHz
+  *        HCLK 200 MHz, APB1..4 100 MHz (timers 200 MHz), HSI48 for the RNG
+  * @retval None
   */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
+  /** Supply configuration update enable
+  */
   HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI48 | RCC_OSCILLATORTYPE_HSI;
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
+                              |RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
-  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
-  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;          /* 64 MHz, per_ck for the ADC */
+  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -106,9 +192,11 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-                              | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2
-                              | RCC_CLOCKTYPE_D3PCLK1 | RCC_CLOCKTYPE_D1PCLK1;
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
+                              |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
@@ -116,76 +204,56 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
+
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
 }
 
-/* kernel clocks: SPI1 = PLL1Q 80 MHz, ADC = per_ck (HSI 64 MHz), RNG = HSI48 */
-static void PeriphClock_Config(void)
+/**
+  * @brief Peripherals Common Clock Configuration
+  *        per_ck (CKPER) = HSI 64 MHz, used as the ADC kernel clock
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
 {
-  RCC_PeriphCLKInitTypeDef p = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
-  p.PeriphClockSelection = RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_ADC | RCC_PERIPHCLK_RNG | RCC_PERIPHCLK_CKPER;
-  p.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL;
-  p.CkperClockSelection = RCC_CLKPSOURCE_HSI;
-  p.AdcClockSelection = RCC_ADCCLKSOURCE_CLKP;
-  p.RngClockSelection = RCC_RNGCLKSOURCE_HSI48;
-  if (HAL_RCCEx_PeriphCLKConfig(&p) != HAL_OK)
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CKPER;
+  PeriphClkInitStruct.CkperClockSelection = RCC_CLKPSOURCE_HSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
 }
 
-static void MX_SPI1_Init(void)
-{
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;          /* QCA7000/7005: SPI mode 3 */
-  hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;                       /* CS on PD14 by software */
-  hspi1.Init.BaudRatePrescaler = QCA_SPI_PRESCALER;    /* 80 MHz / 16 = 5 MHz */
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 0x0;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
-  hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
-  hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
-  hspi1.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
-  hspi1.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
-  hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
-  hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
-  hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
-  /* keep SCK at its idle level (high) between HAL calls while CS stays low */
-  hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;
-  hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-static void MX_RNG_Init(void)
-{
-  hrng.Instance = RNG;
-  hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
-  if (HAL_RNG_Init(&hrng) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-/* ADC1 IN15 (PA3) continuous, 12 bit, read by polling in cp.c */
+/**
+  * @brief ADC1 Initialization Function
+  *        IN15 (PA3) continuous 12 bit, software start, read by polling in cp.c
+  * @param None
+  * @retval None
+  */
 static void MX_ADC1_Init(void)
 {
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
   ADC_ChannelConfTypeDef sConfig = {0};
 
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;    /* 64 MHz / 2 */
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
@@ -204,6 +272,16 @@ static void MX_ADC1_Init(void)
     Error_Handler();
   }
 
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
   sConfig.Channel = ADC_CHANNEL_15;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_8CYCLES_5;
@@ -215,19 +293,113 @@ static void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
+  /* USER CODE BEGIN ADC1_Init 2 */
+  /* CubeMX does not generate the calibration: run it once before the first start */
   if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK)
   {
     Error_Handler();
   }
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
-#if PLC_ROLE == PLC_ROLE_EVSE
-/* TIM1 CH1 (PE9): 200 MHz / 200 = 1 MHz, ARR 999 -> 1 kHz, CCR = duty in 0.1 % */
+/**
+  * @brief RNG Initialization Function (NMK, RunID)
+  * @param None
+  * @retval None
+  */
+static void MX_RNG_Init(void)
+{
+
+  /* USER CODE BEGIN RNG_Init 0 */
+
+  /* USER CODE END RNG_Init 0 */
+
+  /* USER CODE BEGIN RNG_Init 1 */
+
+  /* USER CODE END RNG_Init 1 */
+  hrng.Instance = RNG;
+  hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
+  if (HAL_RNG_Init(&hrng) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RNG_Init 2 */
+
+  /* USER CODE END RNG_Init 2 */
+
+}
+
+/**
+  * @brief SPI1 Initialization Function (QCA7005)
+  *        mode 3, 8 bit, MSB first, software NSS, 80 MHz / 16 = 5 MHz
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 0x0;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi1.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;
+  hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function (Control Pilot PWM, EVSE)
+  *        200 MHz / (199+1) = 1 MHz, ARR 999 -> 1 kHz, CCR = duty in 0.1 %
+  * @param None
+  * @retval None
+  */
 static void MX_TIM1_Init(void)
 {
-  TIM_OC_InitTypeDef sConfigOC = {0};
-  TIM_BreakDeadTimeConfigTypeDef sBDT = {0};
 
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 199;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -235,13 +407,28 @@ static void MX_TIM1_Init(void)
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
   }
-
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 1000;                              /* 100 %: static +12 V (state A/B1) */
+  sConfigOC.Pulse = 1000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -251,28 +438,43 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
-
-  sBDT.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBDT.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBDT.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBDT.DeadTime = 0;
-  sBDT.BreakState = TIM_BREAK_DISABLE;
-  sBDT.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBDT.BreakFilter = 0;
-  sBDT.Break2State = TIM_BREAK2_DISABLE;
-  sBDT.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
-  sBDT.Break2Filter = 0;
-  sBDT.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBDT) != HAL_OK)
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+  sBreakDeadTimeConfig.Break2Filter = 0;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
   {
     Error_Handler();
   }
+  /* USER CODE BEGIN TIM1_Init 2 */
+  /* the PWM is started in cp_init() only for PLC_ROLE_EVSE */
+  /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
-}
-#endif
 
+}
+
+/**
+  * @brief USART3 Initialization Function (ST-LINK VCP log, 115200-8-N-1)
+  * @param None
+  * @retval None
+  */
 static void MX_USART3_UART_Init(void)
 {
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
   huart3.Init.BaudRate = 115200;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
@@ -288,60 +490,103 @@ static void MX_USART3_UART_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
   {
     Error_Handler();
   }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
 }
 
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef g = {0};
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
 
+  /* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
-  /* idle levels first: CS high, QCA7005 held in reset, S2 open, LEDs off */
-  HAL_GPIO_WritePin(QCA_CS_PORT, QCA_CS_PIN, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(QCA_RST_PORT, QCA_RST_PIN, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(CP_S2_PORT, CP_S2_PIN, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LED_GREEN_PORT, LED_GREEN_PIN | LED_RED_PIN, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LED_YELLOW_PORT, LED_YELLOW_PIN, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LED_GREEN_Pin|LED_RED_Pin, GPIO_PIN_RESET);
 
-  g.Mode = GPIO_MODE_OUTPUT_PP;
-  g.Pull = GPIO_NOPULL;
-  g.Speed = GPIO_SPEED_FREQ_HIGH;
-  g.Pin = QCA_CS_PIN;
-  HAL_GPIO_Init(QCA_CS_PORT, &g);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, CP_S2_Pin|QCA_RST_Pin|LED_YELLOW_Pin, GPIO_PIN_RESET);
 
-  g.Speed = GPIO_SPEED_FREQ_LOW;
-  g.Pin = QCA_RST_PIN;
-  HAL_GPIO_Init(QCA_RST_PORT, &g);
-  g.Pin = CP_S2_PIN;
-  HAL_GPIO_Init(CP_S2_PORT, &g);
-  g.Pin = LED_GREEN_PIN | LED_RED_PIN;
-  HAL_GPIO_Init(LED_GREEN_PORT, &g);
-  g.Pin = LED_YELLOW_PIN;
-  HAL_GPIO_Init(LED_YELLOW_PORT, &g);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(QCA_CS_GPIO_Port, QCA_CS_Pin, GPIO_PIN_SET);
 
-  /* QCA7005 INTR: rising edge, pull-down keeps it low while the modem is in reset */
-  g.Pin = QCA_INT_PIN;
-  g.Mode = GPIO_MODE_IT_RISING;
-  g.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(QCA_INT_PORT, &g);
-  HAL_NVIC_SetPriority(QCA_INT_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(QCA_INT_IRQn);
+  /*Configure GPIO pins : LED_GREEN_Pin LED_RED_Pin */
+  GPIO_InitStruct.Pin = LED_GREEN_Pin|LED_RED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : CP_S2_Pin QCA_RST_Pin LED_YELLOW_Pin */
+  GPIO_InitStruct.Pin = CP_S2_Pin|QCA_RST_Pin|LED_YELLOW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : QCA_INT_Pin */
+  GPIO_InitStruct.Pin = QCA_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(QCA_INT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : QCA_CS_Pin */
+  GPIO_InitStruct.Pin = QCA_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(QCA_CS_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
-/* background region: no access to unused address space (speculative reads) */
-static void MPU_Config(void)
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+ /* MPU Configuration */
+
+void MPU_Config(void)
 {
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
+  /* Disables the MPU */
   HAL_MPU_Disable();
+
+  /** Initializes and configures the Region and the memory to be protected
+  */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
   MPU_InitStruct.Number = MPU_REGION_NUMBER0;
   MPU_InitStruct.BaseAddress = 0x0;
@@ -353,23 +598,41 @@ static void MPU_Config(void)
   MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
   MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
   MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
+  /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
 }
 
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
 void Error_Handler(void)
 {
+  /* USER CODE BEGIN Error_Handler_Debug */
   __disable_irq();
-  HAL_GPIO_WritePin(LED_RED_PORT, LED_RED_PIN, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
   while (1)
   {
   }
+  /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef USE_FULL_ASSERT
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
+  /* USER CODE BEGIN 6 */
   (void)file;
   (void)line;
+  /* USER CODE END 6 */
 }
-#endif
+#endif /* USE_FULL_ASSERT */

@@ -4,6 +4,10 @@ STM32H743 MCU가 **SPI로 QCA7005 PLC 모뎀을 직접 제어**하고, ISO 15118
 **충전기(EVSE) 측**과 **차량(EV) 측**으로 나누어 구현한 STM32CubeIDE 프로젝트입니다.
 HAL과 CMSIS가 모두 들어 있어서 **Import → Build → Debug** 만 하면 됩니다.
 
+> **STM32CubeMX 설정**: [`docs/CubeMX_설정.md`](docs/CubeMX_설정.md) 에 모든 설정값과 이유를 정리했고,
+> 같은 설정의 [`STM32H7_QCA7005_PLC.ioc`](STM32H7_QCA7005_PLC.ioc) 도 들어 있습니다.
+> `main.c` / `stm32h7xx_hal_msp.c` / `stm32h7xx_it.c` 는 CubeMX 생성 형식이라 다시 생성해도 사용자 코드가 유지됩니다.
+
 - 보드 : **NUCLEO-H743ZI2** (STM32H743ZIT6). 다른 STM32H7 보드도 핀만 맞추면 그대로 사용할 수 있습니다
 - 모뎀 : **Qualcomm QCA7005** (QCA7000 계열 SPI 호스트 인터페이스)
 - 역할 : `PLC_ROLE_EVSE` (충전기) / `PLC_ROLE_EV` (차량) — **같은 소스에서 빌드할 때 선택**
@@ -93,7 +97,8 @@ make test
 | PD8 / PD9 | USART3 | ST-LINK VCP | 로그 115200 |
 | PB0 / PE1 / PB14 | LED | 초록 / 노랑 / 빨강 | 4장 참고 |
 
-- 핀은 모두 `Core/Inc/app_conf.h` 에 모여 있습니다. NUCLEO 커넥터 위치는 UM2407을 참고하세요
+- 핀은 CubeMX(`.ioc`)에서 **User Label**(`QCA_CS`, `QCA_INT`, `CP_ADC` …)로 정의되고, `app_conf.h` 가 그 라벨 매크로를 씁니다.
+  NUCLEO 커넥터 위치는 UM2407을 참고하세요
 - **CP 아날로그 회로는 보드마다 다릅니다.** ±12 V 를 ADC 범위(0~3.3 V)로 바꾸는 회로에 맞게
   `CP_ADC_ZERO_MV`(CP 0 V일 때 ADC 전압), `CP_ADC_MV_PER_V`(CP 1 V당 ADC mV)를 맞춰 주세요.
   기본값은 1650 mV / 110 mV (−12~+12 V → 0.33~2.97 V)입니다
@@ -198,14 +203,16 @@ PLC/                       하드웨어 독립 라이브러리 (HAL 의존 없�
   slac_ev.c/.h             SLAC 차량 측 상태 머신
   plc_modem.c/.h           모뎀 펌웨어 버전, AVLN 상태 조회
   sha256.c/.h              NID 계산용 SHA-256
+STM32H7_QCA7005_PLC.ioc    STM32CubeMX 설정 (docs/CubeMX_설정.md 참고)
+docs/CubeMX_설정.md        CubeMX 설정값과 이유, 코드 생성 후 할 일
 Core/
-  Src/main.c               클럭(400 MHz), SPI1, ADC1, TIM1, RNG, USART3, GPIO 초기화
+  Src/main.c               클럭(400 MHz), SPI1, ADC1, TIM1, RNG, USART3, GPIO 초기화 (CubeMX 생성 형식)
   Src/qca7k_port_stm32.c   드라이버 포팅 계층: HAL SPI, CS, EXTI, RESET, RNG, UID→MAC
   Src/cp.c, Inc/cp.h       Control Pilot: 2 ms 측정(상태 A~F, 듀티), PWM(충전기), S2(차량)
   Src/app_plc.c            드라이버 ↔ 모뎀 조회 ↔ 역할 연결, LED, 상태 로그
   Src/app_evse.c           충전기 측 동작 (PLC_ROLE_EVSE 일 때만 빌드)
   Src/app_ev.c             차량 측 동작 (PLC_ROLE_EV 일 때만 빌드)
-  Inc/app_conf.h           역할, 핀, CP 아날로그 보정값
+  Inc/app_conf.h           역할, 핀 라벨 연결, CP 아날로그 보정값
 tests/                     PC 단위 테스트 (gcc + AddressSanitizer)
 ```
 
