@@ -18,12 +18,16 @@ CC       = $(PREFIX)gcc
 OBJCOPY  = $(PREFIX)objcopy
 SIZE     = $(PREFIX)size
 
-C_SRCS  := $(shell find Core/Src PLC Drivers -name '*.c' | sort)
+C_SRCS  := $(shell find Core/Src PLC V2G Drivers Middlewares -name '*.c' | sort)
 ASM_SRCS = Core/Startup/startup_stm32h743zitx.s
 
 C_DEFS   = -DUSE_HAL_DRIVER -DSTM32H743xx -DUSE_PWR_LDO_SUPPLY -DPLC_ROLE=PLC_ROLE_$(ROLE)
 C_INCS   = -ICore/Inc \
            -IPLC \
+           -IV2G \
+           -IMiddlewares/Third_Party/LwIP/src/include \
+           -IMiddlewares/Third_Party/LwIP/system \
+           -IMiddlewares/Third_Party/cbv2g/include \
            -IDrivers/STM32H7xx_HAL_Driver/Inc \
            -IDrivers/STM32H7xx_HAL_Driver/Inc/Legacy \
            -IDrivers/CMSIS/Device/ST/STM32H7xx/Include \
@@ -35,9 +39,12 @@ CFLAGS   = $(MCU) $(C_DEFS) $(C_INCS) $(OPT) -std=gnu11 -Wall \
            -ffunction-sections -fdata-sections -fstack-usage -MMD -MP
 ASFLAGS  = $(MCU) -x assembler-with-cpp $(OPT)
 LDSCRIPT = STM32H743ZITX_FLASH.ld
-LDFLAGS  = $(MCU) -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs \
+LDFLAGS  = $(MCU) -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs -u _printf_float \
            -Wl,-Map=$(BUILD)/$(TARGET).map -Wl,--gc-sections -Wl,--print-memory-usage \
            -Wl,--start-group -lc -lm -Wl,--end-group
+
+# third-party code (lwIP, libcbv2g): no warnings from upstream sources
+$(BUILD)/Middlewares/%.o: CFLAGS += -w
 
 OBJS = $(addprefix $(BUILD)/,$(C_SRCS:.c=.o)) $(addprefix $(BUILD)/,$(ASM_SRCS:.s=.o))
 

@@ -1,8 +1,12 @@
-# STM32H7_QCA7005_PLC — STM32H743 + QCA7005 HomePlug Green PHY (ISO 15118-3 SLAC)
+# STM32H7_QCA7005_PLC — STM32H743 + QCA7005 HomePlug Green PHY (SLAC + DIN 70121)
 
 STM32H743 MCU가 **SPI로 QCA7005 PLC 모뎀을 직접 제어**하고, ISO 15118-3 **SLAC**(충전기와 차량 매칭)를
 **충전기(EVSE) 측**과 **차량(EV) 측**으로 나누어 구현한 STM32CubeIDE 프로젝트입니다.
-HAL과 CMSIS가 모두 들어 있어서 **Import → Build → Debug** 만 하면 됩니다.
+SLAC 다음 단계인 **high level 통신(IPv6 · SDP · V2GTP · EXI · DIN SPEC 70121 DC 충전)** 까지 들어 있습니다.
+HAL, CMSIS, lwIP, EXI 코덱이 모두 들어 있어서 **Import → Build → Debug** 만 하면 됩니다.
+
+> **High level 통신 (DIN 70121)**: [`docs/V2G_DIN70121.md`](docs/V2G_DIN70121.md) — 구조, 메시지 순서, 하드웨어 훅, 시험 방법.
+> 전력부(충전기 출력)와 배터리는 **시뮬레이션**입니다. 실제 고전압 하드웨어 훅으로 바꾸기 전에는 충전에 쓰면 안 됩니다.
 
 > **STM32CubeMX 설정**: [`docs/CubeMX_설정.md`](docs/CubeMX_설정.md) 에 모든 설정값과 이유를 정리했고,
 > 같은 설정의 [`STM32H7_QCA7005_PLC.ioc`](STM32H7_QCA7005_PLC.ioc) 도 들어 있습니다.
@@ -12,8 +16,8 @@ HAL과 CMSIS가 모두 들어 있어서 **Import → Build → Debug** 만 하�
 - 모뎀 : **Qualcomm QCA7005** (QCA7000 계열 SPI 호스트 인터페이스)
 - 역할 : `PLC_ROLE_EVSE` (충전기) / `PLC_ROLE_EV` (차량) — **같은 소스에서 빌드할 때 선택**
 - 구조 : 베어메탈 메인 루프, 블로킹 없는 상태 머신, SPI는 폴링 방식(DMA·D-Cache 정합 문제 없음)
-- 검증 : PC 시뮬레이션 테스트(가상 QCA SPI 슬레이브, 가상 모뎀 여러 대) 통과,
-  `arm-none-eabi-gcc`로 두 역할 모두 **경고 없이 빌드** 확인. **실제 보드와 모뎀에서는 아직 시험하지 않았습니다**
+- 검증 : PC 시뮬레이션 테스트(가상 QCA SPI 슬레이브, 가상 모뎀 여러 대, 두 프로세스 간 DIN 70121 세션 전체) 통과,
+  `arm-none-eabi-gcc`로 두 역할 모두 **경고 없이 빌드** 확인. **실제 보드·모뎀·차량에서는 아직 시험하지 않았습니다**
 
 ```
  충전기 (EVSE)                                                     차량 (EV)
@@ -36,10 +40,10 @@ SLAC 메시지 처리 정도입니다.
 | 항목 | 필요량 | STM32H743 |
 |---|---|---|
 | SPI | 모드 3, 최대 16 MHz (보통 8 MHz) | SPI1 최대 수십 MHz, 이 프로젝트는 5 MHz |
-| 이 프로젝트 Flash / RAM | 약 40 KB / 약 15 KB | 2 MB / 1 MB |
+| 이 프로젝트 Flash / RAM | SLAC 까지 약 42 KB / 15 KB, DIN 70121 포함 약 164 KB / 77 KB | 2 MB / 1 MB |
 | 수신 버퍼 | 3,167 B (QCA 읽기 버퍼 전체) | 여유 많음 |
 | SLAC 타이밍 | 20~50 ms 간격 전송, 200 ms 응답 대기 | 1 ms 틱으로 충분 |
-| 다음 단계 (IPv6/TCP + SDP + EXI + TLS) | 수백 KB Flash, 100 KB대 RAM | 충분 (더 작은 STM32에서 동작하는 공개 구현도 있음) |
+| TLS (ISO 15118-2 PnC / -20, 다음 단계) | 수백 KB Flash, 수십 KB RAM 추가 | 충분 |
 
 SPI 5 MHz에서 1.5 KB 프레임 하나를 보내는 데 약 2.4 ms가 걸립니다. SLAC 메시지는 60~130 바이트라 1 ms 미만입니다.
 H7은 V2G 상위 프로토콜(DIN 70121 / ISO 15118-2)까지 올리기에도 자원이 넉넉합니다.
@@ -113,7 +117,8 @@ make test
 |---|---|
 | A (+12 V, 미연결) | PWM 끔(+12 V DC), SLAC 정지, 다음 세션용 **새 NMK** |
 | B/C/D (차량 연결) | **5 % PWM** 켬 → SLAC 응답 대기 (TT_EVSE_SLAC_init 40 s) |
-| SLAC 매칭 | 같은 AVLN 형성 → 다음 단계 SDP / V2G 서버 |
+| SLAC 매칭 | 같은 AVLN 형성 → **SDP 서버 + DIN 70121 SECC** (TCP 61851) |
+| DIN 세션 종료 / 실패 | PWM 끔, 커넥터를 뽑을 때까지 새 세션 없음 |
 | 40 s 동안 요청 없음 | PWM 4 s 끄고 다시 5 % (재시도) |
 | E / F | PWM 끔, SLAC 정지 |
 
@@ -121,11 +126,12 @@ make test
 | CP 상태 | 동작 |
 |---|---|
 | B + 3~7 % PWM (150 ms 확인) | SLAC 시작 (연결당 1회) |
-| SLAC 매칭 | 충전기 NMK로 모뎀 키 설정 → 같은 AVLN → 다음 단계 SDP / V2G 클라이언트 |
+| SLAC 매칭 | 충전기 NMK로 모뎀 키 설정 → 같은 AVLN → **SDP → DIN 70121 세션 전체** |
 | SLAC 실패 | 5 % 가 유지되면 5 s 후 재시도 (최대 3회) |
-| A / E / F (분리) | 무작위 개인 NMK로 AVLN 탈퇴, S2 열림 |
+| A / E / F (분리) | V2G 중단, 무작위 개인 NMK로 AVLN 탈퇴, S2·접촉기 열림 |
 
-S2는 SLAC에서 건드리지 않습니다. 충전 조건이 합의되면 V2G 계층이 `cp_ev_set_s2(1)` 로 닫습니다(B → C).
+S2는 DIN 70121 상태 머신이 제어합니다. ChargeParameterDiscovery 뒤 닫고(B → C), SessionStop 이나 실패 시 엽니다.
+high level 통신 순서는 [`docs/V2G_DIN70121.md`](docs/V2G_DIN70121.md) 2장을 보세요.
 
 ### 4-3. SLAC 메시지 흐름 (`PLC/slac.h`)
 ```
@@ -205,6 +211,19 @@ PLC/                       하드웨어 독립 라이브러리 (HAL 의존 없�
   sha256.c/.h              NID 계산용 SHA-256
 STM32H7_QCA7005_PLC.ioc    STM32CubeMX 설정 (docs/CubeMX_설정.md 참고)
 docs/CubeMX_설정.md        CubeMX 설정값과 이유, 코드 생성 후 할 일
+docs/V2G_DIN70121.md       SLAC 이후 high level 통신 (DIN 70121) 설명
+V2G/                       IPv6 · SDP · V2GTP · EXI · DIN 70121 (HAL 의존 없음, PC 테스트 가능)
+  v2g_netif.c              lwIP netif ↔ QCA7005 드라이버, IPv6 link-local
+  v2g_sdp.c                SDP (UDP 15118) 서버 / 클라이언트
+  v2gtp.c                  V2GTP 헤더, TCP 스트림 재조립
+  v2g_codec.c              EXI 인코드/디코드 (libcbv2g), PhysicalValue
+  din_secc.c               DIN 70121 충전기 측 상태 머신
+  din_evcc.c               DIN 70121 차량 측 상태 머신
+  v2g_hw.h, v2g_sim.c      하드웨어 훅 + 시뮬레이션 (전력부, 배터리)
+  lwipopts.h, v2g_conf.h   lwIP 설정, 포트·타임아웃
+Middlewares/Third_Party/
+  LwIP/                    lwIP 2.1.2 (core, ipv6, ethernet)
+  cbv2g/                   libcbv2g EXI 코덱 (common, app_handshake, din)
 Core/
   Src/main.c               클럭(400 MHz), SPI1, ADC1, TIM1, RNG, USART3, GPIO 초기화 (CubeMX 생성 형식)
   Src/qca7k_port_stm32.c   드라이버 포팅 계층: HAL SPI, CS, EXTI, RESET, RNG, UID→MAC
@@ -234,15 +253,17 @@ tests/                     PC 단위 테스트 (gcc + AddressSanitizer)
 | SLAC 누화 | EVSE 2대(15 dB / 47 dB) → 차량이 15 dB 쪽 선택, 다른 EVSE는 10 s 후 대기로 복귀 |
 | 손실 | 잃어버린 CM_ATTEN_CHAR.RSP → EVSE 재전송 후 매칭 |
 | 타임아웃 | 충전기 없음 → CM_SLAC_PARAM.REQ 3회 후 실패, EVSE 40 s 타임아웃 |
+| V2G 코덱 | PhysicalValue, V2GTP 재조립, SDP 바이트 배치, EXI 인코드 → 디코드 |
+| DIN 세션 | 충전기·차량 두 프로세스가 각자 lwIP 로 SDP → TCP → … → CurrentDemand → SessionStop (정상 종료 / 충전기 중단) |
 
 ---
 
 ## 8. 아직 없는 것 / 다음 단계
 
-- **상위 프로토콜**: SLAC 다음의 IPv6 + SDP(UDP 15118) + V2GTP/TCP + EXI(DIN 70121 / ISO 15118-2/-20).
-  `app_plc.c` 의 `on_rx()` 에 이더타입 0x86DD(IPv6) 프레임이 들어오므로, 여기서 lwIP(IPv6) 같은 스택으로 넘기면 됩니다
+- **실제 하드웨어 훅**: 충전기 전력 모듈·절연 감시, 차량 BMS·접촉기 (`V2G/v2g_hw.h`). 지금은 시뮬레이션입니다
+- **ISO 15118-2 / -20**: libcbv2g 원본에 코덱이 있으므로 같은 구조로 상태 머신을 추가하면 됩니다
+- **TLS / Plug & Charge**: mbedTLS + 인증서. 지금 SDP 는 항상 "TLS 없음" 으로 응답합니다
 - **CM_VALIDATE** (선택 사항인 BCB 토글 검증)는 구현하지 않았습니다. 대부분의 차량과 충전기는 사용하지 않습니다
-- **보안**: ISO 15118-2 PnC 의 TLS는 V2G 계층 단계에서 필요합니다
 - SPI DMA: 지금은 폴링입니다. 처리량이 더 필요하면 DMA + D-Cache 정리(또는 non-cacheable 영역)로 바꾸세요
 
 ---
@@ -253,5 +274,7 @@ tests/                     PC 단위 테스트 (gcc + AddressSanitizer)
   Copyright Qualcomm Atheros / I2SE GmbH)를 바탕으로 MCU용으로 다시 작성했습니다. 원본은 **GPL-2.0 OR BSD-2-Clause**
   이중 라이선스이고, 여기서는 **BSD-2-Clause** 로 사용합니다
 - SLAC 메시지 구조와 코드 값: Qualcomm Atheros **open-plc-utils** (`slac/`, `mme/`, `key/HPAVKeyNID.c`, BSD 계열 라이선스)
-- 그 밖의 `PLC/`, `Core/` 코드: BSD-2-Clause
+- `Middlewares/Third_Party/LwIP` : lwIP 2.1.2, **BSD-3-Clause** (`COPYING`)
+- `Middlewares/Third_Party/cbv2g` : chargebyte / EVerest **libcbv2g**, **Apache-2.0** (`LICENSE`, 버전은 `VERSION.txt`)
+- 그 밖의 `PLC/`, `V2G/`, `Core/` 코드: BSD-2-Clause
 - `Drivers/` : STMicroelectronics STM32H7 HAL v1.11.5 / CMSIS (각 폴더의 LICENSE 참고)

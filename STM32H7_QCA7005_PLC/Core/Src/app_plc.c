@@ -7,6 +7,9 @@
 #include "cp.h"
 #include "qca7k.h"
 #include "qca7k_port_stm32.h"
+#include "hpgp.h"
+#include "v2g_netif.h"
+#include "lwip/sys.h"
 
 slac_io_t   g_plc_io;
 plc_modem_t g_plc_modem;
@@ -26,10 +29,27 @@ static void on_rx(void *user, const uint8_t *frame, uint16_t len)
 {
   uint32_t now = HAL_GetTick();
   (void)user;
+  if (len >= 14 && plc_get_be16(&frame[12]) != ETH_P_HPAV)
+  {
+    /* IPv6 (SDP, V2GTP / DIN 70121) -> lwIP */
+    v2g_netif_input(frame, len);
+    return;
+  }
   plc_modem_on_frame(&g_plc_modem, frame, len, now);
   app_role_on_frame(frame, len, now);
-  /* IPv6 / V2GTP frames for the higher layers (SDP, DIN 70121, ISO 15118-2)
-   * arrive here too: hand frames with ethertype 0x86DD to a TCP/IP stack. */
+}
+
+/* ---- platform functions for lwIP / V2G -------------------------------------------- */
+u32_t sys_now(void)
+{
+  return HAL_GetTick();
+}
+
+uint32_t v2g_rand32(void)
+{
+  uint32_t r;
+  stm32_random(NULL, (uint8_t *)&r, sizeof(r));
+  return r;
 }
 
 void APP_PLC_Init(void)
@@ -51,6 +71,7 @@ void APP_PLC_Init(void)
   printf("host MAC " PLC_MAC_FMT "\r\n", PLC_MAC_ARG(g_plc_io.host_mac));
 
   qca7k_init(&s_qca, &qca7k_port_stm32, on_rx, NULL);   /* pulses RESET_L */
+  v2g_netif_init(g_plc_io.host_mac, io_send, &s_qca);    /* lwIP, IPv6 link-local */
   s_t_status = now + APP_STATUS_PERIOD_MS;
 }
 
@@ -73,6 +94,7 @@ void APP_PLC_Process(void)
   int ready;
 
   qca7k_poll(&s_qca);
+  v2g_netif_poll();           /* lwIP timers (TCP retransmission, ND, MLD) */
   now = HAL_GetTick();
   ready = qca7k_is_ready(&s_qca);
 

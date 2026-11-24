@@ -2,12 +2,14 @@
  * app_ev.c - vehicle (EV) side: Control Pilot + SLAC
  *
  *   CP B with 3..7 % PWM (debounced) : start SLAC (once per plug-in)
- *   SLAC matched                     : same AVLN, next: SDP / V2G client
+ *   SLAC matched                     : SDP + DIN 70121 EVCC (whole DC session)
  *   SLAC failed                      : retry after 5 s while 5 % is present
- *   CP A (unplugged) / E / F         : leave AVLN (private NMK), open S2
+ *   CP A (unplugged) / E / F         : abort V2G, leave AVLN (private NMK), open S2
  *
- * S2 is not touched by SLAC. The V2G layer closes it (cp_ev_set_s2(1))
- * when the charge parameters are agreed (state B -> C).
+ * S2 is driven by the DIN 70121 state machine (closed after
+ * ChargeParameterDiscovery, opened at SessionStop / on any failure).
+ * The battery and contactors are SIMULATED (v2g_sim.c): a small "battery"
+ * charges from 30 % to 40 % in a few seconds. Replace s_hw.* with the BMS.
  */
 #include "app_conf.h"
 
@@ -18,6 +20,8 @@
 #include "app_plc.h"
 #include "cp.h"
 #include "slac_ev.h"
+#include "din_evcc.h"
+#include "v2g_sim.h"
 
 #define CP_PERIOD_MS     50u
 #define HLC_DEBOUNCE     3u        /* 150 ms of 5 % before SLAC starts   */
@@ -36,6 +40,39 @@ static uint32_t   s_t_cp;
 static uint32_t   s_t_retry;
 static cp_state_t s_cp_shown = CP_STATE_INVALID;
 
+static din_evcc_t     s_evcc;
+static v2g_sim_evcc_t s_sim;
+static evcc_hw_t      s_hw;
+static uint8_t        s_hw_ok;
+
+/* S2: real pin, and tell the battery model */
+static void hw_s2(void *ctx, int closed)
+{
+  (void)ctx;
+  cp_ev_set_s2(closed);
+  s_sim.s2 = closed;
+  printf("[EV] S2 %s (CP state %s)\r\n", closed ? "closed" : "open", closed ? "C" : "B");
+}
+
+static void on_v2g_event(void *user, v2g_event_t e, int arg)
+{
+  (void)user;
+  switch (e)
+  {
+  case V2G_EVT_CHARGING:
+    printf("[EV] *** DC charging (simulated battery) ***\r\n");
+    break;
+  case V2G_EVT_DONE:
+    printf("[EV] *** DIN 70121 session finished, SOC %d %% ***\r\n", (int)s_sim.soc);
+    break;
+  case V2G_EVT_FAILED:
+    printf("[EV] DIN 70121: %s\r\n", v2g_fail_name((v2g_fail_t)arg));
+    break;
+  default:
+    break;
+  }
+}
+
 static void on_slac_event(void *user, slac_event_t e, int arg)
 {
   (void)user;
@@ -46,6 +83,7 @@ static void on_slac_event(void *user, slac_event_t e, int arg)
            PLC_MAC_ARG(s_slac.evse_mac), s_slac.evse_atten);
     s_failed = 0;
     s_retries = 0;
+    din_evcc_start(&s_evcc, &s_hw, g_plc_io.host_mac, on_v2g_event, NULL, HAL_GetTick());
     break;
   case SLAC_EVT_FAILED:
     printf("[EV] SLAC: %s\r\n", slac_fail_name((slac_fail_t)arg));
@@ -68,6 +106,13 @@ static int hlc_offered(const cp_meas_t *m)
 
 void app_role_init(uint32_t now)
 {
+  if (!s_hw_ok)
+  {
+    v2g_sim_evcc_init(&s_sim, &s_hw);
+    s_hw.s2 = hw_s2;
+    s_hw_ok = 1;
+  }
+  din_evcc_stop(&s_evcc);                 /* modem rebooted: old TCP session is gone */
   slac_ev_init(&s_slac, &g_plc_io, on_slac_event, NULL, now);
   s_slac_ok = 1;
   if (s_started)
@@ -84,6 +129,8 @@ void app_role_process(uint32_t now)
 {
   if (s_slac_ok)
     slac_ev_process(&s_slac, now);
+  if (s_hw_ok && s_evcc.phase != EVCC_IDLE)
+    din_evcc_process(&s_evcc, now);
 
   if ((int32_t)(now - s_t_cp) < 0)
     return;
@@ -106,6 +153,8 @@ void app_role_process(uint32_t now)
       s_started = 0;
       s_retries = 0;
       s_failed = 0;
+      if (s_hw_ok)
+        din_evcc_stop(&s_evcc);           /* S2 and contactors open */
       cp_ev_set_s2(0);
       if (s_slac_ok)
         slac_ev_leave(&s_slac, now);
@@ -142,10 +191,13 @@ void app_role_process(uint32_t now)
 
 void app_role_status(void)
 {
-  printf("CP %s %ld mV %u.%u %% | SLAC %s",
+  printf("CP %s %ld mV %u.%u %% | SLAC %s | DIN %s %s SOC %d %%",
          cp_state_name(s_cp.state), (long)s_cp.high_mv,
          s_cp.duty_permille / 10u, s_cp.duty_permille % 10u,
-         s_slac_ok ? slac_ev_state_name(slac_ev_state(&s_slac)) : "-");
+         s_slac_ok ? slac_ev_state_name(slac_ev_state(&s_slac)) : "-",
+         din_evcc_phase_name(s_evcc.phase),
+         s_evcc.phase == EVCC_SESSION ? din_evcc_req_name(s_evcc.req) : "",
+         (int)s_sim.soc);
 }
 
 const char *app_role_name(void) { return "EV (vehicle)"; }

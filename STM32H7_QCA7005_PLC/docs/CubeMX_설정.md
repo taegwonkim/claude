@@ -418,6 +418,11 @@ USART3 를 일찍 초기화하면 이후 오류도 로그로 볼 수 있습니�
 
 ## 10. 코드 생성 후 할 일
 
+> **lwIP 와 EXI 코덱은 CubeMX 로 생성하지 않습니다.** `.ioc` 에서 LWIP 미들웨어를 켜지 마세요.
+> `Middlewares/Third_Party/LwIP` (IPv6 전용 설정 `V2G/lwipopts.h`)와 `Middlewares/Third_Party/cbv2g` 는
+> 이 저장소가 직접 관리하는 파일이고, CubeMX 가 만든 적이 없으므로 다시 생성해도 지워지지 않습니다.
+> CubeIDE 의 링커 옵션 **Use float with printf from newlib-nano** 는 켜 두었습니다(V2G 로그의 전압·전류 출력).
+
 ### 10-1. 이 저장소에서 생성한 경우 (A 방법)
 `USER CODE` 구역이 이미 채워져 있으므로 **추가 작업이 없습니다.** 생성 후 `git diff` 로 바뀐 내용을 확인하세요.
 CubeMX 버전 차이로 주석이나 순서가 조금 바뀌는 것은 정상입니다.
