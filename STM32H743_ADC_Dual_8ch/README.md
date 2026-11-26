@@ -74,7 +74,7 @@ ADC12_COMMON->CDR (32-bit) = [ADC2 결과 : ADC1 결과]  ──DMA1_Stream0─�
 STM32H743_ADC_Dual_8ch/
 ├── Core/
 │   ├── Inc/
-│   │   ├── adc_dual.h            # 설정값(스캔 레이트, 버퍼 크기, 샘플링 시간 등)과 API
+│   │   ├── adc_dual.h            # 설정값(초기화 방식, 스캔 레이트, 버퍼 크기, 샘플링 시간 등)과 API
 │   │   ├── main.h
 │   │   └── stm32h7xx_hal_conf.h  # 필요한 HAL 모듈만 켬, HSE_VALUE = 8 MHz
 │   └── Src/
@@ -85,6 +85,7 @@ STM32H743_ADC_Dual_8ch/
 ├── Linker/
 │   ├── STM32H743ZITX_FLASH.ld    # .RAM_D2 섹션이 들어간 전체 링커 스크립트
 │   └── RAM_D2_section.ld         # CubeIDE 링커 스크립트에 붙여 넣을 블록
+├── CubeMX_Setup.md               # STM32CubeMX 설정 가이드(CubeMX 모드)
 ├── tools/fetch_drivers.sh        # ST HAL / CMSIS 받기
 └── Makefile
 ```
@@ -109,7 +110,15 @@ make -j
 STM32_Programmer_CLI -c port=SWD -w build/adc_dual_8ch.hex -v -rst
 ```
 
-### 방법 B: STM32CubeIDE
+### 방법 B: STM32CubeMX로 주변장치 설정 (권장)
+
+CubeMX가 ADC1/ADC2/TIM6/DMA/USART3 초기화 코드를 생성하고, `adc_dual.c`는
+`ADC_DUAL_USE_CUBEMX_INIT=1` 모드로 캘리브레이션, 시작, 콜백 처리만 합니다.
+설정 항목 전체와 main.c에 넣을 코드는 **[CubeMX_Setup.md](CubeMX_Setup.md)**에 있습니다.
+
+### 방법 C: STM32CubeIDE + 이 저장소의 초기화 코드 사용
+
+`.ioc`에서는 아무 주변장치도 설정하지 않고, `adc_dual.c`(기본 모드 `ADC_DUAL_USE_CUBEMX_INIT=0`)가 모두 초기화하는 방법입니다.
 
 1. **File → New → STM32 Project**에서 `STM32H743ZITx`(또는 NUCLEO-H743ZI2)를 선택합니다.
    보드 템플릿으로 만들 때 "Initialize all peripherals with their default Mode?"에는 **No**를 선택하세요.

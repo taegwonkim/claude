@@ -31,6 +31,14 @@ extern "C" {
 /* 사용자 설정                                                                */
 /* ------------------------------------------------------------------------- */
 
+/** 초기화 방식
+ *  0 : adc_dual.c가 ADC/DMA/TIM6/GPIO/클럭/IRQ를 직접 초기화(Makefile 빌드 기본값)
+ *  1 : STM32CubeMX가 생성한 초기화 코드와 핸들(hadc1, hadc2, htim6)을 사용
+ *      CubeIDE의 전처리기 정의(-DADC_DUAL_USE_CUBEMX_INIT=1)나 여기서 바꾸세요. */
+#ifndef ADC_DUAL_USE_CUBEMX_INIT
+#define ADC_DUAL_USE_CUBEMX_INIT     0
+#endif
+
 /** 논리 채널 수(ADC1 4개 + ADC2 4개). 핀 테이블이 4+4 구조이므로 바꾸지 마세요. */
 #define ADC_DUAL_NUM_CH              8U
 /** ADC 하나당 랭크 수(= 스캔 1회당 32비트 워드 수) */
@@ -75,7 +83,8 @@ typedef struct
 /* API                                                                        */
 /* ------------------------------------------------------------------------- */
 
-/** ADC 클럭(PLL2P), GPIO, DMA, ADC1/ADC2, 듀얼 모드, TIM6을 설정합니다.
+/** ADC_DUAL_USE_CUBEMX_INIT = 0: ADC 클럭(PLL2P), GPIO, DMA, ADC1/ADC2, 듀얼 모드, TIM6을 설정합니다.
+ *  ADC_DUAL_USE_CUBEMX_INIT = 1: CubeMX 설정을 확인하고 TIM6 주기만 맞춥니다(MX_xxx_Init() 뒤에 호출).
  *  @retval 성공하면 HAL_OK */
 HAL_StatusTypeDef ADC_Dual_Init(void);
 

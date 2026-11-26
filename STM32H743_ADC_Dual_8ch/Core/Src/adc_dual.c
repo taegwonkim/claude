@@ -2,9 +2,12 @@
  * @file    adc_dual.c
  * @brief   STM32H743 ADC1/ADC2 16-bit 듀얼 인터리브 8채널 + TIM6 트리거 + DMA
  *
- * 이 파일은 CubeMX가 생성하는 MX_ADCx_Init / HAL_ADC_MspInit을 쓰지 않고
- * 필요한 초기화를 모두 직접 수행합니다. 따라서 CubeMX 프로젝트에서
- * ADC1/ADC2/TIM6/DMA1_Stream0를 따로 설정하면 안 됩니다(README 참고).
+ * 초기화 방식은 ADC_DUAL_USE_CUBEMX_INIT(adc_dual.h)로 고릅니다.
+ *   0 (기본) : 이 파일이 클럭/GPIO/DMA/ADC/TIM6/IRQ 초기화를 모두 직접 합니다.
+ *              CubeMX에서 ADC1/ADC2/TIM6/DMA를 설정하면 안 됩니다.
+ *   1        : CubeMX가 생성한 MX_xxx_Init()와 hadc1/hadc2/htim6, IRQ 핸들러를 씁니다.
+ *              이 파일은 설정 확인, 캘리브레이션, 시작/정지, 콜백 처리만 합니다.
+ *              CubeMX 설정은 CubeMX_Setup.md를 따르세요.
  *
  * 클럭 전제
  *   - HSE 8 MHz(Nucleo-H743ZI2의 ST-LINK MCO, bypass)
@@ -16,6 +19,7 @@
 #include "adc_dual.h"
 #include <string.h>
 
+#if !ADC_DUAL_USE_CUBEMX_INIT
 /* ------------------------------------------------------------------------- */
 /* 핀/채널 테이블                                                              */
 /*  - 모두 ADC1/ADC2 공용(ADC12_INPx) 또는 해당 ADC 전용 핀입니다.              */
@@ -52,12 +56,25 @@ static const uint32_t s_ranks[ADC_DUAL_RANKS_PER_ADC] =
 };
 
 /* ------------------------------------------------------------------------- */
-/* 핸들 / 버퍼                                                                 */
+/* 핸들                                                                        */
 /* ------------------------------------------------------------------------- */
 ADC_HandleTypeDef hadc1;   /* 마스터 */
 ADC_HandleTypeDef hadc2;   /* 슬레이브 */
 DMA_HandleTypeDef hdma_adc1;
 TIM_HandleTypeDef htim6;
+
+#else  /* ADC_DUAL_USE_CUBEMX_INIT */
+
+/* CubeMX가 main.c(또는 adc.c / tim.c)에 생성한 핸들 */
+extern ADC_HandleTypeDef hadc1;   /* 마스터 */
+extern ADC_HandleTypeDef hadc2;   /* 슬레이브 */
+extern TIM_HandleTypeDef htim6;
+
+#endif /* ADC_DUAL_USE_CUBEMX_INIT */
+
+/* ------------------------------------------------------------------------- */
+/* 버퍼 / 상태                                                                 */
+/* ------------------------------------------------------------------------- */
 
 /* DMA1은 DTCM(0x20000000)에 접근할 수 없으므로 D2 SRAM(0x30000000)에 둡니다.
  * 링커 스크립트에 .RAM_D2 섹션이 있어야 합니다(Linker/ 폴더 참고).
@@ -74,6 +91,7 @@ static volatile uint32_t         s_error_count;
 /* ------------------------------------------------------------------------- */
 /* 내부 함수                                                                   */
 /* ------------------------------------------------------------------------- */
+#if !ADC_DUAL_USE_CUBEMX_INIT
 static HAL_StatusTypeDef adc_clock_init(void)
 {
   RCC_PeriphCLKInitTypeDef clk = {0};
@@ -200,6 +218,8 @@ static HAL_StatusTypeDef adc_config_channels(ADC_HandleTypeDef *h, const ADC_Dua
   return HAL_OK;
 }
 
+#endif /* !ADC_DUAL_USE_CUBEMX_INIT */
+
 static uint32_t tim6_clock_hz(void)
 {
   /* APB1 프리스케일러가 1이 아니면 타이머 클럭은 PCLK1 × 2 */
@@ -211,24 +231,34 @@ static uint32_t tim6_clock_hz(void)
   return pclk1 * 2U;
 }
 
+/** TIM6 프리스케일러/주기 계산(ADC_DUAL_SCAN_RATE_HZ 기준) */
+static void tim6_calc(uint32_t *psc, uint32_t *arr)
+{
+  uint32_t ticks = tim6_clock_hz() / ADC_DUAL_SCAN_RATE_HZ;
+  uint32_t p = 0;
+
+  /* TIM6은 16비트 카운터이므로 ARR이 넘치면 프리스케일러를 키웁니다. */
+  while ((ticks / (p + 1U)) > 65536U)
+  {
+    p++;
+  }
+  *psc = p;
+  *arr = (ticks / (p + 1U)) - 1U;
+}
+
+#if !ADC_DUAL_USE_CUBEMX_INIT
 static HAL_StatusTypeDef tim6_init(void)
 {
   TIM_MasterConfigTypeDef m = {0};
-  uint32_t ticks = tim6_clock_hz() / ADC_DUAL_SCAN_RATE_HZ;
-  uint32_t psc = 0;
+  uint32_t psc, arr;
 
-  /* TIM6은 16비트 카운터이므로 ARR이 넘치면 프리스케일러를 키웁니다. */
-  while ((ticks / (psc + 1U)) > 65536U)
-  {
-    psc++;
-  }
-
+  tim6_calc(&psc, &arr);
   __HAL_RCC_TIM6_CLK_ENABLE();
 
   htim6.Instance               = TIM6;
   htim6.Init.Prescaler         = psc;
   htim6.Init.CounterMode       = TIM_COUNTERMODE_UP;
-  htim6.Init.Period            = (ticks / (psc + 1U)) - 1U;
+  htim6.Init.Period            = arr;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -239,6 +269,7 @@ static HAL_StatusTypeDef tim6_init(void)
   m.MasterSlaveMode     = TIM_MASTERSLAVEMODE_DISABLE;
   return HAL_TIMEx_MasterConfigSynchronization(&htim6, &m);
 }
+#endif /* !ADC_DUAL_USE_CUBEMX_INIT */
 
 /** 하프 버퍼 통계 계산 */
 static void process_block(const uint32_t *raw, uint32_t scans)
@@ -291,14 +322,26 @@ static void on_half_ready(const uint32_t *half)
 /* ------------------------------------------------------------------------- */
 /* 공개 API                                                                    */
 /* ------------------------------------------------------------------------- */
-HAL_StatusTypeDef ADC_Dual_Init(void)
+static void d2sram_enable(void)
 {
-  ADC_MultiModeTypeDef mm = {0};
-
   /* D2 SRAM1~3을 CPU에 할당(클럭 활성화). DMA 버퍼가 0x30000000에 있습니다. */
   __HAL_RCC_D2SRAM1_CLK_ENABLE();
   __HAL_RCC_D2SRAM2_CLK_ENABLE();
   __HAL_RCC_D2SRAM3_CLK_ENABLE();
+}
+
+static void dma_buf_clear(void)
+{
+  memset((void *)s_dma_buf, 0, sizeof(s_dma_buf));
+  SCB_CleanInvalidateDCache_by_Addr((void *)s_dma_buf, (int32_t)sizeof(s_dma_buf));
+}
+
+#if !ADC_DUAL_USE_CUBEMX_INIT
+HAL_StatusTypeDef ADC_Dual_Init(void)
+{
+  ADC_MultiModeTypeDef mm = {0};
+
+  d2sram_enable();
 
   if (adc_clock_init() != HAL_OK) { return HAL_ERROR; }
 
@@ -329,10 +372,45 @@ HAL_StatusTypeDef ADC_Dual_Init(void)
 
   if (tim6_init() != HAL_OK) { return HAL_ERROR; }
 
-  memset((void *)s_dma_buf, 0, sizeof(s_dma_buf));
-  SCB_CleanInvalidateDCache_by_Addr((void *)s_dma_buf, (int32_t)sizeof(s_dma_buf));
+  dma_buf_clear();
   return HAL_OK;
 }
+
+#else  /* ADC_DUAL_USE_CUBEMX_INIT */
+
+/**
+ * CubeMX 모드: MX_ADC1_Init(), MX_ADC2_Init(), MX_TIM6_Init(), MX_DMA_Init()가
+ * 먼저 호출되어 있어야 합니다. 여기서는 설정이 맞는지 확인하고,
+ * TIM6 주기를 ADC_DUAL_SCAN_RATE_HZ에 맞춥니다.
+ */
+HAL_StatusTypeDef ADC_Dual_Init(void)
+{
+  uint32_t psc, arr;
+
+  d2sram_enable();
+
+  /* CubeMX 설정 확인: 하나라도 다르면 CubeMX_Setup.md를 다시 확인하세요. */
+  if (hadc1.Instance != ADC1 || hadc2.Instance != ADC2)                         { return HAL_ERROR; }
+  if (hadc1.DMA_Handle == NULL)                                                  { return HAL_ERROR; }
+  if (hadc1.Init.Resolution != ADC_RESOLUTION_16B)                               { return HAL_ERROR; }
+  if (hadc1.Init.NbrOfConversion != ADC_DUAL_RANKS_PER_ADC)                      { return HAL_ERROR; }
+  if (hadc2.Init.NbrOfConversion != ADC_DUAL_RANKS_PER_ADC)                      { return HAL_ERROR; }
+  if (LL_ADC_GetMultimode(ADC12_COMMON) != LL_ADC_MULTI_DUAL_REG_INTERL)         { return HAL_ERROR; }
+  if (LL_ADC_GetMultiDMATransfer(ADC12_COMMON) != LL_ADC_MULTI_REG_DMA_RES_32_10B) { return HAL_ERROR; }
+  if (htim6.Instance != TIM6)                                                    { return HAL_ERROR; }
+
+  /* TIM6 주기를 adc_dual.h의 스캔 레이트에 맞춥니다(CubeMX 값보다 우선). */
+  tim6_calc(&psc, &arr);
+  __HAL_TIM_SET_PRESCALER(&htim6, psc);
+  __HAL_TIM_SET_AUTORELOAD(&htim6, arr);
+  htim6.Instance->EGR = TIM_EGR_UG;   /* 프리스케일러 즉시 반영 */
+  __HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);
+
+  dma_buf_clear();
+  return HAL_OK;
+}
+
+#endif /* ADC_DUAL_USE_CUBEMX_INIT */
 
 HAL_StatusTypeDef ADC_Dual_Start(void)
 {
@@ -407,9 +485,10 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
   /* 오버런 플래그는 HAL_ADC_IRQHandler에서 지워집니다. DMA circular는 계속 동작합니다. */
 }
 
+#if !ADC_DUAL_USE_CUBEMX_INIT
 /* ------------------------------------------------------------------------- */
 /* 인터럽트 핸들러                                                             */
-/*  CubeMX가 생성한 stm32h7xx_it.c에 같은 이름의 함수가 있으면 한쪽을 지우세요.   */
+/*  CubeMX 모드에서는 CubeMX가 생성한 stm32h7xx_it.c의 핸들러를 씁니다.          */
 /* ------------------------------------------------------------------------- */
 void DMA1_Stream0_IRQHandler(void)
 {
@@ -420,3 +499,4 @@ void ADC_IRQHandler(void)
 {
   HAL_ADC_IRQHandler(&hadc1);
 }
+#endif /* !ADC_DUAL_USE_CUBEMX_INIT */
